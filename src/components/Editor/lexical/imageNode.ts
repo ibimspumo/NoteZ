@@ -23,6 +23,12 @@ export type SerializedImageNode = Spread<
     blurhash: string | null;
     /** Optional alt text for accessibility. */
     alt: string;
+    /**
+     * User-resized display width as a percentage of the editor column.
+     * `null` means "natural" — fall back to the CSS default (100% capped at 720px).
+     * Old notes (pre-resize) deserialize with `null` and stay visually identical.
+     */
+    widthPct: number | null;
   },
   SerializedElementNode
 >;
@@ -56,6 +62,7 @@ export class ImageNode extends ElementNode {
   __height: number;
   __blurhash: string | null;
   __alt: string;
+  __widthPct: number | null;
 
   static getType(): string {
     return "image";
@@ -69,6 +76,7 @@ export class ImageNode extends ElementNode {
       n.__height,
       n.__blurhash,
       n.__alt,
+      n.__widthPct,
       n.__key,
     );
   }
@@ -80,6 +88,7 @@ export class ImageNode extends ElementNode {
     height: number,
     blurhash: string | null,
     alt: string,
+    widthPct: number | null,
     key?: NodeKey,
   ) {
     super(key);
@@ -89,10 +98,21 @@ export class ImageNode extends ElementNode {
     this.__height = height;
     this.__blurhash = blurhash;
     this.__alt = alt;
+    this.__widthPct = widthPct;
   }
 
   getAssetId(): string {
     return this.__assetId;
+  }
+
+  getWidthPct(): number | null {
+    return this.__widthPct;
+  }
+
+  setWidthPct(pct: number | null): this {
+    const writable = this.getWritable();
+    writable.__widthPct = pct;
+    return writable;
   }
 
   createDOM(_config: EditorConfig): HTMLElement {
@@ -101,6 +121,8 @@ export class ImageNode extends ElementNode {
     figure.setAttribute("data-lexical-image", "true");
     figure.setAttribute("data-asset-id", this.__assetId);
     figure.setAttribute("contenteditable", "false");
+    figure.draggable = true;
+    applyWidthStyle(figure, this.__widthPct);
 
     const wrap = document.createElement("div");
     wrap.className = "nz-image-wrap";
@@ -139,14 +161,30 @@ export class ImageNode extends ElementNode {
 
     wrap.appendChild(img);
     figure.appendChild(wrap);
+
+    // Resize handles. Always present in the DOM so they survive Lexical
+    // reconciliation, but only visible when the figure has the `.selected`
+    // class (driven by NodeSelection — see imagePlugin.ts).
+    for (const corner of ["nw", "ne", "sw", "se"] as const) {
+      const handle = document.createElement("div");
+      handle.className = `nz-image-handle nz-image-handle-${corner}`;
+      handle.setAttribute("data-corner", corner);
+      handle.setAttribute("contenteditable", "false");
+      figure.appendChild(handle);
+    }
+
     return figure;
   }
 
-  updateDOM(prev: ImageNode, _dom: HTMLElement, _config: EditorConfig): boolean {
+  updateDOM(prev: ImageNode, dom: HTMLElement, _config: EditorConfig): boolean {
     // Path is content-addressed (sha256) — if the assetId hasn't changed, the
     // bytes haven't changed, and we can reuse the existing DOM. If the assetId
     // changes, returning true tells Lexical to recreate the DOM.
-    return prev.__assetId !== this.__assetId;
+    if (prev.__assetId !== this.__assetId) return true;
+    if (prev.__widthPct !== this.__widthPct) {
+      applyWidthStyle(dom, this.__widthPct);
+    }
+    return false;
   }
 
   isInline(): boolean {
@@ -172,6 +210,7 @@ export class ImageNode extends ElementNode {
       height: this.__height,
       blurhash: this.__blurhash,
       alt: this.__alt,
+      widthPct: this.__widthPct,
     };
   }
 
@@ -183,6 +222,7 @@ export class ImageNode extends ElementNode {
       height: s.height,
       blurhash: s.blurhash,
       alt: s.alt ?? "",
+      widthPct: s.widthPct ?? null,
     });
   }
 
@@ -198,6 +238,7 @@ export type CreateImageInput = {
   height: number;
   blurhash: string | null;
   alt?: string;
+  widthPct?: number | null;
 };
 
 export function $createImageNode(input: CreateImageInput): ImageNode {
@@ -209,8 +250,24 @@ export function $createImageNode(input: CreateImageInput): ImageNode {
       input.height,
       input.blurhash,
       input.alt ?? "",
+      input.widthPct ?? null,
     ),
   );
+}
+
+/**
+ * Apply the user-resized width to a figure DOM node. Kept as a free function
+ * so `imagePlugin.ts` can use the same logic for the live-drag preview without
+ * round-tripping through Lexical state on every pointer move.
+ */
+export function applyWidthStyle(figure: HTMLElement, widthPct: number | null) {
+  if (widthPct == null) {
+    figure.style.width = "";
+    figure.style.maxWidth = "";
+  } else {
+    figure.style.width = `${widthPct}%`;
+    figure.style.maxWidth = "none";
+  }
 }
 
 export function $isImageNode(n: LexicalNode | null | undefined): n is ImageNode {

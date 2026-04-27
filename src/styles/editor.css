@@ -369,18 +369,46 @@ mark {
 
 /* ─── Image embeds ───
    The blurhash background paints first (a tiny PNG via toDataURL), then the
-   real bitmap fades in on top. The wrapper carries the aspect ratio so the
-   layout doesn't shift when the image actually loads. */
+   real bitmap fades in on top. The figure carries the column-width and
+   user-resized width; the wrapper carries the aspect-ratio so the layout
+   doesn't shift when the image actually loads. */
 .nz-image {
   margin: 12px 0;
   display: block;
+  position: relative;
+  width: 100%;
+  max-width: 720px;
   user-select: none;
+  cursor: grab;
+  border-radius: 8px;
+  /* `outline` (not `border`) — leaves layout untouched when toggling
+     selection so the image doesn't jump by 2 px on click. */
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  transition: outline-color 120ms var(--nz-ease), opacity 120ms var(--nz-ease);
+}
+
+.nz-image:active {
+  cursor: grabbing;
+}
+
+.nz-image.selected {
+  outline-color: var(--nz-accent);
+}
+
+.nz-image.dragging {
+  opacity: 0.4;
+}
+
+.nz-image.resizing {
+  /* Disable the outline transition mid-resize so the ring tracks the corner
+     instead of lagging behind. */
+  transition: none;
 }
 
 .nz-image-wrap {
   position: relative;
   width: 100%;
-  max-width: 720px;
   border-radius: 6px;
   overflow: hidden;
   background-size: cover;
@@ -401,4 +429,45 @@ mark {
 
 .nz-image-img.loaded {
   opacity: 1;
+}
+
+/* Resize handles — kept in DOM at all times (so they survive Lexical
+   reconciliation), revealed via .selected. */
+.nz-image-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--nz-accent);
+  border: 2px solid var(--nz-bg-main, white);
+  border-radius: 50%;
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  transition: opacity 120ms var(--nz-ease);
+}
+
+.nz-image.selected .nz-image-handle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.nz-image-handle-nw { top: -6px;    left: -6px;   cursor: nwse-resize; }
+.nz-image-handle-ne { top: -6px;    right: -6px;  cursor: nesw-resize; }
+.nz-image-handle-sw { bottom: -6px; left: -6px;   cursor: nesw-resize; }
+.nz-image-handle-se { bottom: -6px; right: -6px;  cursor: nwse-resize; }
+
+/* Drop indicator — a 3 px line that previews the insertion point.
+   Lives inside .nz-editor-shell (position: relative) and is positioned
+   in absolute coords by imagePlugin.ts. */
+.nz-drop-indicator {
+  position: absolute;
+  height: 3px;
+  background: var(--nz-accent);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 100;
+  box-shadow: 0 0 8px var(--nz-accent-glow);
+  transition: top 80ms var(--nz-ease), left 80ms var(--nz-ease),
+    width 80ms var(--nz-ease);
 }
