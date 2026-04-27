@@ -56,15 +56,20 @@
   color: var(--nz-text-strong);
 }
 
-.nz-editor-content[data-placeholder] > p:first-child:only-child:empty::before,
-.nz-editor-content[data-placeholder] > .nz-paragraph:first-child:only-child:empty::before,
-.nz-editor-content[data-placeholder]:empty::before {
-  content: attr(data-placeholder);
-  color: var(--nz-text-whisper);
-  pointer-events: none;
-  font-weight: 700;
+.nz-editor-placeholder {
+  position: absolute;
+  top: 14px;
+  left: 64px;
+  right: 64px;
   font-size: 22px;
+  font-weight: 700;
   letter-spacing: -0.022em;
+  line-height: 1.25;
+  color: var(--nz-text-faint);
+  pointer-events: auto;
+  user-select: none;
+  cursor: text;
+  z-index: 1;
 }
 
 .nz-paragraph {

@@ -20,11 +20,13 @@ export type EditorHandles = {
 };
 
 export function createNoteZEditor(rootEl: HTMLElement): EditorHandles {
+  console.log("[NoteZ] creating Lexical editor on", rootEl);
+
   const editor = lexicalCreateEditor({
     namespace: "notez",
     theme: editorTheme,
     onError: (error) => {
-      console.error("[Lexical]", error);
+      console.error("[Lexical] runtime error:", error);
     },
     nodes: [
       HeadingNode,
@@ -37,10 +39,9 @@ export function createNoteZEditor(rootEl: HTMLElement): EditorHandles {
     ],
   });
 
-  editor.setRootElement(rootEl);
-
-  // Lexical's default state is a root with no children. Without a paragraph
-  // there is no place for the cursor to land, so the editor would feel "dead".
+  // Initialise state with one empty paragraph BEFORE attaching to DOM —
+  // Lexical's default state has zero children which renders as a 0-height
+  // contenteditable that nothing can be typed into.
   editor.update(
     () => {
       const root = $getRoot();
@@ -48,7 +49,15 @@ export function createNoteZEditor(rootEl: HTMLElement): EditorHandles {
         root.append($createParagraphNode());
       }
     },
-    { discrete: true },
+    { discrete: true, tag: "history-merge" },
+  );
+
+  editor.setRootElement(rootEl);
+  console.log(
+    "[NoteZ] setRootElement done — contenteditable=",
+    rootEl.getAttribute("contenteditable"),
+    "rect=",
+    rootEl.getBoundingClientRect(),
   );
 
   const cleanup = mergeRegister(
