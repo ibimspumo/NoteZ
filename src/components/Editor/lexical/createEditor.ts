@@ -2,7 +2,7 @@ import { CodeNode } from "@lexical/code";
 import { LinkNode } from "@lexical/link";
 import { ListItemNode, ListNode } from "@lexical/list";
 import { TRANSFORMERS, registerMarkdownShortcuts } from "@lexical/markdown";
-import { HeadingNode, QuoteNode } from "@lexical/rich-text";
+import { HeadingNode, QuoteNode, registerRichText } from "@lexical/rich-text";
 import { mergeRegister } from "@lexical/utils";
 import { registerHistory, createEmptyHistoryState } from "@lexical/history";
 import {
@@ -20,8 +20,6 @@ export type EditorHandles = {
 };
 
 export function createNoteZEditor(rootEl: HTMLElement): EditorHandles {
-  console.log("[NoteZ] creating Lexical editor on", rootEl);
-
   const editor = lexicalCreateEditor({
     namespace: "notez",
     theme: editorTheme,
@@ -39,9 +37,8 @@ export function createNoteZEditor(rootEl: HTMLElement): EditorHandles {
     ],
   });
 
-  // Initialise state with one empty paragraph BEFORE attaching to DOM —
   // Lexical's default state has zero children which renders as a 0-height
-  // contenteditable that nothing can be typed into.
+  // contenteditable; seed an empty paragraph before attaching to the DOM.
   editor.update(
     () => {
       const root = $getRoot();
@@ -53,14 +50,13 @@ export function createNoteZEditor(rootEl: HTMLElement): EditorHandles {
   );
 
   editor.setRootElement(rootEl);
-  console.log(
-    "[NoteZ] setRootElement done — contenteditable=",
-    rootEl.getAttribute("contenteditable"),
-    "rect=",
-    rootEl.getBoundingClientRect(),
-  );
 
+  // registerRichText wires the command handlers (CONTROLLED_TEXT_INSERTION,
+  // INSERT_PARAGRAPH, DELETE_CHARACTER, …) that translate beforeinput events
+  // into editor state mutations. @lexical/react does this internally; in
+  // vanilla mode it's our responsibility.
   const cleanup = mergeRegister(
+    registerRichText(editor),
     registerHistory(editor, createEmptyHistoryState(), 300),
     registerMarkdownShortcuts(editor, TRANSFORMERS),
   );

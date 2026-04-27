@@ -71,7 +71,6 @@ export const Editor: Component<EditorProps> = (props) => {
     });
 
     const cleanupChange = handles.editor.registerUpdateListener(({ dirtyElements, dirtyLeaves, editorState }) => {
-      // Compute empty-state on every editor change for the placeholder overlay.
       editorState.read(() => {
         const root = $getRoot();
         const size = root.getChildrenSize();
@@ -123,6 +122,7 @@ export const Editor: Component<EditorProps> = (props) => {
     }
     queueMicrotask(() => {
       suppressChange = false;
+      containerRef?.focus();
       editorRef?.focus();
     });
   });
@@ -137,14 +137,7 @@ export const Editor: Component<EditorProps> = (props) => {
   return (
     <div class="nz-editor-shell">
       <Show when={isEmpty()}>
-        <div
-          class="nz-editor-placeholder"
-          aria-hidden="true"
-          onMouseDown={(e) => {
-            e.preventDefault();
-            editorRef?.focus();
-          }}
-        >
+        <div class="nz-editor-placeholder" aria-hidden="true">
           Title
         </div>
       </Show>

@@ -246,6 +246,19 @@ export const MainView: Component = () => {
             <SidebarIcon />
           </button>
           <div class="nz-main-header-spacer" data-tauri-drag-region />
+          <Show when={activeNote()}>
+            {(note) => (
+              <div
+                class="nz-main-header-title"
+                classList={{ "is-untitled": !note().title.trim() }}
+                data-tauri-drag-region
+                title={note().title.trim() || "Untitled"}
+              >
+                {note().title.trim() || "Untitled"}
+              </div>
+            )}
+          </Show>
+          <div class="nz-main-header-spacer" data-tauri-drag-region />
           <div class="nz-saving-indicator" data-state={savingState()}>
             <Show when={savingState() === "saving"}>Saving…</Show>
             <Show when={savingState() === "saved"}>Saved</Show>

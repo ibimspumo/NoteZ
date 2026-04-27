@@ -66,9 +66,8 @@
   letter-spacing: -0.022em;
   line-height: 1.25;
   color: var(--nz-text-faint);
-  pointer-events: auto;
+  pointer-events: none;
   user-select: none;
-  cursor: text;
   z-index: 1;
 }
 
