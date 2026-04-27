@@ -19,7 +19,6 @@ body {
   color: var(--nz-text);
   font-family: var(--nz-font-ui);
   font-size: 13.5px;
-  font-feature-settings: "ss01", "cv11";
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -33,6 +32,7 @@ textarea,
 [contenteditable="true"] {
   user-select: text;
   -webkit-user-select: text;
+  outline: none;
 }
 
 button {
@@ -45,13 +45,16 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 
-button:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-[contenteditable="true"]:focus-visible {
+/* Focus rings only for interactive controls — never for the editor surface. */
+button:focus-visible {
   outline: 2px solid var(--nz-focus-ring);
-  outline-offset: 2px;
+  outline-offset: 1px;
   border-radius: var(--nz-radius-sm);
+}
+
+input:focus-visible,
+textarea:focus-visible {
+  outline: none;
 }
 
 a {
@@ -107,6 +110,6 @@ ol {
 }
 
 @keyframes nz-rise {
-  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  from { opacity: 0; transform: translateY(6px) scale(0.985); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }

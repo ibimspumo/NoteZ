@@ -18,6 +18,11 @@
   background: var(--nz-bg-main);
   border-left: 1px solid var(--nz-divider);
   position: relative;
+  transition: border-color 220ms var(--nz-ease);
+}
+
+.nz-app.sidebar-collapsed .nz-main {
+  border-left-color: transparent;
 }
 
 .nz-main-header {
@@ -26,10 +31,21 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 0 12px;
-  -webkit-app-region: drag;
+  padding: 0 12px 0 0;
   border-bottom: 1px solid var(--nz-divider);
   background: transparent;
+}
+
+/* When sidebar is collapsed the main column owns the top-left, so we have to
+   push controls past the macOS traffic-light cluster (~78px wide). */
+.nz-traffic-light-spacer {
+  flex: 0 0 0px;
+  height: 100%;
+  transition: flex-basis 220ms var(--nz-ease);
+}
+
+.nz-app.sidebar-collapsed .nz-traffic-light-spacer {
+  flex: 0 0 78px;
 }
 
 .nz-main-header-spacer {
@@ -47,7 +63,6 @@
   color: var(--nz-text-muted);
   transition: background 140ms var(--nz-ease), color 140ms var(--nz-ease),
     transform 80ms var(--nz-ease);
-  -webkit-app-region: no-drag;
 }
 
 .nz-icon-btn:hover {
@@ -59,11 +74,6 @@
   transform: scale(0.92);
 }
 
-.nz-icon-btn:focus-visible {
-  outline: 2px solid var(--nz-focus-ring);
-  outline-offset: 1px;
-}
-
 .nz-saving-indicator {
   font-size: 11px;
   color: var(--nz-text-faint);
@@ -71,7 +81,6 @@
   font-variant-numeric: tabular-nums;
   min-width: 48px;
   text-align: right;
-  -webkit-app-region: no-drag;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -128,7 +137,7 @@
   color: #1a1208;
   border-color: var(--nz-accent-hot);
   font-weight: 600;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 0 var(--nz-accent-glow);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
   transition: box-shadow 220ms var(--nz-ease), background 140ms var(--nz-ease),
     transform 100ms var(--nz-ease);
 }

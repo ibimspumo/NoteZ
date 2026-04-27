@@ -21,11 +21,10 @@ export const Sidebar: Component<Props> = (props) => {
     <aside
       class="nz-sidebar"
       classList={{ collapsed: sidebarCollapsed() }}
-      data-tauri-drag-region
     >
       <div class="nz-sidebar-titlebar" data-tauri-drag-region />
-      <div class="nz-sidebar-header">
-        <div class="nz-app-name">NoteZ</div>
+      <div class="nz-sidebar-header" data-tauri-drag-region>
+        <div class="nz-app-name" data-tauri-drag-region>NoteZ</div>
         <button
           class="nz-icon-btn"
           aria-label="New note"

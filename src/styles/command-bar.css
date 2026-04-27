@@ -47,15 +47,14 @@
   outline: none;
   background: transparent;
   font-family: var(--nz-font-ui);
-  font-size: 16px;
+  font-size: 15.5px;
   font-weight: 400;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.008em;
   color: var(--nz-text-strong);
 }
 
 .nz-cb-input::placeholder {
   color: var(--nz-text-whisper);
-  font-style: italic;
 }
 
 .nz-cb-esc {
@@ -132,7 +131,6 @@
 
 .nz-cb-pin {
   font-size: 10px;
-  filter: drop-shadow(0 0 3px var(--nz-accent-glow));
 }
 
 .nz-cb-row.create .nz-cb-row-title {
@@ -158,7 +156,6 @@
   font-size: 12px;
   color: var(--nz-text-whisper);
   text-align: center;
-  font-style: italic;
   letter-spacing: 0.005em;
 }
 

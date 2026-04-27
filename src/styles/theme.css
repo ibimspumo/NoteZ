@@ -12,8 +12,7 @@
 
   --nz-font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
     "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --nz-font-serif: "New York", "Iowan Old Style", "Charter", "Georgia", ui-serif, serif;
-  --nz-font-mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --nz-font-mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
 }
 
 @media (prefers-color-scheme: light) {

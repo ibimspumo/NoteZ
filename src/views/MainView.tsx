@@ -236,6 +236,7 @@ export const MainView: Component = () => {
       />
       <main class="nz-main">
         <header class="nz-main-header" data-tauri-drag-region>
+          <div class="nz-traffic-light-spacer" data-tauri-drag-region />
           <button
             class="nz-icon-btn"
             aria-label="Toggle sidebar"

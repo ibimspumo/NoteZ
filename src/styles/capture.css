@@ -4,7 +4,6 @@
   height: 100vh;
   width: 100vw;
   background: transparent;
-  -webkit-app-region: drag;
   border-radius: var(--nz-radius-xl);
   overflow: hidden;
 }
@@ -17,7 +16,6 @@
   font-size: 10px;
   color: var(--nz-text-whisper);
   letter-spacing: 0.08em;
-  -webkit-app-region: drag;
 }
 
 .nz-capture-title {
@@ -29,7 +27,6 @@
 .nz-capture-hint {
   font-size: 10px;
   font-variant-numeric: tabular-nums;
-  font-feature-settings: "ss01";
 }
 
 .nz-capture-input {
@@ -39,16 +36,14 @@
   background: transparent;
   resize: none;
   padding: 12px 20px 22px;
-  font-family: var(--nz-font-serif);
-  font-size: 17px;
+  font-family: var(--nz-font-ui);
+  font-size: 15.5px;
   line-height: 1.55;
-  letter-spacing: -0.003em;
+  letter-spacing: -0.005em;
   color: var(--nz-text);
   caret-color: var(--nz-accent-hot);
-  -webkit-app-region: no-drag;
 }
 
 .nz-capture-input::placeholder {
   color: var(--nz-text-whisper);
-  font-style: italic;
 }

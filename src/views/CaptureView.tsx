@@ -50,10 +50,10 @@ export const CaptureView: Component = () => {
   });
 
   return (
-    <div class="nz-capture" data-tauri-drag-region>
+    <div class="nz-capture">
       <header class="nz-capture-header" data-tauri-drag-region>
-        <span class="nz-capture-title">Quick Capture</span>
-        <span class="nz-capture-hint">⌘ + ↵ to save · esc to dismiss</span>
+        <span class="nz-capture-title" data-tauri-drag-region>Quick Capture</span>
+        <span class="nz-capture-hint" data-tauri-drag-region>⌘ + ↵ to save · esc to dismiss</span>
       </header>
       <textarea
         ref={(el) => (textareaRef = el)}

@@ -5,7 +5,13 @@ import {
   Show,
   type Component,
 } from "solid-js";
-import { $createParagraphNode, $getRoot, type LexicalEditor } from "lexical";
+import {
+  $createParagraphNode,
+  $createTextNode,
+  $getRoot,
+  type LexicalEditor,
+} from "lexical";
+import { $createHeadingNode } from "@lexical/rich-text";
 import {
   createNoteZEditor,
   getEditorStateJSON,
@@ -40,6 +46,7 @@ export const Editor: Component<EditorProps> = (props) => {
   let containerRef: HTMLDivElement | undefined;
   let editorRef: LexicalEditor | undefined;
   let lastNoteId: string | null = null;
+  let suppressChange = false;
 
   const [activeMatch, setActiveMatch] = createSignal<MentionMatch | null>(null);
   let confirmFn: (() => boolean) | null = null;
@@ -66,7 +73,10 @@ export const Editor: Component<EditorProps> = (props) => {
       },
     });
 
-    const cleanupChange = handles.editor.registerUpdateListener(() => {
+    const cleanupChange = handles.editor.registerUpdateListener(({ dirtyElements, dirtyLeaves }) => {
+      if (suppressChange) return;
+      // Skip events that don't actually carry content changes (e.g. selection-only).
+      if (dirtyElements.size === 0 && dirtyLeaves.size === 0) return;
       const json = getEditorStateJSON(handles.editor);
       const text = getPlainText(handles.editor);
       const targets = collectMentionTargets(handles.editor);
@@ -90,15 +100,33 @@ export const Editor: Component<EditorProps> = (props) => {
     if (!editorRef) return;
     if (id === lastNoteId) return;
     lastNoteId = id;
+
+    suppressChange = true;
     if (props.initialJson && props.initialJson !== "{}") {
       loadEditorStateFromJSON(editorRef, props.initialJson);
+      // Place cursor at the end of the loaded document.
+      editorRef.update(() => {
+        const root = $getRoot();
+        root.selectEnd();
+      });
     } else {
       editorRef.update(() => {
         const root = $getRoot();
         root.clear();
-        root.append($createParagraphNode());
+        const heading = $createHeadingNode("h1");
+        heading.append($createTextNode(""));
+        root.append(heading);
+        heading.selectStart();
       });
     }
+    // Allow the next microtask's update to fire normally.
+    queueMicrotask(() => {
+      suppressChange = false;
+    });
+    // Hand focus back to the editor after a note switch.
+    queueMicrotask(() => {
+      editorRef?.focus();
+    });
   });
 
   const handleSelect = (noteId: string, title: string) => {
@@ -108,14 +136,15 @@ export const Editor: Component<EditorProps> = (props) => {
     setActiveMatch(null);
   };
 
+  void $createParagraphNode;
+
   return (
     <div class="nz-editor-shell">
       <div
         ref={(el) => (containerRef = el)}
         class="nz-editor-content"
-        contentEditable={true}
         spellcheck={true}
-        data-placeholder="Start writing…"
+        data-placeholder="Title"
       />
       <Show when={activeMatch()}>
         {(match) => (
