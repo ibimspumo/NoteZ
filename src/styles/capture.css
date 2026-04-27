@@ -1,0 +1,54 @@
+.nz-capture {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background: transparent;
+  -webkit-app-region: drag;
+  border-radius: var(--nz-radius-xl);
+  overflow: hidden;
+}
+
+.nz-capture-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px 4px 80px;
+  font-size: 10px;
+  color: var(--nz-text-whisper);
+  letter-spacing: 0.08em;
+  -webkit-app-region: drag;
+}
+
+.nz-capture-title {
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--nz-text-faint);
+}
+
+.nz-capture-hint {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "ss01";
+}
+
+.nz-capture-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  resize: none;
+  padding: 12px 20px 22px;
+  font-family: var(--nz-font-serif);
+  font-size: 17px;
+  line-height: 1.55;
+  letter-spacing: -0.003em;
+  color: var(--nz-text);
+  caret-color: var(--nz-accent-hot);
+  -webkit-app-region: no-drag;
+}
+
+.nz-capture-input::placeholder {
+  color: var(--nz-text-whisper);
+  font-style: italic;
+}

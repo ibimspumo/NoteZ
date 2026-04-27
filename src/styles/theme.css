@@ -1,0 +1,85 @@
+:root {
+  --nz-accent: #ffba2b;
+  --nz-accent-hot: #f0a000;
+  --nz-accent-soft: rgba(255, 186, 43, 0.16);
+  --nz-accent-glow: rgba(255, 186, 43, 0.28);
+  --nz-danger: #d54a3a;
+  --nz-radius-sm: 6px;
+  --nz-radius-md: 8px;
+  --nz-radius-lg: 12px;
+  --nz-radius-xl: 16px;
+  --nz-ease: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --nz-font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --nz-font-serif: "New York", "Iowan Old Style", "Charter", "Georgia", ui-serif, serif;
+  --nz-font-mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --nz-bg-app: rgba(252, 251, 249, 0.0);
+    --nz-bg-sidebar: transparent;
+    --nz-bg-main: rgba(255, 254, 252, 0.55);
+    --nz-bg-elev: rgba(255, 255, 255, 0.88);
+    --nz-bg-overlay: rgba(255, 254, 252, 0.92);
+    --nz-bg-hover: rgba(20, 20, 22, 0.045);
+    --nz-bg-active: rgba(255, 186, 43, 0.16);
+    --nz-bg-active-strong: rgba(255, 186, 43, 0.22);
+    --nz-bg-row: rgba(255, 255, 255, 0.42);
+    --nz-divider: rgba(20, 20, 22, 0.07);
+    --nz-divider-strong: rgba(20, 20, 22, 0.13);
+    --nz-text: #18181b;
+    --nz-text-strong: #0a0a0c;
+    --nz-text-muted: rgba(24, 24, 27, 0.62);
+    --nz-text-faint: rgba(24, 24, 27, 0.38);
+    --nz-text-whisper: rgba(24, 24, 27, 0.22);
+    --nz-selection: rgba(255, 186, 43, 0.34);
+    --nz-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05), 0 1px 1px rgba(0, 0, 0, 0.04);
+    --nz-shadow: 0 12px 36px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.05);
+    --nz-shadow-lg: 0 28px 80px rgba(0, 0, 0, 0.22), 0 6px 18px rgba(0, 0, 0, 0.08);
+    --nz-scrollbar: rgba(20, 20, 22, 0.12);
+    --nz-scrollbar-hover: rgba(20, 20, 22, 0.24);
+    --nz-mark: #ffe886;
+    --nz-mention-text: #8a5a00;
+    --nz-mention-bg: rgba(255, 186, 43, 0.14);
+    --nz-mention-border: rgba(255, 186, 43, 0.32);
+    --nz-mention-bg-hover: rgba(255, 186, 43, 0.22);
+    --nz-focus-ring: rgba(255, 186, 43, 0.55);
+    --nz-checkbox-fill: #18181b;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --nz-bg-app: rgba(28, 28, 30, 0.0);
+    --nz-bg-sidebar: transparent;
+    --nz-bg-main: rgba(28, 28, 30, 0.5);
+    --nz-bg-elev: rgba(38, 38, 42, 0.94);
+    --nz-bg-overlay: rgba(34, 34, 38, 0.92);
+    --nz-bg-hover: rgba(255, 255, 255, 0.06);
+    --nz-bg-active: rgba(255, 186, 43, 0.18);
+    --nz-bg-active-strong: rgba(255, 186, 43, 0.26);
+    --nz-bg-row: rgba(255, 255, 255, 0.04);
+    --nz-divider: rgba(255, 255, 255, 0.07);
+    --nz-divider-strong: rgba(255, 255, 255, 0.14);
+    --nz-text: #f4f4f5;
+    --nz-text-strong: #fafafa;
+    --nz-text-muted: rgba(244, 244, 245, 0.62);
+    --nz-text-faint: rgba(244, 244, 245, 0.4);
+    --nz-text-whisper: rgba(244, 244, 245, 0.22);
+    --nz-selection: rgba(255, 186, 43, 0.38);
+    --nz-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --nz-shadow: 0 14px 44px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.3);
+    --nz-shadow-lg: 0 28px 80px rgba(0, 0, 0, 0.7), 0 8px 22px rgba(0, 0, 0, 0.45);
+    --nz-scrollbar: rgba(255, 255, 255, 0.14);
+    --nz-scrollbar-hover: rgba(255, 255, 255, 0.32);
+    --nz-mark: rgba(255, 220, 96, 0.42);
+    --nz-mention-text: #ffd66e;
+    --nz-mention-bg: rgba(255, 186, 43, 0.16);
+    --nz-mention-border: rgba(255, 186, 43, 0.42);
+    --nz-mention-bg-hover: rgba(255, 186, 43, 0.26);
+    --nz-focus-ring: rgba(255, 186, 43, 0.6);
+    --nz-checkbox-fill: #18181b;
+  }
+}

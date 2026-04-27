@@ -1,0 +1,183 @@
+.nz-app {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  height: 100vh;
+  width: 100vw;
+  background: var(--nz-bg-app);
+  transition: grid-template-columns 220ms var(--nz-ease);
+}
+
+.nz-app.sidebar-collapsed {
+  grid-template-columns: 0px minmax(0, 1fr);
+}
+
+.nz-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--nz-bg-main);
+  border-left: 1px solid var(--nz-divider);
+  position: relative;
+}
+
+.nz-main-header {
+  height: 38px;
+  flex: 0 0 38px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 12px;
+  -webkit-app-region: drag;
+  border-bottom: 1px solid var(--nz-divider);
+  background: transparent;
+}
+
+.nz-main-header-spacer {
+  flex: 1;
+  height: 100%;
+}
+
+.nz-icon-btn {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--nz-radius-sm);
+  color: var(--nz-text-muted);
+  transition: background 140ms var(--nz-ease), color 140ms var(--nz-ease),
+    transform 80ms var(--nz-ease);
+  -webkit-app-region: no-drag;
+}
+
+.nz-icon-btn:hover {
+  background: var(--nz-bg-hover);
+  color: var(--nz-text-strong);
+}
+
+.nz-icon-btn:active {
+  transform: scale(0.92);
+}
+
+.nz-icon-btn:focus-visible {
+  outline: 2px solid var(--nz-focus-ring);
+  outline-offset: 1px;
+}
+
+.nz-saving-indicator {
+  font-size: 11px;
+  color: var(--nz-text-faint);
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  min-width: 48px;
+  text-align: right;
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: opacity 220ms var(--nz-ease);
+}
+
+.nz-saving-indicator[data-state="idle"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.nz-saving-indicator::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--nz-text-faint);
+  display: inline-block;
+}
+
+.nz-saving-indicator[data-state="saving"]::before {
+  background: var(--nz-accent);
+  animation: nz-pulse 1.1s ease-in-out infinite;
+}
+
+.nz-saving-indicator[data-state="saved"]::before {
+  background: #44b86a;
+}
+
+.nz-pill-btn {
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: var(--nz-bg-row);
+  color: var(--nz-text-strong);
+  border: 1px solid var(--nz-divider);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: -0.005em;
+  transition: background 140ms var(--nz-ease), transform 100ms var(--nz-ease),
+    border-color 140ms var(--nz-ease);
+}
+
+.nz-pill-btn:hover {
+  background: var(--nz-bg-hover);
+  border-color: var(--nz-divider-strong);
+}
+
+.nz-pill-btn:active {
+  transform: scale(0.97);
+}
+
+.nz-pill-btn.primary {
+  background: var(--nz-accent);
+  color: #1a1208;
+  border-color: var(--nz-accent-hot);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 0 var(--nz-accent-glow);
+  transition: box-shadow 220ms var(--nz-ease), background 140ms var(--nz-ease),
+    transform 100ms var(--nz-ease);
+}
+
+.nz-pill-btn.primary:hover {
+  background: var(--nz-accent-hot);
+  box-shadow: 0 4px 14px var(--nz-accent-glow);
+}
+
+.nz-empty-editor {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nz-row-menu {
+  position: fixed;
+  z-index: 9999;
+  background: var(--nz-bg-overlay);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--nz-divider-strong);
+  border-radius: var(--nz-radius-md);
+  padding: 4px;
+  min-width: 168px;
+  box-shadow: var(--nz-shadow);
+  display: flex;
+  flex-direction: column;
+  animation: nz-rise 140ms var(--nz-ease);
+}
+
+.nz-row-menu button {
+  text-align: left;
+  padding: 7px 11px;
+  border-radius: var(--nz-radius-sm);
+  font-size: 13px;
+  color: var(--nz-text);
+  transition: background 100ms var(--nz-ease);
+}
+
+.nz-row-menu button:hover {
+  background: var(--nz-bg-hover);
+}
+
+.nz-row-menu button.danger {
+  color: var(--nz-danger);
+}
+
+.nz-row-menu button.danger:hover {
+  background: rgba(213, 74, 58, 0.12);
+}

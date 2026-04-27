@@ -1,0 +1,12 @@
+/* @refresh reload */
+import { render } from "solid-js/web";
+import App from "./App";
+import "./styles/global.css";
+import "./styles/theme.css";
+import "./styles/app.css";
+import "./styles/sidebar.css";
+import "./styles/editor.css";
+import "./styles/command-bar.css";
+import "./styles/capture.css";
+
+render(() => <App />, document.getElementById("root") as HTMLElement);
