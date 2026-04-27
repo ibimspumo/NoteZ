@@ -50,6 +50,9 @@ importers:
       '@tauri-apps/plugin-window-state':
         specifier: ^2.4.1
         version: 2.4.1
+      blurhash:
+        specifier: ^2.0.5
+        version: 2.0.5
       lexical:
         specifier: ^0.44.0
         version: 0.44.0
@@ -625,6 +628,9 @@ packages:
     resolution: {integrity: sha512-xwVXGqevyKPsiuQdLj+dZMVjidjJV508TBqexND5HrF89cGdCYCJFB3qhcxRHSeMctdCfbR1jrxBajhDy7o29g==}
     engines: {node: '>=6.0.0'}
     hasBin: true
+
+  blurhash@2.0.5:
+    resolution: {integrity: sha512-cRygWd7kGBQO3VEhPiTgq4Wc43ctsM+o46urrmPOiuAe+07fzlSB9OJVdpgDL0jPqXUVQ9ht7aq7kxOeJHRK+w==}
 
   browserslist@4.28.2:
     resolution: {integrity: sha512-48xSriZYYg+8qXna9kwqjIVzuQxi+KYWp2+5nCYnYKPTr0LvD89Jqk2Or5ogxz0NUMfIjhh2lIUX/LyX9B4oIg==}
@@ -1343,6 +1349,8 @@ snapshots:
       solid-js: 1.9.12
 
   baseline-browser-mapping@2.10.23: {}
+
+  blurhash@2.0.5: {}
 
   browserslist@4.28.2:
     dependencies:

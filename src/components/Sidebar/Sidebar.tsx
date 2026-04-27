@@ -1,10 +1,12 @@
-import { For, Show, createMemo, type Component } from "solid-js";
+import { For, Show, type Component } from "solid-js";
 import {
+  loadMoreNotes,
   notesState,
   selectedId,
   setSelectedId,
 } from "../../stores/notes";
 import { sidebarCollapsed } from "../../stores/ui";
+import { VirtualList } from "../VirtualList";
 import { NoteListItem } from "./NoteListItem";
 
 type Props = {
@@ -13,10 +15,11 @@ type Props = {
   onDelete: (id: string) => void;
 };
 
-export const Sidebar: Component<Props> = (props) => {
-  const pinned = createMemo(() => notesState.list.filter((n) => n.is_pinned));
-  const others = createMemo(() => notesState.list.filter((n) => !n.is_pinned));
+// Keep this in sync with `.nz-note-item` in sidebar.css.
+// VirtualList needs a known fixed height to compute its window.
+const ROW_HEIGHT = 60;
 
+export const Sidebar: Component<Props> = (props) => {
   return (
     <aside
       class="nz-sidebar"
@@ -34,49 +37,73 @@ export const Sidebar: Component<Props> = (props) => {
           <NewNoteIcon />
         </button>
       </div>
-      <div class="nz-sidebar-scroll">
-        <Show when={pinned().length > 0}>
-          <div class="nz-section-label">Pinned</div>
-          <ul class="nz-note-list">
-            <For each={pinned()}>
-              {(n) => (
-                <NoteListItem
-                  note={n}
-                  selected={n.id === selectedId()}
-                  onSelect={() => setSelectedId(n.id)}
-                  onTogglePin={() => props.onTogglePin(n.id)}
-                  onDelete={() => props.onDelete(n.id)}
-                />
-              )}
-            </For>
-          </ul>
-        </Show>
-        <Show when={others().length > 0}>
-          <Show when={pinned().length > 0}>
-            <div class="nz-section-label">Notes</div>
-          </Show>
-          <ul class="nz-note-list">
-            <For each={others()}>
-              {(n) => (
-                <NoteListItem
-                  note={n}
-                  selected={n.id === selectedId()}
-                  onSelect={() => setSelectedId(n.id)}
-                  onTogglePin={() => props.onTogglePin(n.id)}
-                  onDelete={() => props.onDelete(n.id)}
-                />
-              )}
-            </For>
-          </ul>
-        </Show>
-        <Show when={notesState.list.length === 0 && !notesState.loading}>
-          <div class="nz-empty-state">
-            <p>No notes yet.</p>
-            <button class="nz-pill-btn" onClick={props.onCreate}>
-              Create your first note
-            </button>
+
+      <div class="nz-sidebar-body">
+        <Show when={notesState.pinned.length > 0}>
+          <div class="nz-pinned-region">
+            <div class="nz-section-label">Pinned</div>
+            <ul class="nz-note-list">
+              <For each={notesState.pinned}>
+                {(n) => (
+                  <NoteListItem
+                    note={n}
+                    selected={n.id === selectedId()}
+                    onSelect={() => setSelectedId(n.id)}
+                    onTogglePin={() => props.onTogglePin(n.id)}
+                    onDelete={() => props.onDelete(n.id)}
+                  />
+                )}
+              </For>
+            </ul>
           </div>
         </Show>
+
+        <div class="nz-others-region">
+          <Show when={notesState.pinned.length > 0 && notesState.items.length > 0}>
+            <div class="nz-section-label nz-section-label--inline">Notes</div>
+          </Show>
+          <Show
+            when={notesState.items.length > 0}
+            fallback={
+              <Show
+                when={
+                  notesState.pinned.length === 0 && notesState.initialLoaded
+                }
+              >
+                <div class="nz-empty-state">
+                  <p>No notes yet.</p>
+                  <button class="nz-pill-btn" onClick={props.onCreate}>
+                    Create your first note
+                  </button>
+                </div>
+              </Show>
+            }
+          >
+            <VirtualList
+              class="nz-others-vlist"
+              count={notesState.items.length}
+              rowHeight={ROW_HEIGHT}
+              hasMore={!!notesState.nextCursor}
+              onLoadMore={loadMoreNotes}
+              renderRow={(i) => (
+                /* `<Show>` keeps `note` reactive: when the store mutates
+                   `items[i]` (e.g. updateNote re-sorts, togglePin hoists a row),
+                   the inner closure re-runs with the fresh value. */
+                <Show when={notesState.items[i]}>
+                  {(note) => (
+                    <NoteListItem
+                      note={note()}
+                      selected={note().id === selectedId()}
+                      onSelect={() => setSelectedId(note().id)}
+                      onTogglePin={() => props.onTogglePin(note().id)}
+                      onDelete={() => props.onDelete(note().id)}
+                    />
+                  )}
+                </Show>
+              )}
+            />
+          </Show>
+        </div>
       </div>
     </aside>
   );

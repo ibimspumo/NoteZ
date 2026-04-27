@@ -55,32 +55,15 @@ export function registerMentionPlugin(
       const text = (anchorNode as TextNode).getTextContent();
       const offset = selection.anchor.offset;
 
-      const before = text.slice(0, offset);
-      const atIdx = before.lastIndexOf("@");
-      if (atIdx < 0) {
+      const partial = detectMention(text, offset);
+      if (!partial) {
         closeIfOpen();
         return;
       }
-      const between = before.slice(atIdx + 1);
-      if (/[\s\n]/.test(between)) {
-        closeIfOpen();
-        return;
-      }
-      if (atIdx > 0) {
-        const prevChar = before[atIdx - 1];
-        if (prevChar && /[a-zA-Z0-9]/.test(prevChar)) {
-          closeIfOpen();
-          return;
-        }
-      }
-
-      const rect = getCaretRect();
       const match: MentionMatch = {
-        query: between,
-        rangeStart: atIdx,
-        rangeEnd: offset,
+        ...partial,
         textNodeKey: anchorNode.getKey(),
-        rect,
+        rect: getCaretRect(),
       };
       if (!adapter.isOpen()) adapter.onOpen(match);
       else adapter.onUpdate(match);
@@ -176,6 +159,32 @@ export function insertMention(
     trailingSpace.select(1, 1);
     void beforeAt;
   });
+}
+
+/**
+ * Pure detection: given a text node's content and the caret offset, return the
+ * `@<query>` match that should drive the mention popover, or `null` if there's
+ * no active match. Called on every keystroke — keep it allocation-light.
+ *
+ * Rules:
+ *   - Caret must follow an `@` with no whitespace between.
+ *   - The `@` must not be glued to a preceding alphanumeric (so emails like
+ *     `name@host` don't trigger).
+ */
+export function detectMention(
+  text: string,
+  caretOffset: number,
+): { query: string; rangeStart: number; rangeEnd: number } | null {
+  const before = text.slice(0, caretOffset);
+  const atIdx = before.lastIndexOf("@");
+  if (atIdx < 0) return null;
+  const between = before.slice(atIdx + 1);
+  if (/[\s\n]/.test(between)) return null;
+  if (atIdx > 0) {
+    const prevChar = before[atIdx - 1];
+    if (prevChar && /[a-zA-Z0-9]/.test(prevChar)) return null;
+  }
+  return { query: between, rangeStart: atIdx, rangeEnd: caretOffset };
 }
 
 function getCaretRect(): DOMRect | null {

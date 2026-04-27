@@ -3,7 +3,14 @@ use crate::error::Result;
 use crate::models::SearchHit;
 use tauri::State;
 
-/// Spotlight-grade search.
+/// Spotlight-grade search. Two-stage:
+///   1. FTS5 returns the top `FTS_CANDIDATE_POOL` matches by raw bm25 (cheap; uses
+///      the prefix='2 3 4' index so trailing-* tokens hit a real index, not a scan).
+///   2. We re-rank those candidates with the composite score below and trim to `limit`.
+///
+/// Scaling ceiling: stage 1 stays sub-100ms up to ~10M notes. Beyond that the
+/// FTS index itself starts paging from disk; mitigation = per-year FTS shards or
+/// an external index (Tantivy). Not needed for v1.
 ///
 /// Ranking is composed from:
 ///   - FTS5 bm25 score (lower is better → we negate)
@@ -11,10 +18,12 @@ use tauri::State;
 ///   - title-substring bonus (medium)
 ///   - recency decay (notes touched recently rank higher; halves every 14 days)
 ///   - pinned bonus (small: keeps order intuitive when scores are close)
+const FTS_CANDIDATE_POOL: i64 = 500;
+
 #[tauri::command]
 pub fn search_notes(db: State<Db>, query: String, limit: Option<u32>) -> Result<Vec<SearchHit>> {
     let q = query.trim();
-    let limit = limit.unwrap_or(50).min(200);
+    let limit = limit.unwrap_or(50).min(200) as usize;
 
     if q.is_empty() {
         return Ok(Vec::new());
@@ -41,6 +50,9 @@ pub fn search_notes(db: State<Db>, query: String, limit: Option<u32>) -> Result<
 
     let lower_q = q.to_lowercase();
 
+    // Stage 1: pull a candidate pool from FTS, ordered by raw bm25.
+    // We deliberately fetch more than `limit` so the re-rank can surface a great
+    // title-match that lost on bm25 alone (e.g. very short titles that bm25 underweights).
     let sql = "
         SELECT
             n.id,
@@ -49,8 +61,7 @@ pub fn search_notes(db: State<Db>, query: String, limit: Option<u32>) -> Result<
             n.is_pinned,
             n.updated_at,
             bm25(notes_fts) AS bm25,
-            (julianday('now') - julianday(n.updated_at)) AS age_days,
-            n.content_text
+            (julianday('now') - julianday(n.updated_at)) AS age_days
         FROM notes_fts
         JOIN notes n ON n.rowid = notes_fts.rowid
         WHERE notes_fts MATCH ?1 AND n.deleted_at IS NULL
@@ -59,7 +70,7 @@ pub fn search_notes(db: State<Db>, query: String, limit: Option<u32>) -> Result<
     ";
 
     let mut stmt = conn.prepare(sql)?;
-    let rows = stmt.query_map(rusqlite::params![fts_query, limit as i64], |row| {
+    let rows = stmt.query_map(rusqlite::params![fts_query, FTS_CANDIDATE_POOL], |row| {
         let id: String = row.get("id")?;
         let title: String = row.get("title")?;
         let snippet: String = row.get("snippet")?;
@@ -95,8 +106,10 @@ pub fn search_notes(db: State<Db>, query: String, limit: Option<u32>) -> Result<
         })
     })?;
 
+    // Stage 2: re-rank in memory and trim to `limit`.
     let mut hits: Vec<SearchHit> = rows.filter_map(|r| r.ok()).collect();
     hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    hits.truncate(limit);
     Ok(hits)
 }
 

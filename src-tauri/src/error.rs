@@ -22,6 +22,9 @@ pub enum NoteZError {
 
     #[error("tauri: {0}")]
     Tauri(#[from] tauri::Error),
+
+    #[error("{0}")]
+    Other(String),
 }
 
 impl Serialize for NoteZError {

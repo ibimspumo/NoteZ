@@ -33,6 +33,7 @@ export const CaptureView: Component = () => {
       content_json: JSON.stringify(initialJson),
       content_text: text,
       mention_target_ids: [],
+      asset_ids: [],
     });
     textareaRef.value = "";
     await api.hideCaptureWindow();

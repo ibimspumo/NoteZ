@@ -31,13 +31,13 @@ export const NoteListItem: Component<Props> = (props) => {
             <PinIcon />
           </span>
         </Show>
-      </div>
-      <div class="nz-note-meta">
         <span class="nz-note-time">{formatRelative(props.note.updated_at)}</span>
-        <Show when={preview()}>
-          <span class="nz-note-preview">{preview()}</span>
-        </Show>
       </div>
+      <Show when={preview()}>
+        <div class="nz-note-meta">
+          <span class="nz-note-preview">{preview()}</span>
+        </div>
+      </Show>
     </li>
   );
 };

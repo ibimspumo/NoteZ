@@ -10,13 +10,23 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 
 use crate::db::Db;
 
-fn resolve_db_path(app: &AppHandle) -> std::io::Result<PathBuf> {
+struct AppPaths {
+    db: PathBuf,
+    assets: PathBuf,
+}
+
+fn resolve_app_paths(app: &AppHandle) -> std::io::Result<AppPaths> {
     let dir = app
         .path()
         .app_data_dir()
         .map_err(|e| std::io::Error::other(format!("app_data_dir: {e}")))?;
     std::fs::create_dir_all(&dir)?;
-    Ok(dir.join("notez.db"))
+    let assets = dir.join("assets");
+    std::fs::create_dir_all(&assets)?;
+    Ok(AppPaths {
+        db: dir.join("notez.db"),
+        assets,
+    })
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -62,9 +72,10 @@ pub fn run() {
                 .build(),
         )
         .setup(|app| {
-            let db_path = resolve_db_path(&app.handle())?;
-            tracing::info!("opening database: {:?}", db_path);
-            let db = Db::open(&db_path)
+            let paths = resolve_app_paths(&app.handle())?;
+            tracing::info!("opening database: {:?}", paths.db);
+            tracing::info!("assets dir: {:?}", paths.assets);
+            let db = Db::open(&paths.db, &paths.assets)
                 .map_err(|e| Box::<dyn std::error::Error>::from(format!("db open: {e}")))?;
             app.manage(db);
 
@@ -110,6 +121,12 @@ pub fn run() {
             commands::settings::get_setting,
             commands::settings::set_setting,
             commands::settings::list_settings,
+            // assets
+            commands::assets::save_asset,
+            commands::assets::get_asset,
+            commands::assets::get_assets_dir,
+            commands::assets::list_assets,
+            commands::assets::gc_orphan_assets,
             // capture
             commands::capture::toggle_capture_window,
             commands::capture::hide_capture_window,

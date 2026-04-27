@@ -1,10 +1,18 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  Asset,
+  AssetRef,
   Note,
   NoteSummary,
+  NotesCursor,
+  NotesPage,
   SearchHit,
   Snapshot,
+  SnapshotsCursor,
+  SnapshotsPage,
+  TrashCursor,
+  TrashPage,
   UpdateNoteInput,
 } from "./types";
 
@@ -14,9 +22,10 @@ export const api = {
   getNote: (id: string) => invoke<Note>("get_note", { id }),
   updateNote: (input: UpdateNoteInput) =>
     invoke<Note>("update_note", { input }),
-  listNotes: (includeDeleted = false) =>
-    invoke<NoteSummary[]>("list_notes", { includeDeleted }),
-  listTrash: () => invoke<NoteSummary[]>("list_trash"),
+  listNotes: (cursor?: NotesCursor | null, limit?: number) =>
+    invoke<NotesPage>("list_notes", { cursor: cursor ?? null, limit }),
+  listTrash: (cursor?: TrashCursor | null, limit?: number) =>
+    invoke<TrashPage>("list_trash", { cursor: cursor ?? null, limit }),
   togglePin: (id: string) => invoke<Note>("toggle_pin", { id }),
   softDeleteNote: (id: string) => invoke<void>("soft_delete_note", { id }),
   restoreNote: (id: string) => invoke<Note>("restore_note", { id }),
@@ -37,8 +46,16 @@ export const api = {
     manualLabel?: string,
   ) =>
     invoke<Snapshot>("create_snapshot", { noteId, isManual, manualLabel }),
-  listSnapshots: (noteId: string) =>
-    invoke<Snapshot[]>("list_snapshots", { noteId }),
+  listSnapshots: (
+    noteId: string,
+    cursor?: SnapshotsCursor | null,
+    limit?: number,
+  ) =>
+    invoke<SnapshotsPage>("list_snapshots", {
+      noteId,
+      cursor: cursor ?? null,
+      limit,
+    }),
   restoreSnapshot: (snapshotId: string) =>
     invoke<void>("restore_snapshot", { snapshotId }),
 
@@ -51,10 +68,23 @@ export const api = {
   setSetting: (key: string, value: string) =>
     invoke<void>("set_setting", { key, value }),
 
+  // assets
+  saveAsset: (bytes: number[], mime: string) =>
+    invoke<AssetRef>("save_asset", { bytes, mime }),
+  getAsset: (id: string) => invoke<AssetRef | null>("get_asset", { id }),
+  getAssetsDir: () => invoke<string>("get_assets_dir"),
+  listAssets: () => invoke<Asset[]>("list_assets"),
+  gcOrphanAssets: () => invoke<number>("gc_orphan_assets"),
+
   // capture window
   toggleCaptureWindow: () => invoke<void>("toggle_capture_window"),
   hideCaptureWindow: () => invoke<void>("hide_capture_window"),
 };
+
+/** Convert an absolute on-disk asset path to a webview-loadable URL. */
+export function assetUrl(absolutePath: string): string {
+  return convertFileSrc(absolutePath);
+}
 
 export type NoteZEvent =
   | "notez://global/quick-capture"

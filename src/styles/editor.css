@@ -366,3 +366,39 @@ mark {
   font-style: italic;
   font-weight: 500;
 }
+
+/* ─── Image embeds ───
+   The blurhash background paints first (a tiny PNG via toDataURL), then the
+   real bitmap fades in on top. The wrapper carries the aspect ratio so the
+   layout doesn't shift when the image actually loads. */
+.nz-image {
+  margin: 12px 0;
+  display: block;
+  user-select: none;
+}
+
+.nz-image-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 720px;
+  border-radius: 6px;
+  overflow: hidden;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  /* aspect-ratio is set inline from the asset's true dimensions */
+}
+
+.nz-image-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 220ms var(--nz-ease);
+  -webkit-user-drag: none;
+}
+
+.nz-image-img.loaded {
+  opacity: 1;
+}

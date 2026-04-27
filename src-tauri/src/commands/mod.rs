@@ -1,3 +1,4 @@
+pub mod assets;
 pub mod capture;
 pub mod mentions;
 pub mod notes;

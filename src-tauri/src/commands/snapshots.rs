@@ -1,8 +1,10 @@
 use crate::db::{now_iso, Db};
 use crate::error::{NoteZError, Result};
-use crate::models::Snapshot;
+use crate::models::{Snapshot, SnapshotsCursor, SnapshotsPage};
 use tauri::State;
 use uuid::Uuid;
+
+const MAX_SNAPSHOTS_PAGE: u32 = 200;
 
 #[tauri::command]
 pub fn create_snapshot(
@@ -76,15 +78,17 @@ pub fn create_snapshot(
 }
 
 #[tauri::command]
-pub fn list_snapshots(db: State<Db>, note_id: String) -> Result<Vec<Snapshot>> {
+pub fn list_snapshots(
+    db: State<Db>,
+    note_id: String,
+    cursor: Option<SnapshotsCursor>,
+    limit: Option<u32>,
+) -> Result<SnapshotsPage> {
     let conn = db.conn()?;
-    let mut stmt = conn.prepare(
-        "SELECT id, note_id, title, content_json, content_text, created_at, is_manual, manual_label
-         FROM snapshots
-         WHERE note_id = ?1
-         ORDER BY created_at DESC",
-    )?;
-    let rows = stmt.query_map(rusqlite::params![note_id], |r| {
+    let limit = limit.unwrap_or(50).clamp(1, MAX_SNAPSHOTS_PAGE);
+    let fetch = (limit + 1) as i64;
+
+    let map_row = |r: &rusqlite::Row<'_>| -> rusqlite::Result<Snapshot> {
         Ok(Snapshot {
             id: r.get("id")?,
             note_id: r.get("note_id")?,
@@ -95,12 +99,49 @@ pub fn list_snapshots(db: State<Db>, note_id: String) -> Result<Vec<Snapshot>> {
             is_manual: r.get::<_, i64>("is_manual")? != 0,
             manual_label: r.get("manual_label")?,
         })
-    })?;
-    let mut out = Vec::new();
-    for r in rows {
-        out.push(r?);
-    }
-    Ok(out)
+    };
+
+    let rows: Vec<Snapshot> = if let Some(c) = cursor.as_ref() {
+        let mut stmt = conn.prepare(
+            "SELECT id, note_id, title, content_json, content_text, created_at, is_manual, manual_label
+             FROM snapshots
+             WHERE note_id = ?1
+               AND (created_at, id) < (?2, ?3)
+             ORDER BY created_at DESC, id DESC
+             LIMIT ?4",
+        )?;
+        let mapped = stmt.query_map(
+            rusqlite::params![note_id, c.created_at, c.id, fetch],
+            map_row,
+        )?;
+        let collected: rusqlite::Result<Vec<_>> = mapped.collect();
+        collected?
+    } else {
+        let mut stmt = conn.prepare(
+            "SELECT id, note_id, title, content_json, content_text, created_at, is_manual, manual_label
+             FROM snapshots
+             WHERE note_id = ?1
+             ORDER BY created_at DESC, id DESC
+             LIMIT ?2",
+        )?;
+        let mapped = stmt.query_map(rusqlite::params![note_id, fetch], map_row)?;
+        let collected: rusqlite::Result<Vec<_>> = mapped.collect();
+        collected?
+    };
+
+    let has_more = rows.len() > limit as usize;
+    let mut items = rows;
+    items.truncate(limit as usize);
+    let next_cursor = if has_more {
+        items.last().map(|s| SnapshotsCursor {
+            created_at: s.created_at.clone(),
+            id: s.id.clone(),
+        })
+    } else {
+        None
+    };
+
+    Ok(SnapshotsPage { items, next_cursor })
 }
 
 #[tauri::command]

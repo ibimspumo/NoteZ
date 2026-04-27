@@ -33,10 +33,28 @@
   user-select: none;
 }
 
-.nz-sidebar-scroll {
+.nz-sidebar-body {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 2px 6px 8px;
+}
+
+/* Pinned region: regular flow, capped so it never crowds out the notes list. */
+.nz-pinned-region {
+  flex: 0 0 auto;
+  max-height: 40%;
   overflow-y: auto;
-  padding: 2px 6px 16px;
+  padding-bottom: 4px;
+}
+
+/* Others region hosts the virtualized list and consumes the remaining height. */
+.nz-others-region {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .nz-section-label {
@@ -48,10 +66,47 @@
   color: var(--nz-text-whisper);
 }
 
+.nz-section-label--inline {
+  margin-top: 8px;
+  flex-shrink: 0;
+}
+
 .nz-note-list {
   display: flex;
   flex-direction: column;
   gap: 0;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* Virtualized list: scroll container that mirrors the visible window only.
+   Uses absolute-positioned rows inside a tall spacer for native-smooth scrolling. */
+.nz-vlist {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  position: relative;
+  contain: strict; /* isolate layout/paint — sidebar scroll never reflows the editor */
+}
+
+.nz-vlist-spacer {
+  position: relative;
+  width: 100%;
+}
+
+.nz-vlist-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  will-change: transform;
+  padding: 2px 0;
+  box-sizing: border-box;
+}
+
+.nz-others-vlist {
+  margin: 0 -2px;
+  padding: 0 2px;
 }
 
 .nz-note-item {
@@ -63,6 +118,17 @@
   flex-direction: column;
   gap: 1px;
   transition: background 120ms var(--nz-ease);
+  /* Fixed row height so the virtual list can measure deterministically.
+     If the design ever needs variable heights, swap to a measured-row impl. */
+  height: 56px;
+  margin: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Spacing only in the regular (non-virtualized) pinned list. */
+.nz-note-list .nz-note-item + .nz-note-item {
+  margin-top: 4px;
 }
 
 .nz-note-item:hover {
@@ -129,8 +195,15 @@
 
 .nz-note-time {
   flex-shrink: 0;
+  margin-left: auto;
+  padding-left: 8px;
+  font-size: 11px;
   color: var(--nz-text-muted);
   font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .nz-note-preview {

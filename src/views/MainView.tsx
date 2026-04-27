@@ -9,10 +9,8 @@ import {
 import { Sidebar } from "../components/Sidebar/Sidebar";
 import { Editor, type EditorChange } from "../components/Editor/Editor";
 import { CommandBar } from "../components/CommandBar/CommandBar";
-import { api, onEvent } from "../lib/tauri";
-import { debounce } from "../lib/debounce";
-import { deriveTitle, formatRelative } from "../lib/format";
-import { matchHotkey } from "../lib/keymap";
+import { onEvent } from "../lib/tauri";
+import { formatRelative } from "../lib/format";
 import {
   createNote,
   ensureSelection,
@@ -25,90 +23,70 @@ import {
   softDeleteNote,
   togglePin,
   updateNote,
+  loadMoreNotes,
+  notesState,
 } from "../stores/notes";
 import {
   closeCommandBar,
   commandBarOpen,
   openCommandBar,
-  setSidebarCollapsed,
   sidebarCollapsed,
   toggleSidebar,
 } from "../stores/ui";
 import type { Note } from "../lib/types";
-
-const SAVE_DEBOUNCE_MS = 350;
-const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
+import { useSavePipeline } from "./useSavePipeline";
+import { useShortcuts } from "./useShortcuts";
 
 export const MainView: Component = () => {
   const [activeNote, setActiveNote] = createSignal<Note | null>(null);
   const [editorKey, setEditorKey] = createSignal(0);
-  const [savingState, setSavingState] = createSignal<"idle" | "saving" | "saved">("idle");
-  let pendingChange: EditorChange | null = null;
-  let lastSnapshotAt = 0;
 
-  const persist = debounce(async (change: EditorChange, noteId: string) => {
-    pendingChange = null;
-    setSavingState("saving");
-    try {
-      const title = deriveTitle(change.contentText);
-      const updated = await updateNote({
-        id: noteId,
-        title,
-        content_json: change.contentJson,
-        content_text: change.contentText,
-        mention_target_ids: change.mentionTargetIds,
-      });
-      patchCachedNote(updated);
+  const save = useSavePipeline({
+    onSaved: (updated) => {
       const current = activeNote();
-      if (current && current.id === updated.id) {
-        setActiveNote(updated);
-      }
-      setSavingState("saved");
-      setTimeout(() => {
-        if (savingState() === "saved") setSavingState("idle");
-      }, 800);
-
-      if (Date.now() - lastSnapshotAt > SNAPSHOT_INTERVAL_MS) {
-        try {
-          await api.createSnapshot(updated.id, false);
-          lastSnapshotAt = Date.now();
-        } catch (_) {
-          // expected when no changes since last snapshot
-        }
-      }
-    } catch (e) {
-      console.error("save failed", e);
-      setSavingState("idle");
-    }
-  }, SAVE_DEBOUNCE_MS);
+      if (current && current.id === updated.id) setActiveNote(updated);
+    },
+  });
 
   const handleChange = (change: EditorChange) => {
-    pendingChange = change;
     const id = selectedId();
     if (!id) return;
-    persist(change, id);
+    save.markDirty(id, change.snapshot);
   };
 
   const handleOpenNote = async (id: string) => {
+    if (save.hasPending()) await save.flush();
     setSelectedId(id);
   };
 
   const handleCreateNote = async () => {
-    persist.flush();
+    await save.flush();
     const note = await createNote();
+    save.resetBaseline(note.id, note.content_json);
     setSelectedId(note.id);
   };
 
   const handleCreateWithTitle = async (title: string) => {
-    persist.flush();
+    await save.flush();
     const note = await createNote();
+    save.resetBaseline(note.id, note.content_json);
     setSelectedId(note.id);
     // Inject title via a fresh editor state — easiest is to call updateNote with title-only state.
     const initialJson = {
       root: {
         children: [
           {
-            children: [{ detail: 0, format: 0, mode: "normal", style: "", text: title, type: "text", version: 1 }],
+            children: [
+              {
+                detail: 0,
+                format: 0,
+                mode: "normal",
+                style: "",
+                text: title,
+                type: "text",
+                version: 1,
+              },
+            ],
             direction: "ltr",
             format: "",
             indent: 0,
@@ -125,15 +103,18 @@ export const MainView: Component = () => {
         version: 1,
       },
     };
+    const json = JSON.stringify(initialJson);
     const updated = await updateNote({
       id: note.id,
       title,
-      content_json: JSON.stringify(initialJson),
+      content_json: json,
       content_text: title,
       mention_target_ids: [],
+      asset_ids: [],
     });
     patchCachedNote(updated);
     setActiveNote(updated);
+    save.resetBaseline(note.id, json);
     setEditorKey((k) => k + 1);
   };
 
@@ -144,12 +125,23 @@ export const MainView: Component = () => {
   };
 
   const handleDelete = async (id: string) => {
-    persist.flush();
+    if (save.hasPending()) await save.flush();
     await softDeleteNote(id);
     if (selectedId() === id) {
-      const list = await api.listNotes(false);
-      const next = list[0]?.id ?? null;
-      setSelectedId(next);
+      const next =
+        notesState.pinned[0]?.id ?? notesState.items[0]?.id ?? null;
+      if (next) {
+        setSelectedId(next);
+      } else {
+        // No notes left in the loaded prefix — try to fetch the next page
+        // before giving up, in case there are more behind the cursor.
+        if (notesState.nextCursor) {
+          await loadMoreNotes();
+          setSelectedId(notesState.items[0]?.id ?? null);
+        } else {
+          setSelectedId(null);
+        }
+      }
     }
   };
 
@@ -165,48 +157,55 @@ export const MainView: Component = () => {
       setActiveNote(null);
       return;
     }
+    // Wait for any save targeting the previous note to land before we hand the
+    // baseline over to the new one — otherwise the in-flight save could update
+    // the new note's baseline if its IPC resolves after this effect.
+    if (save.hasPending()) await save.flush();
     const note = await loadNote(id);
     setActiveNote(note);
+    save.resetBaseline(note.id, note.content_json);
     setEditorKey((k) => k + 1);
   });
 
-  // Keyboard shortcuts (in-window).
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (matchHotkey(e, { key: "k", mods: ["mod"] })) {
-      e.preventDefault();
-      openCommandBar();
-      return;
-    }
-    if (matchHotkey(e, { key: "n", mods: ["mod"] })) {
-      e.preventDefault();
-      handleCreateNote();
-      return;
-    }
-    if (matchHotkey(e, { key: "\\", mods: ["mod"] })) {
-      e.preventDefault();
-      toggleSidebar();
-      return;
-    }
-    if (matchHotkey(e, { key: "p", mods: ["mod", "shift"] })) {
-      e.preventDefault();
-      const id = selectedId();
-      if (id) handleTogglePin(id);
-      return;
-    }
-    if (
-      matchHotkey(e, { key: "Backspace", mods: ["mod", "shift"] }) ||
-      matchHotkey(e, { key: "Delete", mods: ["mod", "shift"] })
-    ) {
-      e.preventDefault();
-      const id = selectedId();
-      if (id) handleDelete(id);
-    }
-  };
-
-  onMount(() => {
-    window.addEventListener("keydown", handleKeyDown);
-    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
-  });
+  useShortcuts([
+    {
+      hotkey: { key: "k", mods: ["mod"] },
+      handler: () => {
+        openCommandBar();
+      },
+    },
+    {
+      hotkey: { key: "n", mods: ["mod"] },
+      handler: () => {
+        void handleCreateNote();
+      },
+    },
+    {
+      hotkey: { key: "\\", mods: ["mod"] },
+      handler: () => toggleSidebar(),
+    },
+    {
+      hotkey: { key: "p", mods: ["mod", "shift"] },
+      handler: () => {
+        const id = selectedId();
+        if (id) void handleTogglePin(id);
+      },
+    },
+    {
+      hotkey: { key: "Backspace", mods: ["mod", "shift"] },
+      handler: () => {
+        const id = selectedId();
+        if (id) void handleDelete(id);
+      },
+    },
+    {
+      hotkey: { key: "Delete", mods: ["mod", "shift"] },
+      handler: () => {
+        const id = selectedId();
+        if (id) void handleDelete(id);
+      },
+    },
+  ]);
 
   onMount(async () => {
     const unlistenCmd = await onEvent("notez://global/command-bar", () => {
@@ -214,18 +213,6 @@ export const MainView: Component = () => {
     });
     onCleanup(() => unlistenCmd());
   });
-
-  // Flush pending changes when window loses focus.
-  onMount(() => {
-    const onBlur = () => {
-      if (pendingChange) persist.flush();
-    };
-    window.addEventListener("blur", onBlur);
-    onCleanup(() => window.removeEventListener("blur", onBlur));
-  });
-
-  void sidebarCollapsed;
-  void setSidebarCollapsed;
 
   return (
     <div class="nz-app" classList={{ "sidebar-collapsed": sidebarCollapsed() }}>
@@ -259,9 +246,9 @@ export const MainView: Component = () => {
             )}
           </Show>
           <div class="nz-main-header-spacer" data-tauri-drag-region />
-          <div class="nz-saving-indicator" data-state={savingState()}>
-            <Show when={savingState() === "saving"}>Saving…</Show>
-            <Show when={savingState() === "saved"}>Saved</Show>
+          <div class="nz-saving-indicator" data-state={save.savingState()}>
+            <Show when={save.savingState() === "saving"}>Saving…</Show>
+            <Show when={save.savingState() === "saved"}>Saved</Show>
           </div>
           <button
             class="nz-icon-btn"

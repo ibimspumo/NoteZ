@@ -1,8 +1,15 @@
 use crate::db::{note_row_to_summary, now_iso, Db};
 use crate::error::{NoteZError, Result};
-use crate::models::{Note, NoteSummary, UpdateNoteInput};
+use crate::models::{
+    Note, NoteSummary, NotesCursor, NotesPage, TrashCursor, TrashPage, UpdateNoteInput,
+};
+use rusqlite::Connection;
 use tauri::State;
 use uuid::Uuid;
+
+/// Hard cap to keep IPC frames small even if a buggy caller asks for the moon.
+/// 500 rows ≈ 80 KB of NoteSummary JSON — that's our budget per RTT.
+const MAX_PAGE_SIZE: u32 = 500;
 
 #[tauri::command]
 pub fn create_note(db: State<Db>) -> Result<Note> {
@@ -62,46 +69,100 @@ pub fn update_note(db: State<Db>, input: UpdateNoteInput) -> Result<Note> {
     fetch_note(&conn, &input.id)
 }
 
+/// Paginated active-notes listing.
+///
+/// First page (cursor=None) returns pinned items in full — pinned counts are
+/// bounded by user behaviour so we don't paginate them. Following pages return
+/// only unpinned items, ordered by `updated_at DESC, id DESC` for cursor stability
+/// when several notes share the same timestamp.
 #[tauri::command]
-pub fn list_notes(db: State<Db>, include_deleted: Option<bool>) -> Result<Vec<NoteSummary>> {
+pub fn list_notes(
+    db: State<Db>,
+    cursor: Option<NotesCursor>,
+    limit: Option<u32>,
+) -> Result<NotesPage> {
     let conn = db.conn()?;
-    let include_deleted = include_deleted.unwrap_or(false);
+    let limit = clamp_limit(limit, 100);
 
-    let sql = if include_deleted {
-        "SELECT id, title, content_text, is_pinned, pinned_at, updated_at
-         FROM notes
-         ORDER BY is_pinned DESC, COALESCE(pinned_at, updated_at) DESC, updated_at DESC"
+    // Pinned notes only on the first page.
+    let pinned = if cursor.is_none() {
+        load_pinned_summaries(&conn)?
     } else {
-        "SELECT id, title, content_text, is_pinned, pinned_at, updated_at
-         FROM notes
-         WHERE deleted_at IS NULL
-         ORDER BY is_pinned DESC, COALESCE(pinned_at, updated_at) DESC, updated_at DESC"
+        Vec::new()
     };
 
-    let mut stmt = conn.prepare(sql)?;
-    let rows = stmt.query_map([], |row| note_row_to_summary(&conn, row))?;
-    let mut out = Vec::new();
-    for r in rows {
-        out.push(r?);
-    }
-    Ok(out)
+    let items = load_unpinned_page(&conn, cursor.as_ref(), limit + 1)?;
+
+    let (items, next_cursor) = split_page(items, limit, |last| NotesCursor {
+        updated_at: last.updated_at.clone(),
+        id: last.id.clone(),
+    });
+
+    Ok(NotesPage { pinned, items, next_cursor })
 }
 
 #[tauri::command]
-pub fn list_trash(db: State<Db>) -> Result<Vec<NoteSummary>> {
+pub fn list_trash(
+    db: State<Db>,
+    cursor: Option<TrashCursor>,
+    limit: Option<u32>,
+) -> Result<TrashPage> {
     let conn = db.conn()?;
-    let mut stmt = conn.prepare(
-        "SELECT id, title, content_text, is_pinned, pinned_at, updated_at
-         FROM notes
-         WHERE deleted_at IS NOT NULL
-         ORDER BY deleted_at DESC",
-    )?;
-    let rows = stmt.query_map([], |row| note_row_to_summary(&conn, row))?;
-    let mut out = Vec::new();
-    for r in rows {
-        out.push(r?);
-    }
-    Ok(out)
+    let limit = clamp_limit(limit, 100);
+
+    // Trash uses a separate cursor (deleted_at instead of updated_at).
+    // The partial index `idx_notes_trash_deleted` makes this a covered range scan.
+    let rows: Vec<(NoteSummary, String)> = if let Some(c) = cursor.as_ref() {
+        let mut stmt = conn.prepare(
+            "SELECT id, title, content_text, is_pinned, pinned_at, updated_at, deleted_at
+             FROM notes
+             WHERE deleted_at IS NOT NULL
+               AND (deleted_at, id) < (?1, ?2)
+             ORDER BY deleted_at DESC, id DESC
+             LIMIT ?3",
+        )?;
+        let mapped = stmt.query_map(
+            rusqlite::params![c.deleted_at, c.id, (limit + 1) as i64],
+            |row| {
+                let summary = note_row_to_summary(&conn, row)?;
+                let deleted_at: String = row.get("deleted_at")?;
+                Ok((summary, deleted_at))
+            },
+        )?;
+        let collected: rusqlite::Result<Vec<_>> = mapped.collect();
+        collected?
+    } else {
+        let mut stmt = conn.prepare(
+            "SELECT id, title, content_text, is_pinned, pinned_at, updated_at, deleted_at
+             FROM notes
+             WHERE deleted_at IS NOT NULL
+             ORDER BY deleted_at DESC, id DESC
+             LIMIT ?1",
+        )?;
+        let mapped = stmt.query_map(rusqlite::params![(limit + 1) as i64], |row| {
+            let summary = note_row_to_summary(&conn, row)?;
+            let deleted_at: String = row.get("deleted_at")?;
+            Ok((summary, deleted_at))
+        })?;
+        let collected: rusqlite::Result<Vec<_>> = mapped.collect();
+        collected?
+    };
+
+    let has_more = rows.len() > limit as usize;
+    let items_with_cursor: Vec<(NoteSummary, String)> =
+        rows.into_iter().take(limit as usize).collect();
+
+    let next_cursor = if has_more {
+        items_with_cursor.last().map(|(s, deleted_at)| TrashCursor {
+            deleted_at: deleted_at.clone(),
+            id: s.id.clone(),
+        })
+    } else {
+        None
+    };
+
+    let items = items_with_cursor.into_iter().map(|(s, _)| s).collect();
+    Ok(TrashPage { items, next_cursor })
 }
 
 #[tauri::command]
@@ -200,4 +261,87 @@ fn fetch_note(conn: &rusqlite::Connection, id: &str) -> Result<Note> {
             other => NoteZError::Database(other),
         })?;
     Ok(note)
+}
+
+fn clamp_limit(requested: Option<u32>, default: u32) -> u32 {
+    requested.unwrap_or(default).clamp(1, MAX_PAGE_SIZE)
+}
+
+/// Hard ceiling on pinned items returned to the frontend. Pinned counts are
+/// bounded by user behaviour in practice — but a misuse (or a sync bug from a
+/// future feature) shouldn't be able to dump 100k summaries into the IPC.
+const MAX_PINNED: i64 = 200;
+
+fn load_pinned_summaries(conn: &Connection) -> Result<Vec<NoteSummary>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, title, content_text, is_pinned, pinned_at, updated_at
+         FROM notes
+         WHERE deleted_at IS NULL AND is_pinned = 1
+         ORDER BY pinned_at DESC, updated_at DESC
+         LIMIT ?1",
+    )?;
+    let rows = stmt.query_map(rusqlite::params![MAX_PINNED], |row| {
+        note_row_to_summary(conn, row)
+    })?;
+    let mut out = Vec::new();
+    for r in rows {
+        out.push(r?);
+    }
+    Ok(out)
+}
+
+fn load_unpinned_page(
+    conn: &Connection,
+    cursor: Option<&NotesCursor>,
+    limit_plus_one: u32,
+) -> Result<Vec<NoteSummary>> {
+    let rows = if let Some(c) = cursor {
+        let mut stmt = conn.prepare(
+            "SELECT id, title, content_text, is_pinned, pinned_at, updated_at
+             FROM notes
+             WHERE deleted_at IS NULL
+               AND is_pinned = 0
+               AND (updated_at, id) < (?1, ?2)
+             ORDER BY updated_at DESC, id DESC
+             LIMIT ?3",
+        )?;
+        let mapped = stmt.query_map(
+            rusqlite::params![c.updated_at, c.id, limit_plus_one as i64],
+            |row| note_row_to_summary(conn, row),
+        )?;
+        let collected: rusqlite::Result<Vec<_>> = mapped.collect();
+        collected?
+    } else {
+        let mut stmt = conn.prepare(
+            "SELECT id, title, content_text, is_pinned, pinned_at, updated_at
+             FROM notes
+             WHERE deleted_at IS NULL
+               AND is_pinned = 0
+             ORDER BY updated_at DESC, id DESC
+             LIMIT ?1",
+        )?;
+        let mapped = stmt.query_map(rusqlite::params![limit_plus_one as i64], |row| {
+            note_row_to_summary(conn, row)
+        })?;
+        let collected: rusqlite::Result<Vec<_>> = mapped.collect();
+        collected?
+    };
+    Ok(rows)
+}
+
+fn split_page<F>(
+    mut rows: Vec<NoteSummary>,
+    limit: u32,
+    make_cursor: F,
+) -> (Vec<NoteSummary>, Option<NotesCursor>)
+where
+    F: Fn(&NoteSummary) -> NotesCursor,
+{
+    if rows.len() > limit as usize {
+        rows.truncate(limit as usize);
+        let cursor = rows.last().map(&make_cursor);
+        (rows, cursor)
+    } else {
+        (rows, None)
+    }
 }

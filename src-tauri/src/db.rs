@@ -10,21 +10,40 @@ pub type DbPool = Pool<SqliteConnectionManager>;
 #[derive(Clone)]
 pub struct Db {
     pub pool: Arc<DbPool>,
+    /// Absolute path to the on-disk asset directory (`<app_data>/assets`).
+    /// Stable for the lifetime of the app.
+    pub assets_dir: std::path::PathBuf,
 }
 
 impl Db {
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+    pub fn open(path: impl AsRef<Path>, assets_dir: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
+        let assets_dir = assets_dir.as_ref().to_path_buf();
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
+        std::fs::create_dir_all(&assets_dir)?;
 
-        // Set WAL once on a single bootstrap connection — running this from
-        // r2d2's `with_init` racks up "database is locked" errors when the pool
-        // builds multiple connections in parallel.
+        // Bootstrap pass:
+        //   - ensure page_size is 8192 (required before any tables exist; existing DBs are
+        //     migrated via VACUUM, which cannot run inside a transaction or under WAL)
+        //   - turn WAL on once, on a single connection, before the r2d2 pool builds others
+        //     in parallel (avoids "database is locked" races during bootstrap)
+        //
+        // WAL re-enable is unconditional: if the user kills the app between the page_size
+        // VACUUM and the WAL pragma, the DB stays in DELETE mode forever — running this
+        // on every launch is idempotent and self-healing.
         {
             let bootstrap = Connection::open(&path)?;
             bootstrap.busy_timeout(std::time::Duration::from_secs(5))?;
+
+            let current_page_size: i64 =
+                bootstrap.query_row("PRAGMA page_size", [], |r| r.get(0))?;
+            if current_page_size != 8192 {
+                // VACUUM requires journal_mode != WAL.
+                bootstrap.pragma_update(None, "journal_mode", "DELETE")?;
+                bootstrap.execute_batch("PRAGMA page_size = 8192; VACUUM;")?;
+            }
             bootstrap.pragma_update(None, "journal_mode", "WAL")?;
         }
 
@@ -34,12 +53,18 @@ impl Db {
                 "PRAGMA synchronous=NORMAL;
                  PRAGMA foreign_keys=ON;
                  PRAGMA temp_store=MEMORY;
-                 PRAGMA mmap_size=268435456;",
+                 PRAGMA mmap_size=268435456;
+                 PRAGMA cache_size=-65536;
+                 PRAGMA wal_autocheckpoint=1000;
+                 PRAGMA journal_size_limit=67108864;",
             )
         });
         let pool = Pool::builder().max_size(8).build(manager)?;
 
-        let db = Self { pool: Arc::new(pool) };
+        let db = Self {
+            pool: Arc::new(pool),
+            assets_dir,
+        };
         db.migrate()?;
         Ok(db)
     }
@@ -52,7 +77,10 @@ impl Db {
         let mut conn = self.conn()?;
         let current: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
 
-        let migrations: &[(i64, &str)] = &[(1, MIGRATION_001)];
+        let migrations: &[(i64, &str)] = &[
+            (1, MIGRATION_001),
+            (2, MIGRATION_002),
+        ];
 
         let tx = conn.transaction()?;
         for (version, sql) in migrations {
@@ -138,12 +166,89 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 "#;
 
+// v2:
+//   - rebuild FTS5 with prefix='2 3 4' so trailing-* queries don't scan the full term list
+//   - explicitly drop+recreate the FTS triggers so the dependency between the FTS schema
+//     and its maintenance triggers is captured in the same migration (otherwise a future
+//     FTS column change would silently desync from the v1-defined triggers)
+//   - add a partial index for the active-notes listing path (skips trash rows entirely)
+//   - drop the now-redundant full updated_at index
+//   - add a partial index for the pinned-list query
+//   - add an explicit index on notes.created_at (used by upcoming "sort by created" UIs)
+//   - make the FTS update trigger conditional on title/content actually changing —
+//     toggle_pin() and other metadata-only updates no longer cause an FTS rebuild
+//   - add the assets table for image / attachment storage with content-addressed dedup
+const MIGRATION_002: &str = r#"
+DROP TRIGGER IF EXISTS notes_ai;
+DROP TRIGGER IF EXISTS notes_ad;
+DROP TRIGGER IF EXISTS notes_au;
+DROP TABLE IF EXISTS notes_fts;
+
+CREATE VIRTUAL TABLE notes_fts USING fts5(
+    title,
+    content_text,
+    content='notes',
+    content_rowid='rowid',
+    tokenize='unicode61 remove_diacritics 2',
+    prefix='2 3 4'
+);
+
+INSERT INTO notes_fts(rowid, title, content_text)
+SELECT rowid, title, content_text FROM notes;
+
+CREATE TRIGGER notes_ai AFTER INSERT ON notes BEGIN
+    INSERT INTO notes_fts(rowid, title, content_text)
+    VALUES (new.rowid, new.title, new.content_text);
+END;
+
+CREATE TRIGGER notes_ad AFTER DELETE ON notes BEGIN
+    INSERT INTO notes_fts(notes_fts, rowid, title, content_text)
+    VALUES ('delete', old.rowid, old.title, old.content_text);
+END;
+
+-- Conditional update: only rebuild the FTS row when the indexed columns actually
+-- change. This makes pin toggles, soft-deletes, and any other metadata-only
+-- writes free w.r.t. FTS — a real win when a user is rapidly pinning/unpinning.
+CREATE TRIGGER notes_au AFTER UPDATE OF title, content_text ON notes
+WHEN old.title IS NOT new.title OR old.content_text IS NOT new.content_text
+BEGIN
+    INSERT INTO notes_fts(notes_fts, rowid, title, content_text)
+    VALUES ('delete', old.rowid, old.title, old.content_text);
+    INSERT INTO notes_fts(rowid, title, content_text)
+    VALUES (new.rowid, new.title, new.content_text);
+END;
+
+DROP INDEX IF EXISTS idx_notes_updated_at;
+CREATE INDEX IF NOT EXISTS idx_notes_active_updated
+    ON notes(updated_at DESC) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_notes_trash_deleted
+    ON notes(deleted_at DESC) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_notes_active_pinned
+    ON notes(pinned_at DESC) WHERE deleted_at IS NULL AND is_pinned = 1;
+CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS assets (
+    id TEXT PRIMARY KEY,                  -- sha256 hex of bytes
+    mime TEXT NOT NULL,
+    ext TEXT NOT NULL,                    -- file extension without dot
+    width INTEGER NOT NULL,
+    height INTEGER NOT NULL,
+    blurhash TEXT,
+    byte_size INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_assets_created_at ON assets(created_at DESC);
+"#;
+
 pub fn now_iso() -> String {
     chrono::Utc::now().to_rfc3339()
 }
 
-pub fn note_row_to_summary(conn: &Connection, row: &rusqlite::Row) -> rusqlite::Result<crate::models::NoteSummary> {
-    let _ = conn;
+pub fn note_row_to_summary(
+    _conn: &Connection,
+    row: &rusqlite::Row,
+) -> rusqlite::Result<crate::models::NoteSummary> {
     let content_text: String = row.get("content_text")?;
     let preview = make_preview(&content_text, 140);
     Ok(crate::models::NoteSummary {

@@ -13,7 +13,7 @@ import {
 } from "lexical";
 import {
   createNoteZEditor,
-  getEditorStateJSON,
+  getEditorStateSnapshot,
   getPlainText,
   loadEditorStateFromJSON,
 } from "./lexical/createEditor";
@@ -21,17 +21,25 @@ import {
   attachMentionClickHandler,
   collectMentionTargets,
 } from "./lexical/mentionNode";
+import { collectAssetIds } from "./lexical/imageNode";
 import {
   insertMention,
   registerMentionPlugin,
   type MentionMatch,
 } from "./lexical/mentionPlugin";
 import { MentionPopover } from "./MentionPopover";
+import { stringifyEditorState } from "../../lib/editorStringify";
+import type { EditorSnapshot } from "../../views/useSavePipeline";
 
 export type EditorChange = {
-  contentJson: string;
-  contentText: string;
-  mentionTargetIds: string[];
+  /**
+   * Compute the full save payload — JSON state, plain text, mention targets,
+   * asset ids. Deferred so the cost only lands once per save, not once per
+   * keystroke. JSON.stringify runs in a worker.
+   *
+   * Returns `null` if the editor is gone (note unmounted between schedule and call).
+   */
+  snapshot: () => Promise<EditorSnapshot | null>;
 };
 
 type EditorProps = {
@@ -70,7 +78,20 @@ export const Editor: Component<EditorProps> = (props) => {
       confirmSelection: () => confirmFn?.() ?? false,
     });
 
+    // Lazy snapshot: bind the editor handle once, the host calls it on demand.
+    const snapshot = async (): Promise<EditorSnapshot | null> => {
+      const ed = editorRef;
+      if (!ed) return null;
+      const stateObj = getEditorStateSnapshot(ed);
+      const text = getPlainText(ed);
+      const mentionTargetIds = collectMentionTargets(ed);
+      const assetIds = collectAssetIds(ed);
+      const contentJson = await stringifyEditorState(stateObj);
+      return { contentJson, contentText: text, mentionTargetIds, assetIds };
+    };
+
     const cleanupChange = handles.editor.registerUpdateListener(({ dirtyElements, dirtyLeaves, editorState }) => {
+      // Cheap: track empty state for the placeholder, no stringify here.
       editorState.read(() => {
         const root = $getRoot();
         const size = root.getChildrenSize();
@@ -90,10 +111,10 @@ export const Editor: Component<EditorProps> = (props) => {
 
       if (suppressChange) return;
       if (dirtyElements.size === 0 && dirtyLeaves.size === 0) return;
-      const json = getEditorStateJSON(handles.editor);
-      const text = getPlainText(handles.editor);
-      const targets = collectMentionTargets(handles.editor);
-      props.onChange({ contentJson: json, contentText: text, mentionTargetIds: targets });
+
+      // Don't compute the snapshot here — pass the deferred provider to the host.
+      // The save pipeline debounces and pulls the snapshot once per save burst.
+      props.onChange({ snapshot });
     });
 
     onCleanup(() => {

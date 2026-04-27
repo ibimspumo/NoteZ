@@ -1,0 +1,298 @@
+import { decode as decodeBlurhash } from "blurhash";
+import {
+  $applyNodeReplacement,
+  ElementNode,
+  type EditorConfig,
+  type LexicalEditor,
+  type LexicalNode,
+  type NodeKey,
+  type SerializedElementNode,
+  type Spread,
+} from "lexical";
+import { api, assetUrl } from "../../../lib/tauri";
+
+export type SerializedImageNode = Spread<
+  {
+    /** Content-addressed sha256 of the bytes — the only stable handle. */
+    assetId: string;
+    /** File extension (without dot) — needed to reconstruct the on-disk path. */
+    ext: string;
+    width: number;
+    height: number;
+    /** Blurhash for low-quality preview before the real bitmap loads. */
+    blurhash: string | null;
+    /** Optional alt text for accessibility. */
+    alt: string;
+  },
+  SerializedElementNode
+>;
+
+/**
+ * Block-level image embed.
+ *
+ * Render pipeline:
+ *   1. `createDOM` builds a `<figure>` with a wrapper sized to the image's
+ *      aspect ratio so layout is stable from the first paint.
+ *   2. The wrapper gets a blurhash background painted to a small data-URI canvas.
+ *      This makes the image look "filled in" before the real bitmap loads —
+ *      no layout shift, no flash of empty space.
+ *   3. An `<img>` is inserted on top with `loading="lazy"` and `decoding="async"`.
+ *      It fades in over the blurhash once decoded.
+ *
+ * Storage:
+ *   - The on-disk path is *not* serialized. We persist `assetId` + `ext` and
+ *     reconstruct the path at render time from a cached `assetsDir` (set once
+ *     at app startup). This survives data-dir moves between Macs.
+ *   - If `assetsDir` is not yet known when a node is created (very early render
+ *     before init finishes), we fall back to an async `api.getAsset(id)` lookup.
+ *
+ * This node is "atomic" (a token): the cursor jumps over it as a unit, the
+ * full embed is preserved in copy/paste, and Lexical's history undoes it as one.
+ */
+export class ImageNode extends ElementNode {
+  __assetId: string;
+  __ext: string;
+  __width: number;
+  __height: number;
+  __blurhash: string | null;
+  __alt: string;
+
+  static getType(): string {
+    return "image";
+  }
+
+  static clone(n: ImageNode): ImageNode {
+    return new ImageNode(
+      n.__assetId,
+      n.__ext,
+      n.__width,
+      n.__height,
+      n.__blurhash,
+      n.__alt,
+      n.__key,
+    );
+  }
+
+  constructor(
+    assetId: string,
+    ext: string,
+    width: number,
+    height: number,
+    blurhash: string | null,
+    alt: string,
+    key?: NodeKey,
+  ) {
+    super(key);
+    this.__assetId = assetId;
+    this.__ext = ext;
+    this.__width = width;
+    this.__height = height;
+    this.__blurhash = blurhash;
+    this.__alt = alt;
+  }
+
+  getAssetId(): string {
+    return this.__assetId;
+  }
+
+  createDOM(_config: EditorConfig): HTMLElement {
+    const figure = document.createElement("figure");
+    figure.className = "nz-image";
+    figure.setAttribute("data-lexical-image", "true");
+    figure.setAttribute("data-asset-id", this.__assetId);
+    figure.setAttribute("contenteditable", "false");
+
+    const wrap = document.createElement("div");
+    wrap.className = "nz-image-wrap";
+    if (this.__width > 0 && this.__height > 0) {
+      wrap.style.aspectRatio = `${this.__width} / ${this.__height}`;
+    }
+
+    if (this.__blurhash) {
+      const dataUrl = blurhashToDataUrl(this.__blurhash, 32, 24);
+      if (dataUrl) wrap.style.backgroundImage = `url(${dataUrl})`;
+    }
+
+    const img = document.createElement("img");
+    img.alt = this.__alt;
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.draggable = false;
+    img.className = "nz-image-img";
+    img.addEventListener(
+      "load",
+      () => img.classList.add("loaded"),
+      { once: true },
+    );
+
+    // Sync path resolution from the cached assets dir; falls back to an async
+    // IPC lookup if the cache wasn't initialized yet.
+    const syncPath = resolveAssetPathSync(this.__assetId, this.__ext);
+    if (syncPath) {
+      img.src = assetUrl(syncPath);
+    } else {
+      const id = this.__assetId;
+      void api.getAsset(id).then((ref) => {
+        if (ref) img.src = assetUrl(ref.path);
+      });
+    }
+
+    wrap.appendChild(img);
+    figure.appendChild(wrap);
+    return figure;
+  }
+
+  updateDOM(prev: ImageNode, _dom: HTMLElement, _config: EditorConfig): boolean {
+    // Path is content-addressed (sha256) — if the assetId hasn't changed, the
+    // bytes haven't changed, and we can reuse the existing DOM. If the assetId
+    // changes, returning true tells Lexical to recreate the DOM.
+    return prev.__assetId !== this.__assetId;
+  }
+
+  isInline(): boolean {
+    return false;
+  }
+
+  isToken(): boolean {
+    return true;
+  }
+
+  canBeEmpty(): boolean {
+    return true;
+  }
+
+  exportJSON(): SerializedImageNode {
+    return {
+      ...super.exportJSON(),
+      type: "image",
+      version: 1,
+      assetId: this.__assetId,
+      ext: this.__ext,
+      width: this.__width,
+      height: this.__height,
+      blurhash: this.__blurhash,
+      alt: this.__alt,
+    };
+  }
+
+  static importJSON(s: SerializedImageNode): ImageNode {
+    return $createImageNode({
+      assetId: s.assetId,
+      ext: s.ext,
+      width: s.width,
+      height: s.height,
+      blurhash: s.blurhash,
+      alt: s.alt ?? "",
+    });
+  }
+
+  getTextContent(): string {
+    return this.__alt ? `[image: ${this.__alt}]` : "[image]";
+  }
+}
+
+export type CreateImageInput = {
+  assetId: string;
+  ext: string;
+  width: number;
+  height: number;
+  blurhash: string | null;
+  alt?: string;
+};
+
+export function $createImageNode(input: CreateImageInput): ImageNode {
+  return $applyNodeReplacement(
+    new ImageNode(
+      input.assetId,
+      input.ext,
+      input.width,
+      input.height,
+      input.blurhash,
+      input.alt ?? "",
+    ),
+  );
+}
+
+export function $isImageNode(n: LexicalNode | null | undefined): n is ImageNode {
+  return n instanceof ImageNode;
+}
+
+/**
+ * Walk the editor state and collect every asset id referenced by an `ImageNode`.
+ * Used by the save pipeline to populate `UpdateNoteInput.asset_ids` so the
+ * Rust-side garbage collector knows what's live.
+ */
+export function collectAssetIds(editor: LexicalEditor): string[] {
+  const ids = new Set<string>();
+  editor.getEditorState().read(() => {
+    const nodeMap = editor.getEditorState()._nodeMap;
+    for (const node of nodeMap.values()) {
+      if (node instanceof ImageNode) ids.add(node.getAssetId());
+    }
+  });
+  return Array.from(ids);
+}
+
+// --- assets dir cache ---
+
+let cachedAssetsDir: string | null = null;
+let assetsDirLoad: Promise<string> | null = null;
+
+/**
+ * Initialize the cached assets directory. Call once at app startup (in App.tsx).
+ * Subsequent calls are deduped, so it's safe to call from multiple call sites.
+ */
+export function initAssetsDir(): Promise<string> {
+  if (cachedAssetsDir) return Promise.resolve(cachedAssetsDir);
+  if (assetsDirLoad) return assetsDirLoad;
+  assetsDirLoad = api.getAssetsDir().then((dir) => {
+    cachedAssetsDir = dir;
+    return dir;
+  });
+  return assetsDirLoad;
+}
+
+function resolveAssetPathSync(id: string, ext: string): string | null {
+  if (!cachedAssetsDir) return null;
+  // Mirrors the Rust-side layout: <assets_dir>/<id[0:2]>/<id>.<ext>
+  const sep = cachedAssetsDir.includes("\\") && !cachedAssetsDir.includes("/") ? "\\" : "/";
+  return `${cachedAssetsDir}${sep}${id.slice(0, 2)}${sep}${id}.${ext}`;
+}
+
+// --- blurhash → data URL ---
+
+const blurhashCache = new Map<string, string>();
+const BLURHASH_CACHE_CAP = 200;
+
+function blurhashToDataUrl(hash: string, w: number, h: number): string | null {
+  const cacheKey = `${hash}|${w}x${h}`;
+  // Move-to-end LRU: a hit makes the entry "newest" so frequently-viewed
+  // blurhashes survive evictions even when many fresh hashes pass through.
+  const cached = blurhashCache.get(cacheKey);
+  if (cached !== undefined) {
+    blurhashCache.delete(cacheKey);
+    blurhashCache.set(cacheKey, cached);
+    return cached;
+  }
+
+  try {
+    const pixels = decodeBlurhash(hash, w, h);
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    const imgData = ctx.createImageData(w, h);
+    imgData.data.set(pixels);
+    ctx.putImageData(imgData, 0, 0);
+    const url = canvas.toDataURL("image/png");
+    blurhashCache.set(cacheKey, url);
+    if (blurhashCache.size > BLURHASH_CACHE_CAP) {
+      const oldest = blurhashCache.keys().next().value;
+      if (oldest) blurhashCache.delete(oldest);
+    }
+    return url;
+  } catch {
+    return null;
+  }
+}
