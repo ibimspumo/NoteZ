@@ -6,6 +6,7 @@ import { HeadingNode, QuoteNode } from "@lexical/rich-text";
 import { mergeRegister } from "@lexical/utils";
 import { registerHistory, createEmptyHistoryState } from "@lexical/history";
 import {
+  $createParagraphNode,
   $getRoot,
   createEditor as lexicalCreateEditor,
   type LexicalEditor,
@@ -37,6 +38,18 @@ export function createNoteZEditor(rootEl: HTMLElement): EditorHandles {
   });
 
   editor.setRootElement(rootEl);
+
+  // Lexical's default state is a root with no children. Without a paragraph
+  // there is no place for the cursor to land, so the editor would feel "dead".
+  editor.update(
+    () => {
+      const root = $getRoot();
+      if (root.getChildrenSize() === 0) {
+        root.append($createParagraphNode());
+      }
+    },
+    { discrete: true },
+  );
 
   const cleanup = mergeRegister(
     registerHistory(editor, createEmptyHistoryState(), 300),

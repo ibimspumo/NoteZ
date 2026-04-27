@@ -45,13 +45,26 @@
   outline: none;
 }
 
-.nz-editor-content[data-placeholder] > h1:first-child:empty::before,
-.nz-editor-content[data-placeholder] > .nz-h1:first-child:empty::before,
-.nz-editor-content[data-placeholder] > p:first-child:only-child:empty::before {
+/* Apple-Notes-style: the first paragraph IS the title. */
+.nz-editor-content > p:first-child,
+.nz-editor-content > .nz-paragraph:first-child {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.022em;
+  line-height: 1.25;
+  margin: 0 0 14px;
+  color: var(--nz-text-strong);
+}
+
+.nz-editor-content[data-placeholder] > p:first-child:only-child:empty::before,
+.nz-editor-content[data-placeholder] > .nz-paragraph:first-child:only-child:empty::before,
+.nz-editor-content[data-placeholder]:empty::before {
   content: attr(data-placeholder);
   color: var(--nz-text-whisper);
   pointer-events: none;
-  display: inline-block;
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: -0.022em;
 }
 
 .nz-paragraph {

@@ -7,11 +7,9 @@ import {
 } from "solid-js";
 import {
   $createParagraphNode,
-  $createTextNode,
   $getRoot,
   type LexicalEditor,
 } from "lexical";
-import { $createHeadingNode } from "@lexical/rich-text";
 import {
   createNoteZEditor,
   getEditorStateJSON,
@@ -67,24 +65,16 @@ export const Editor: Component<EditorProps> = (props) => {
       onClose: () => setActiveMatch(null),
       isOpen: () => activeMatch() !== null,
       navigate: (dir) => navigateFn?.(dir),
-      confirmSelection: () => {
-        const ok = confirmFn?.() ?? false;
-        return ok;
-      },
+      confirmSelection: () => confirmFn?.() ?? false,
     });
 
     const cleanupChange = handles.editor.registerUpdateListener(({ dirtyElements, dirtyLeaves }) => {
       if (suppressChange) return;
-      // Skip events that don't actually carry content changes (e.g. selection-only).
       if (dirtyElements.size === 0 && dirtyLeaves.size === 0) return;
       const json = getEditorStateJSON(handles.editor);
       const text = getPlainText(handles.editor);
       const targets = collectMentionTargets(handles.editor);
-      props.onChange({
-        contentJson: json,
-        contentText: text,
-        mentionTargetIds: targets,
-      });
+      props.onChange({ contentJson: json, contentText: text, mentionTargetIds: targets });
     });
 
     onCleanup(() => {
@@ -104,27 +94,15 @@ export const Editor: Component<EditorProps> = (props) => {
     suppressChange = true;
     if (props.initialJson && props.initialJson !== "{}") {
       loadEditorStateFromJSON(editorRef, props.initialJson);
-      // Place cursor at the end of the loaded document.
-      editorRef.update(() => {
-        const root = $getRoot();
-        root.selectEnd();
-      });
     } else {
       editorRef.update(() => {
         const root = $getRoot();
         root.clear();
-        const heading = $createHeadingNode("h1");
-        heading.append($createTextNode(""));
-        root.append(heading);
-        heading.selectStart();
+        root.append($createParagraphNode());
       });
     }
-    // Allow the next microtask's update to fire normally.
     queueMicrotask(() => {
       suppressChange = false;
-    });
-    // Hand focus back to the editor after a note switch.
-    queueMicrotask(() => {
       editorRef?.focus();
     });
   });
@@ -135,8 +113,6 @@ export const Editor: Component<EditorProps> = (props) => {
     insertMention(editorRef, m, noteId, title);
     setActiveMatch(null);
   };
-
-  void $createParagraphNode;
 
   return (
     <div class="nz-editor-shell">
