@@ -1,98 +1,119 @@
-# NoteZ
+<p align="center">
+  <img src="app-icon.png" width="160" alt="NoteZ" />
+</p>
 
-**v0.4.4** — Fast, local, beautiful notes for Mac.
+<h1 align="center">NoteZ</h1>
 
-NoteZ is the note-taking app that fills the gap between Apple Notes (too simple, Apple-only)
-and Obsidian/Notion (too complex, online-first). Built native with Tauri 2 + Rust + Solid.js,
-it boots instantly, ships zero telemetry, stores everything locally in SQLite, and gets out
-of your way.
+<p align="center">
+  <em>Fast, local, beautiful notes for Mac.</em>
+</p>
 
-## Why
+<p align="center">
+  <img src="https://img.shields.io/badge/version-0.4.4-1f883d?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/platform-macOS-1f883d?style=flat-square" alt="macOS" />
+  <img src="https://img.shields.io/badge/storage-local%20only-1f883d?style=flat-square" alt="local-only" />
+  <img src="https://img.shields.io/badge/telemetry-none-1f883d?style=flat-square" alt="no telemetry" />
+  <img src="https://img.shields.io/badge/license-MIT-1f883d?style=flat-square" alt="license" />
+</p>
 
-- **Apple-Notes speed.** Sub-100ms search across 100k notes via SQLite FTS5 with smart
-  ranking (recency × match quality × pin × prefix bonus).
-- **No cloud lock-in.** Your data is one SQLite file in a folder of your choice. Sync it
-  yourself with iCloud Drive, Dropbox, Syncthing — or don't sync at all.
-- **No Markdown in your face.** WYSIWYG editor (custom-built on Lexical) where Markdown
-  shortcuts work but the syntax is never shown.
-- **Mac-first.** Vibrancy, native window chrome, system dark mode, global hotkeys.
-  Win/Linux possible later — same codebase.
+---
 
-## Stack
+NoteZ is the note app for people who think Apple Notes is too simple and Notion is
+too much. It opens instantly, searches across thousands of notes in under a
+hundred milliseconds, and keeps every word you write in a single file on
+your Mac — no cloud, no account, no waiting.
 
-- **Tauri 2** for the shell (native macOS WebKit, ~10 MB bundle).
-- **Rust** for the backend: SQLite (with FTS5), migrations, ranking, snapshots.
-- **Solid.js + TypeScript** for the frontend (fine-grained reactivity, fast on long lists).
-- **Lexical** as an invisible editor engine — custom UI, custom nodes, custom plugins built on top.
-- **No telemetry, no accounts, no required network calls.**
+## Why NoteZ
 
-## Features
+**It's actually fast.** Most note apps slow down once you have a few thousand
+notes. NoteZ uses a real database under the hood and stays snappy whether you
+have ten notes or a hundred thousand. Search results appear as you type.
 
-- ⚡️ Instant search (`⌘K`) — Spotlight-style command bar, fuzzy + FTS, smart ranking.
-- 📝 WYSIWYG editor — type `# `, `## `, `- `, `1. `, `[]`, `**bold**`, `_italic_`. The
-  syntax disappears as you type.
-- 🔗 `@mentions` — type `@` to link to any note. Inline auto-suggest, click to jump.
-- 📌 Pinning — keep important notes at the top of the sidebar.
-- 🗑️ Soft-delete with 30-day Trash.
-- ⏱️ Automatic snapshots — every five minutes of edits, with up to 50 history points
-  per note. Roll back from the Versions panel.
-- 🪟 Quick Capture — a global hotkey (`⌘⇧N`) opens a tiny capture window from anywhere.
-  `⌘ + ↵` to save, `esc` to dismiss.
-- 🍎 Mac-native — vibrancy, transparent titlebar, hidden traffic lights, follows system dark mode.
+**Your notes are yours.** Everything lives in a single file on your Mac. You can
+back it up, sync it with iCloud Drive or Dropbox, copy it to a USB stick, or
+do nothing at all. There is no NoteZ server. There is no account to make. There
+is no internet connection required, ever.
+
+**No Markdown in your face.** Type `# ` for a heading and the `# ` disappears.
+Type `**bold**` and the asterisks vanish. The shortcuts are there if you want
+them, but the screen always shows the finished page — never the source code.
+
+**Mac-first, properly.** Translucent sidebar, hidden traffic lights, native dark
+mode, global hotkeys. It looks and feels like an Apple app because it's built
+with the same materials.
+
+## What you can do
+
+**Search anything in milliseconds.** Press `Cmd+K` for a Spotlight-style command
+bar. Find any note by title, content, or fragment. Smart ranking puts the most
+recent and most relevant matches first.
+
+**Write without friction.** A clean editor that handles headings, bullets,
+numbered lists, bold, italic, links, and inline images — all through familiar
+keyboard shortcuts that get out of your way.
+
+**Link notes together.** Type `@` anywhere to link to another note. Click the
+link to jump there. Build a web of ideas without folders or tags getting in
+the way.
+
+**Pin what matters.** Keep your most-used notes at the top of the sidebar.
+
+**Never lose a thought.** A global hotkey (`Cmd+Shift+N`) opens a tiny capture
+window from anywhere on your Mac. Type, press `Cmd+Enter`, and it's saved.
+
+**Undo yesterday.** Every five minutes of editing, NoteZ quietly takes a
+snapshot. Up to fifty history points per note. Roll back to any of them with
+one click.
+
+**Trust the trash.** Deleted notes sit in a 30-day Trash before they actually
+disappear. Plenty of time to change your mind.
 
 ## Keyboard
 
-| Shortcut | Action |
+| | |
 |---|---|
-| `⌘K` | Open search / command bar |
-| `⌘N` | New note |
-| `⌘⇧N` | Quick Capture (works globally) |
-| `⌘\\` | Toggle sidebar |
-| `⌘⇧P` | Pin/unpin current note |
-| `⌘⌫` | Move current note to trash |
-| `@` (in editor) | Open note-link suggestions |
-| `# `, `## `, `### ` | Heading 1/2/3 |
-| `- `, `* ` | Bullet list |
+| `Cmd+K` | Search / command bar |
+| `Cmd+N` | New note |
+| `Cmd+Shift+N` | Quick Capture (works system-wide) |
+| `Cmd+\` | Toggle sidebar |
+| `Cmd+Shift+P` | Pin or unpin current note |
+| `Cmd+Backspace` | Move note to Trash |
+| `@` | Open note-link suggestions |
+| `# `, `## `, `### ` | Headings |
+| `- ` or `* ` | Bullet list |
 | `1. ` | Numbered list |
-| `**text**`, `_text_` | Bold / italic |
+| `**text**` | Bold |
+| `_text_` | Italic |
 
-## Develop
+## Where your notes live
 
-```bash
-# Install Rust (one time): https://rustup.rs
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-pnpm install
-pnpm tauri dev          # run in dev with hot reload
-pnpm typecheck          # frontend type-check
-pnpm tauri build        # produce a signed-able .app
-```
-
-## Storage
-
-NoteZ stores its database in:
+One SQLite file:
 
 ```
 ~/Library/Application Support/de.agent-z.notez/notez.db
 ```
 
-The schema is documented in [src-tauri/src/db.rs](src-tauri/src/db.rs). It's a single
-SQLite file with FTS5, plus an `attachments/` and `snapshots/` companion directory next to
-it (will be added when image/file support lands in Phase 2).
+That's it. Back it up however you like. Sync the folder if you want it on
+multiple Macs. Move it to a different drive. Open it with any SQLite tool if
+you ever want to look inside.
 
 ## Roadmap
 
-**Phase 1 — Shipped (this repo).**
-Editor, search, sidebar, pinning, soft-delete, auto-snapshots, mentions, quick capture,
-mac vibrancy.
+**Now.** Editor, search, pinning, snapshots, mentions, quick capture, trash,
+images.
 
-**Phase 2.** Multi-pane (drag a note from the sidebar onto the editor for a 50/50 split,
-recursively splittable). Images with content-addressable storage and OCR via Apple Vision.
-Code blocks with syntax highlighting. Slash menu. Backlinks panel. `#hashtag` tags.
-Daily notes. Templates.
+**Next.** Split panes. Slash menu. Code blocks with syntax highlighting.
+Backlinks panel. Hashtag tags. Daily notes. Templates.
 
-**Phase 3.** Windows + Linux builds. Tables, callouts, toggle blocks, LaTeX. CRDT-based
-sync layer. Local semantic search (Ollama). iOS companion app.
+**Later.** Windows and Linux builds. Tables, callouts, LaTeX. End-to-end
+encrypted sync. Local semantic search. iOS companion.
+
+## Built with
+
+Tauri 2, Rust, Solid.js, TypeScript, Lexical, SQLite (FTS5). No Electron, no
+React, no telemetry. The whole app is around ten megabytes.
+
+For development setup, see [CLAUDE.md](CLAUDE.md).
 
 ## License
 
