@@ -1,6 +1,6 @@
 # NoteZ
 
-**v0.4.0** — Fast, local, beautiful notes for Mac.
+**v0.4.1** — Fast, local, beautiful notes for Mac.
 
 NoteZ is the note-taking app that fills the gap between Apple Notes (too simple, Apple-only)
 and Obsidian/Notion (too complex, online-first). Built native with Tauri 2 + Rust + Solid.js,
