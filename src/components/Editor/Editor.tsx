@@ -57,6 +57,7 @@ type EditorProps = {
   initialJson: string;
   onChange: (change: EditorChange) => void;
   onOpenNote: (noteId: string) => void;
+  onReady?: (editor: LexicalEditor | null) => void;
 };
 
 export const Editor: Component<EditorProps> = (props) => {
@@ -94,6 +95,7 @@ export const Editor: Component<EditorProps> = (props) => {
     if (!containerRef) return;
     const handles = createNoteZEditor(containerRef);
     editorRef = handles.editor;
+    props.onReady?.(handles.editor);
 
     const cleanupClick = attachMentionClickHandler(containerRef, (id) => {
       props.onOpenNote(id);
@@ -168,6 +170,7 @@ export const Editor: Component<EditorProps> = (props) => {
       cleanupChange();
       cleanupMentions();
       cleanupClick();
+      props.onReady?.(null);
       handles.destroy();
     });
   });

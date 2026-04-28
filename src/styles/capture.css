@@ -1,49 +1,120 @@
-.nz-capture {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  width: 100vw;
+/* Quick Capture window — single floating textarea, no chrome.
+ *
+ * Window setup (Rust): decorations:false, transparent:true, shadow:false,
+ * background_color = (0,0,0,0). Everything visible is drawn here in CSS so
+ * nothing leaks past the rounded shape.
+ *
+ * No `backdrop-filter`, no big drop-shadow on purpose: WebKit on macOS leaks
+ * the filter region as a faint square ghost around rounded panels, and a
+ * spread shadow widens the bounding rectangle of compositing, which the eye
+ * reads as a "container" behind the pill. We render the panel itself as an
+ * opaque-ish dark slab — clean edges, no rectangular halo on bright
+ * wallpapers. */
+html,
+body {
   background: transparent;
-  border-radius: var(--nz-radius-xl);
+}
+
+.nz-capture {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: 1fr auto;
+  align-items: stretch;
+  padding: 14px 18px 12px;
+  gap: 8px 16px;
+  background: rgba(16, 16, 18, 0.92);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
   overflow: hidden;
 }
 
-.nz-capture-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 16px 4px 80px;
-  font-size: 10px;
-  color: var(--nz-text-whisper);
-  letter-spacing: 0.08em;
-}
-
-.nz-capture-title {
+/* Wordmark sits in the top-right corner, very subtle. The textarea gets
+ * matching padding-right so wrapped text never crosses under it. */
+.nz-capture-wordmark {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  display: inline-flex;
+  align-items: baseline;
+  font-family: var(--nz-font-ui);
+  font-size: 11px;
   font-weight: 700;
-  text-transform: uppercase;
-  color: var(--nz-text-faint);
+  letter-spacing: -0.01em;
+  color: rgba(255, 255, 255, 0.32);
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
 }
 
-.nz-capture-hint {
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
+.nz-capture-wordmark-z {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--nz-accent-hot);
+  opacity: 0.55;
+  margin-left: 1px;
+  line-height: 1;
 }
 
 .nz-capture-input {
-  flex: 1;
+  grid-column: 1 / -1;
+  grid-row: 1 / 2;
+  align-self: stretch;
+  width: 100%;
   border: none;
   outline: none;
   background: transparent;
   resize: none;
-  padding: 12px 20px 22px;
+  padding: 2px 60px 2px 0; /* keep wrapped text clear of the wordmark */
   font-family: var(--nz-font-ui);
   font-size: 15.5px;
-  line-height: 1.55;
+  line-height: 1.5;
   letter-spacing: -0.005em;
   color: var(--nz-text);
   caret-color: var(--nz-accent-hot);
 }
 
 .nz-capture-input::placeholder {
-  color: var(--nz-text-whisper);
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.nz-capture-hints {
+  grid-column: 1 / -1;
+  grid-row: 2 / 3;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+.nz-capture-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nz-capture-hint-sep {
+  color: rgba(255, 255, 255, 0.22);
+}
+
+.nz-capture-hints kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-family: var(--nz-font-ui);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.18);
 }

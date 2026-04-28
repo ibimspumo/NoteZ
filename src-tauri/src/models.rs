@@ -76,8 +76,17 @@ pub struct NotesCursor {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrashSummary {
+    pub id: String,
+    pub title: String,
+    pub preview: String,
+    pub updated_at: String,
+    pub deleted_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrashPage {
-    pub items: Vec<NoteSummary>,
+    pub items: Vec<TrashSummary>,
     pub next_cursor: Option<TrashCursor>,
 }
 

@@ -21,10 +21,24 @@ export function formatRelative(iso: string, now = Date.now()): string {
   }
   const date = new Date(t);
   const sameYear = date.getFullYear() === new Date(now).getFullYear();
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: sameYear ? undefined : "numeric",
+  });
+}
+
+export function formatAbsoluteDate(iso: string): string {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return "";
+  const date = new Date(t);
+  return date.toLocaleString("en-US", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
   });
 }
 

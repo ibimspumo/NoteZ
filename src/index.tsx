@@ -8,5 +8,8 @@ import "./styles/sidebar.css";
 import "./styles/editor.css";
 import "./styles/command-bar.css";
 import "./styles/capture.css";
+import "./styles/about.css";
+import "./styles/settings.css";
+import "./styles/trash.css";
 
 render(() => <App />, document.getElementById("root") as HTMLElement);

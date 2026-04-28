@@ -23,14 +23,33 @@
   padding: 6px 12px 12px 80px;
 }
 
+.nz-app-brand {
+  display: inline-flex;
+  align-items: baseline;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 .nz-app-name {
   font-family: var(--nz-font-ui);
-  font-size: 12.5px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--nz-text-muted);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.018em;
+  color: var(--nz-text-strong);
   user-select: none;
+  display: inline-flex;
+  align-items: baseline;
+  line-height: 1;
+}
+
+.nz-app-name-z {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--nz-accent-hot);
+  letter-spacing: -0.03em;
+  margin-left: 0.5px;
+  line-height: 1;
+  text-shadow: 0 1px 8px var(--nz-accent-glow);
 }
 
 .nz-sidebar-body {
@@ -229,4 +248,52 @@
   margin: 0;
   font-size: 12.5px;
   letter-spacing: -0.005em;
+}
+
+.nz-sidebar-footer {
+  flex: 0 0 auto;
+  padding: 6px 10px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid transparent;
+}
+
+.nz-trash-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 0;
+  padding: 4px 7px;
+  margin: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--nz-text-whisper);
+  transition: background 140ms var(--nz-ease), color 140ms var(--nz-ease);
+}
+
+.nz-trash-button:hover {
+  background: var(--nz-bg-hover);
+  color: var(--nz-text-faint);
+}
+
+.nz-trash-button-count {
+  font-family: var(--nz-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  background: var(--nz-bg-hover);
+  color: var(--nz-text-muted);
+  padding: 1px 6px;
+  border-radius: 999px;
+  line-height: 1.4;
+}
+
+.nz-sidebar-footer-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }

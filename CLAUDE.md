@@ -102,6 +102,26 @@ cargo build --manifest-path src-tauri/Cargo.toml
 - Global shortcuts on macOS: dev builds prompt for Accessibility on first hotkey use.
   Once granted, hot-reload won't re-prompt.
 
+## Versioning
+
+Every user-visible change MUST bump the app version. The version is shown in the
+bottom-right of the sidebar and is the user's only signal that something changed.
+
+**Bump rules (semver-ish, pre-1.0):**
+- Bug fix, minor polish, copy change → patch (`0.0.2` → `0.0.3`)
+- New feature, redesign, behavior change → minor (`0.0.x` → `0.1.0`)
+- Breaking schema/migration → major (when we hit `1.0.0`)
+
+**Files to update on every bump (all five must match):**
+1. `src/lib/version.ts` — `APP_VERSION` constant (drives the in-app label)
+2. `package.json` — `version` field
+3. `src-tauri/tauri.conf.json` — `version` field
+4. `src-tauri/Cargo.toml` — `[package].version`
+5. `README.md` — the `**vX.Y.Z**` line at the top
+
+If you ship a change without bumping, you've shipped a regression — the user can't
+tell what version they're running. The version label is the contract.
+
 ## Don'ts
 
 - **No `@lexical/react`.** Solid + React don't mix; vanilla-only.

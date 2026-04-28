@@ -1,0 +1,210 @@
+.nz-about-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: nz-fade-in 160ms var(--nz-ease);
+  padding: 24px;
+}
+
+.nz-about-dialog {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  background: var(--nz-bg-overlay);
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  border: 1px solid var(--nz-divider-strong);
+  border-radius: var(--nz-radius-lg);
+  box-shadow: var(--nz-shadow-lg);
+  padding: 28px 26px 20px;
+  animation: nz-rise 200ms var(--nz-ease);
+  color: var(--nz-text);
+}
+
+.nz-about-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--nz-radius-sm);
+  color: var(--nz-text-faint);
+  transition: background 120ms var(--nz-ease), color 120ms var(--nz-ease);
+}
+
+.nz-about-close:hover {
+  background: var(--nz-bg-hover);
+  color: var(--nz-text-strong);
+}
+
+.nz-about-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 4px 0 6px;
+}
+
+.nz-about-app {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.nz-about-name {
+  font-family: var(--nz-font-ui);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--nz-text-strong);
+  display: inline-flex;
+  align-items: baseline;
+  line-height: 1;
+}
+
+.nz-about-name-z {
+  font-size: 34px;
+  font-weight: 800;
+  color: var(--nz-accent-hot);
+  letter-spacing: -0.03em;
+  margin-left: 1px;
+  line-height: 1;
+  text-shadow: 0 1px 12px var(--nz-accent-glow);
+}
+
+.nz-about-version {
+  font-family: var(--nz-font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--nz-text-faint);
+  font-variant-numeric: tabular-nums;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--nz-bg-hover);
+  align-self: center;
+}
+
+.nz-about-tagline {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--nz-text-muted);
+  letter-spacing: -0.005em;
+}
+
+.nz-about-divider {
+  height: 1px;
+  background: var(--nz-divider);
+  margin: 18px -6px 16px;
+}
+
+.nz-about-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+}
+
+.nz-about-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--nz-text-whisper);
+}
+
+.nz-about-brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: var(--nz-radius-md);
+  color: var(--nz-text-strong);
+  transition: color 160ms var(--nz-ease), transform 120ms var(--nz-ease);
+}
+
+.nz-about-brand:hover {
+  color: var(--nz-accent-hot);
+  transform: translateY(-1px);
+}
+
+.nz-about-logo {
+  display: block;
+}
+
+.nz-about-blurb {
+  margin: 4px 0 2px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--nz-text-muted);
+  max-width: 30ch;
+  letter-spacing: -0.003em;
+}
+
+.nz-about-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--nz-accent-hot);
+  text-decoration: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  transition: background 140ms var(--nz-ease), color 140ms var(--nz-ease);
+}
+
+.nz-about-link:hover {
+  background: var(--nz-accent-soft);
+}
+
+.nz-about-footer {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--nz-divider);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: var(--nz-text-whisper);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.nz-about-footer-dot {
+  color: var(--nz-text-whisper);
+}
+
+/* Make the version label in the sidebar interactive */
+.nz-version-button {
+  background: transparent;
+  border: 0;
+  padding: 2px 6px;
+  margin: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: var(--nz-font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--nz-text-whisper);
+  font-variant-numeric: tabular-nums;
+  transition: background 140ms var(--nz-ease), color 140ms var(--nz-ease);
+}
+
+.nz-version-button:hover {
+  background: var(--nz-bg-hover);
+  color: var(--nz-text-faint);
+}

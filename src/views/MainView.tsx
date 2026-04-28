@@ -8,9 +8,11 @@ import {
 } from "solid-js";
 import { Sidebar } from "../components/Sidebar/Sidebar";
 import { Editor, type EditorChange } from "../components/Editor/Editor";
+import { EditorToolbar } from "../components/Editor/Toolbar";
 import { CommandBar } from "../components/CommandBar/CommandBar";
 import { onEvent } from "../lib/tauri";
-import { formatRelative } from "../lib/format";
+import { formatAbsoluteDate, formatRelative } from "../lib/format";
+import type { LexicalEditor } from "lexical";
 import {
   createNote,
   ensureSelection,
@@ -33,13 +35,16 @@ import {
   sidebarCollapsed,
   toggleSidebar,
 } from "../stores/ui";
+import { api } from "../lib/tauri";
 import type { Note } from "../lib/types";
+import { loadSettings, trashRetentionDays } from "../stores/settings";
 import { useSavePipeline } from "./useSavePipeline";
 import { useShortcuts } from "./useShortcuts";
 
 export const MainView: Component = () => {
   const [activeNote, setActiveNote] = createSignal<Note | null>(null);
   const [editorKey, setEditorKey] = createSignal(0);
+  const [editorInstance, setEditorInstance] = createSignal<LexicalEditor | null>(null);
 
   const save = useSavePipeline({
     onSaved: (updated) => {
@@ -146,6 +151,17 @@ export const MainView: Component = () => {
   };
 
   onMount(async () => {
+    // Load user settings first so the trash purge uses the configured retention.
+    await loadSettings().catch((e) => {
+      console.warn("loadSettings failed:", e);
+    });
+    // Trash auto-expiry: 0 means "never auto-delete".
+    const days = trashRetentionDays();
+    if (days > 0) {
+      api.purgeOldTrash(days).catch((e) => {
+        console.warn("purge_old_trash failed:", e);
+      });
+    }
     await refreshNotes();
     await ensureSelection();
   });
@@ -211,7 +227,15 @@ export const MainView: Component = () => {
     const unlistenCmd = await onEvent("notez://global/command-bar", () => {
       openCommandBar();
     });
-    onCleanup(() => unlistenCmd());
+    // Fired by the Quick Capture window after it persists a new note —
+    // refresh the sidebar so the entry shows up live.
+    const unlistenChanged = await onEvent("notez://notes/changed", () => {
+      void refreshNotes();
+    });
+    onCleanup(() => {
+      unlistenCmd();
+      unlistenChanged();
+    });
   });
 
   return (
@@ -270,23 +294,36 @@ export const MainView: Component = () => {
           }
         >
           {(note) => (
-            <div class="nz-editor-wrap">
-              <div class="nz-meta-bar">
-                <span>{formatRelative(note().updated_at)}</span>
-                <Show when={note().is_pinned}>
-                  <span class="nz-meta-pin">· Pinned</span>
-                </Show>
+            <>
+              <Show when={editorInstance()}>
+                {(ed) => <EditorToolbar editor={ed()} />}
+              </Show>
+              <div class="nz-editor-wrap">
+                <div class="nz-meta-bar">
+                  <span class="nz-meta-primary">
+                    {formatAbsoluteDate(note().created_at)}
+                  </span>
+                  <span class="nz-meta-dot" aria-hidden="true">·</span>
+                  <span class="nz-meta-secondary">
+                    Last edited {formatRelative(note().updated_at)}
+                  </span>
+                  <Show when={note().is_pinned}>
+                    <span class="nz-meta-dot" aria-hidden="true">·</span>
+                    <span class="nz-meta-pin">Pinned</span>
+                  </Show>
+                </div>
+                {/* Re-mount editor on note change via key. */}
+                <div data-editor-key={editorKey()}>
+                  <Editor
+                    noteId={note().id}
+                    initialJson={note().content_json}
+                    onChange={handleChange}
+                    onOpenNote={handleOpenNote}
+                    onReady={setEditorInstance}
+                  />
+                </div>
               </div>
-              {/* Re-mount editor on note change via key. */}
-              <div data-editor-key={editorKey()}>
-                <Editor
-                  noteId={note().id}
-                  initialJson={note().content_json}
-                  onChange={handleChange}
-                  onOpenNote={handleOpenNote}
-                />
-              </div>
-            </div>
+            </>
           )}
         </Show>
       </main>

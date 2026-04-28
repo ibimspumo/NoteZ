@@ -64,8 +64,16 @@ export type TrashCursor = {
   id: string;
 };
 
+export type TrashSummary = {
+  id: string;
+  title: string;
+  preview: string;
+  updated_at: string;
+  deleted_at: string;
+};
+
 export type TrashPage = {
-  items: NoteSummary[];
+  items: TrashSummary[];
   next_cursor: TrashCursor | null;
 };
 

@@ -67,6 +67,13 @@ export const api = {
   getSetting: (key: string) => invoke<string | null>("get_setting", { key }),
   setSetting: (key: string, value: string) =>
     invoke<void>("set_setting", { key, value }),
+  listSettings: () => invoke<Array<[string, string]>>("list_settings"),
+
+  // shortcuts (live-mutable global hotkeys)
+  getShortcuts: () =>
+    invoke<{ quick_capture: string; command_bar: string }>("get_shortcuts"),
+  updateShortcut: (name: "quick_capture" | "command_bar", accelerator: string) =>
+    invoke<string>("update_shortcut", { name, accelerator }),
 
   // assets
   saveAsset: (bytes: number[], mime: string) =>
@@ -88,7 +95,8 @@ export function assetUrl(absolutePath: string): string {
 
 export type NoteZEvent =
   | "notez://global/quick-capture"
-  | "notez://global/command-bar";
+  | "notez://global/command-bar"
+  | "notez://notes/changed";
 
 export function onEvent(event: NoteZEvent, handler: () => void): Promise<UnlistenFn> {
   return listen(event, handler);

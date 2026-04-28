@@ -11,16 +11,161 @@
   padding: 18px 64px 0;
   font-size: 11px;
   color: var(--nz-text-whisper);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
   display: flex;
-  gap: 6px;
+  gap: 8px;
+  align-items: baseline;
   font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  flex-wrap: wrap;
+}
+
+.nz-meta-primary {
+  color: var(--nz-text-muted);
   font-weight: 600;
+}
+
+.nz-meta-secondary {
+  color: var(--nz-text-faint);
+}
+
+.nz-meta-dot {
+  color: var(--nz-text-whisper);
 }
 
 .nz-meta-pin {
   color: var(--nz-accent-hot);
+  font-weight: 600;
+}
+
+/* ─── Formatting toolbar ─── */
+.nz-toolbar {
+  flex: 0 0 auto;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--nz-divider);
+  background: var(--nz-bg-toolbar, var(--nz-bg-main));
+  user-select: none;
+  -webkit-user-select: none;
+  position: relative;
+  z-index: 5;
+}
+
+.nz-toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  position: relative;
+}
+
+.nz-toolbar-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--nz-divider);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.nz-tb-btn {
+  height: 28px;
+  min-width: 28px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 6px;
+  color: var(--nz-text-muted);
+  transition: background 120ms var(--nz-ease), color 120ms var(--nz-ease),
+    transform 80ms var(--nz-ease);
+}
+
+.nz-tb-btn:hover {
+  background: var(--nz-bg-hover);
+  color: var(--nz-text-strong);
+}
+
+.nz-tb-btn:active {
+  transform: scale(0.94);
+}
+
+.nz-tb-btn.active {
+  background: var(--nz-bg-active);
+  color: var(--nz-accent-hot);
+}
+
+.nz-tb-btn.active:hover {
+  background: var(--nz-bg-active-strong);
+}
+
+.nz-tb-block {
+  padding: 0 8px 0 10px;
+  min-width: 110px;
+  justify-content: space-between;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--nz-text);
+  letter-spacing: -0.005em;
+}
+
+.nz-tb-block.open {
+  background: var(--nz-bg-hover);
+  color: var(--nz-text-strong);
+}
+
+.nz-tb-block-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nz-toolbar-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  min-width: 200px;
+  background: var(--nz-bg-overlay);
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  border: 1px solid var(--nz-divider-strong);
+  border-radius: var(--nz-radius-md);
+  box-shadow: var(--nz-shadow);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  animation: nz-rise 120ms var(--nz-ease);
+}
+
+.nz-toolbar-menu-item {
+  text-align: left;
+  padding: 7px 11px;
+  border-radius: var(--nz-radius-sm);
+  font-size: 13px;
+  color: var(--nz-text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  transition: background 100ms var(--nz-ease);
+}
+
+.nz-toolbar-menu-item:hover {
+  background: var(--nz-bg-hover);
+}
+
+.nz-toolbar-menu-item.active {
+  color: var(--nz-accent-hot);
+}
+
+.nz-toolbar-menu-hint {
+  font-family: var(--nz-font-mono);
+  font-size: 11px;
+  color: var(--nz-text-faint);
 }
 
 .nz-editor-shell {
@@ -33,7 +178,7 @@
   padding: 14px 64px 32px;
   font-family: var(--nz-font-ui);
   font-size: 15.5px;
-  line-height: 1.62;
+  line-height: 1.42;
   letter-spacing: -0.005em;
   color: var(--nz-text);
   word-break: break-word;
@@ -72,7 +217,8 @@
 }
 
 .nz-paragraph {
-  margin: 0 0 0.4em;
+  margin: 0 0 1em;
+  line-height: 1.42;
 }
 
 .nz-h1 {
@@ -124,8 +270,7 @@
 }
 
 .nz-li::marker {
-  color: var(--nz-text-faint);
-  font-size: 0.9em;
+  color: inherit;
 }
 
 .nz-li-nested {
@@ -146,7 +291,7 @@
   content: "";
   position: absolute;
   left: 0;
-  top: 0.42em;
+  top: 3px;
   width: 16px;
   height: 16px;
   border: 1.4px solid var(--nz-divider-strong);
@@ -167,13 +312,14 @@
 .nz-li-checked::after {
   content: "";
   position: absolute;
-  left: 4px;
-  top: 0.62em;
+  left: 3.75px;
+  top: 8.5px;
   width: 8.5px;
   height: 4.5px;
   border-left: 1.7px solid var(--nz-checkbox-fill);
   border-bottom: 1.7px solid var(--nz-checkbox-fill);
   transform: rotate(-45deg);
+  transform-origin: center;
   animation: nz-check-pop 160ms var(--nz-ease);
 }
 

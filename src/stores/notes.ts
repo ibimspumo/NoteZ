@@ -5,6 +5,8 @@ import type {
   Note,
   NoteSummary,
   NotesCursor,
+  TrashCursor,
+  TrashSummary,
   UpdateNoteInput,
 } from "../lib/types";
 
@@ -27,6 +29,9 @@ type NotesState = {
   nextCursor: NotesCursor | null;
   initialLoaded: boolean;
   loadingMore: boolean;
+  trash: TrashSummary[];
+  trashCursor: TrashCursor | null;
+  trashLoaded: boolean;
 };
 
 const PAGE_SIZE = 100;
@@ -37,6 +42,9 @@ const [state, setState] = createStore<NotesState>({
   nextCursor: null,
   initialLoaded: false,
   loadingMore: false,
+  trash: [],
+  trashCursor: null,
+  trashLoaded: false,
 });
 
 const cache = new Map<string, Note>();
@@ -148,16 +156,89 @@ export async function togglePin(id: string): Promise<Note> {
 }
 
 export async function softDeleteNote(id: string): Promise<void> {
+  // Capture summary before mutating so we can prepend to trash if loaded.
+  const prev =
+    state.pinned.find((n) => n.id === id) ?? state.items.find((n) => n.id === id);
   await api.softDeleteNote(id);
   cache.delete(id);
+  const deletedAt = new Date().toISOString();
   setState(
     produce((s) => {
       const fromItems = s.items.findIndex((n) => n.id === id);
       if (fromItems >= 0) s.items.splice(fromItems, 1);
       const fromPinned = s.pinned.findIndex((n) => n.id === id);
       if (fromPinned >= 0) s.pinned.splice(fromPinned, 1);
+      if (s.trashLoaded && prev) {
+        s.trash.unshift({
+          id: prev.id,
+          title: prev.title,
+          preview: prev.preview,
+          updated_at: prev.updated_at,
+          deleted_at: deletedAt,
+        });
+      }
     }),
   );
+}
+
+/* ---------------- Trash ---------------- */
+
+export async function loadTrash() {
+  const page = await api.listTrash(null, PAGE_SIZE);
+  setState(
+    produce((s) => {
+      s.trash = page.items;
+      s.trashCursor = page.next_cursor;
+      s.trashLoaded = true;
+    }),
+  );
+}
+
+export async function loadMoreTrash() {
+  if (!state.trashCursor) return;
+  const page = await api.listTrash(state.trashCursor, PAGE_SIZE);
+  setState(
+    produce((s) => {
+      s.trash = s.trash.concat(page.items);
+      s.trashCursor = page.next_cursor;
+    }),
+  );
+}
+
+export async function restoreNote(id: string): Promise<Note> {
+  const note = await api.restoreNote(id);
+  cache.set(note.id, note);
+  setState(
+    produce((s) => {
+      const idx = s.trash.findIndex((n) => n.id === id);
+      if (idx >= 0) s.trash.splice(idx, 1);
+      const summary = summaryFromNote(note);
+      if (note.is_pinned) s.pinned.unshift(summary);
+      else s.items.unshift(summary);
+    }),
+  );
+  return note;
+}
+
+export async function purgeNote(id: string): Promise<void> {
+  await api.purgeNote(id);
+  setState(
+    produce((s) => {
+      const idx = s.trash.findIndex((n) => n.id === id);
+      if (idx >= 0) s.trash.splice(idx, 1);
+    }),
+  );
+}
+
+export async function emptyTrash(): Promise<number> {
+  const n = await api.emptyTrash();
+  setState(
+    produce((s) => {
+      s.trash = [];
+      s.trashCursor = null;
+    }),
+  );
+  return n;
 }
 
 function summaryFromNote(note: Note): NoteSummary {

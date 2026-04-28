@@ -1,7 +1,8 @@
-use crate::db::{note_row_to_summary, now_iso, Db};
+use crate::db::{make_preview, note_row_to_summary, now_iso, Db};
 use crate::error::{NoteZError, Result};
 use crate::models::{
-    Note, NoteSummary, NotesCursor, NotesPage, TrashCursor, TrashPage, UpdateNoteInput,
+    Note, NoteSummary, NotesCursor, NotesPage, TrashCursor, TrashPage, TrashSummary,
+    UpdateNoteInput,
 };
 use rusqlite::Connection;
 use tauri::State;
@@ -112,9 +113,9 @@ pub fn list_trash(
 
     // Trash uses a separate cursor (deleted_at instead of updated_at).
     // The partial index `idx_notes_trash_deleted` makes this a covered range scan.
-    let rows: Vec<(NoteSummary, String)> = if let Some(c) = cursor.as_ref() {
+    let rows: Vec<TrashSummary> = if let Some(c) = cursor.as_ref() {
         let mut stmt = conn.prepare(
-            "SELECT id, title, content_text, is_pinned, pinned_at, updated_at, deleted_at
+            "SELECT id, title, content_text, updated_at, deleted_at
              FROM notes
              WHERE deleted_at IS NOT NULL
                AND (deleted_at, id) < (?1, ?2)
@@ -124,44 +125,52 @@ pub fn list_trash(
         let mapped = stmt.query_map(
             rusqlite::params![c.deleted_at, c.id, (limit + 1) as i64],
             |row| {
-                let summary = note_row_to_summary(&conn, row)?;
-                let deleted_at: String = row.get("deleted_at")?;
-                Ok((summary, deleted_at))
+                let content_text: String = row.get("content_text")?;
+                Ok(TrashSummary {
+                    id: row.get("id")?,
+                    title: row.get("title")?,
+                    preview: make_preview(&content_text, 140),
+                    updated_at: row.get("updated_at")?,
+                    deleted_at: row.get("deleted_at")?,
+                })
             },
         )?;
         let collected: rusqlite::Result<Vec<_>> = mapped.collect();
         collected?
     } else {
         let mut stmt = conn.prepare(
-            "SELECT id, title, content_text, is_pinned, pinned_at, updated_at, deleted_at
+            "SELECT id, title, content_text, updated_at, deleted_at
              FROM notes
              WHERE deleted_at IS NOT NULL
              ORDER BY deleted_at DESC, id DESC
              LIMIT ?1",
         )?;
         let mapped = stmt.query_map(rusqlite::params![(limit + 1) as i64], |row| {
-            let summary = note_row_to_summary(&conn, row)?;
-            let deleted_at: String = row.get("deleted_at")?;
-            Ok((summary, deleted_at))
+            let content_text: String = row.get("content_text")?;
+            Ok(TrashSummary {
+                id: row.get("id")?,
+                title: row.get("title")?,
+                preview: make_preview(&content_text, 140),
+                updated_at: row.get("updated_at")?,
+                deleted_at: row.get("deleted_at")?,
+            })
         })?;
         let collected: rusqlite::Result<Vec<_>> = mapped.collect();
         collected?
     };
 
     let has_more = rows.len() > limit as usize;
-    let items_with_cursor: Vec<(NoteSummary, String)> =
-        rows.into_iter().take(limit as usize).collect();
+    let items: Vec<TrashSummary> = rows.into_iter().take(limit as usize).collect();
 
     let next_cursor = if has_more {
-        items_with_cursor.last().map(|(s, deleted_at)| TrashCursor {
-            deleted_at: deleted_at.clone(),
-            id: s.id.clone(),
+        items.last().map(|t| TrashCursor {
+            deleted_at: t.deleted_at.clone(),
+            id: t.id.clone(),
         })
     } else {
         None
     };
 
-    let items = items_with_cursor.into_iter().map(|(s, _)| s).collect();
     Ok(TrashPage { items, next_cursor })
 }
 

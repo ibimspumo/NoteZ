@@ -1,6 +1,11 @@
 import { CodeNode } from "@lexical/code";
 import { LinkNode } from "@lexical/link";
-import { ListItemNode, ListNode, registerList } from "@lexical/list";
+import {
+  ListItemNode,
+  ListNode,
+  registerCheckList,
+  registerList,
+} from "@lexical/list";
 import { TRANSFORMERS, registerMarkdownShortcuts } from "@lexical/markdown";
 import { HeadingNode, QuoteNode, registerRichText } from "@lexical/rich-text";
 import { mergeRegister } from "@lexical/utils";
@@ -62,17 +67,108 @@ export function createNoteZEditor(rootEl: HTMLElement): EditorHandles {
     registerRichText(editor),
     registerHistory(editor, createEmptyHistoryState(), 300),
     registerList(editor),
+    registerCheckList(editor),
     registerMarkdownShortcuts(editor, TRANSFORMERS),
     registerImagePlugin(editor, rootEl),
   );
 
+  // Lexical's default text/plain serializer concatenates getTextContent()
+  // across nodes, which drops list markers — paste into another app and
+  // bullets/numbers vanish. Run after Lexical's copy handler (attached during
+  // setRootElement) and overwrite text/plain with a marker-aware version.
+  // text/html and application/x-lexical-editor stay untouched.
+  const detachCopy = registerListAwareCopy(rootEl);
+
   return {
     editor,
     destroy: () => {
+      detachCopy();
       cleanup();
       editor.setRootElement(null);
     },
   };
+}
+
+function registerListAwareCopy(rootEl: HTMLElement): () => void {
+  const handler = (event: ClipboardEvent) => {
+    if (!event.clipboardData) return;
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    if (!rootEl.contains(range.commonAncestorContainer)) return;
+
+    const wrapper = document.createElement("div");
+    wrapper.appendChild(range.cloneContents());
+    const text = serializeWithListMarkers(wrapper);
+    if (text) {
+      event.clipboardData.setData("text/plain", text);
+    }
+  };
+  rootEl.addEventListener("copy", handler);
+  rootEl.addEventListener("cut", handler);
+  return () => {
+    rootEl.removeEventListener("copy", handler);
+    rootEl.removeEventListener("cut", handler);
+  };
+}
+
+function serializeWithListMarkers(root: HTMLElement): string {
+  const out: string[] = [];
+  const endsWithNewline = () =>
+    out.length > 0 && out[out.length - 1].endsWith("\n");
+
+  const walk = (node: Node, listDepth: number) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      out.push(node.textContent ?? "");
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+    const el = node as HTMLElement;
+    const tag = el.tagName.toLowerCase();
+
+    if (tag === "ul" || tag === "ol") {
+      let index = 0;
+      for (const child of Array.from(el.children)) {
+        if (child.tagName.toLowerCase() !== "li") continue;
+        // Lexical wraps nested lists in an empty <li class="nz-li-nested">
+        // — skip its marker and descend into the inner list.
+        if (child.classList.contains("nz-li-nested")) {
+          walk(child, listDepth + 1);
+          continue;
+        }
+        index++;
+        if (out.length > 0 && !endsWithNewline()) out.push("\n");
+        const indent = "  ".repeat(listDepth);
+        const marker = tag === "ol" ? `${index}. ` : "• ";
+        out.push(indent + marker);
+        walk(child, listDepth + 1);
+      }
+      return;
+    }
+
+    if (tag === "li") {
+      for (const child of Array.from(el.childNodes)) walk(child, listDepth);
+      return;
+    }
+
+    if (tag === "br") {
+      out.push("\n");
+      return;
+    }
+
+    if (tag === "p" || tag === "div" || tag === "blockquote" || /^h[1-6]$/.test(tag)) {
+      if (out.length > 0 && !endsWithNewline()) out.push("\n");
+      for (const child of Array.from(el.childNodes)) walk(child, listDepth);
+      if (!endsWithNewline()) out.push("\n");
+      return;
+    }
+
+    for (const child of Array.from(el.childNodes)) walk(child, listDepth);
+  };
+
+  walk(root, 0);
+  return out.join("").replace(/\n+$/, "");
 }
 
 export function getPlainText(editor: LexicalEditor): string {

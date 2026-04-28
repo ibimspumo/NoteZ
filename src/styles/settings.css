@@ -1,0 +1,277 @@
+.nz-settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: nz-fade-in 160ms var(--nz-ease);
+  padding: 24px;
+}
+
+.nz-settings-dialog {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  background: var(--nz-bg-overlay);
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  border: 1px solid var(--nz-divider-strong);
+  border-radius: var(--nz-radius-lg);
+  box-shadow: var(--nz-shadow-lg);
+  padding: 26px 26px 22px;
+  animation: nz-rise 200ms var(--nz-ease);
+  color: var(--nz-text);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+
+.nz-settings-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  border-radius: var(--nz-radius-sm);
+  color: var(--nz-text-faint);
+  cursor: pointer;
+  transition: background 120ms var(--nz-ease), color 120ms var(--nz-ease);
+}
+
+.nz-settings-close:hover {
+  background: var(--nz-bg-hover);
+  color: var(--nz-text-strong);
+}
+
+.nz-settings-title {
+  margin: 0 0 18px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--nz-text-strong);
+}
+
+.nz-settings-divider {
+  height: 1px;
+  background: var(--nz-divider);
+  margin: 18px -6px;
+}
+
+.nz-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.nz-settings-section-header h3 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--nz-text-strong);
+}
+
+.nz-settings-section-hint {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--nz-text-muted);
+}
+
+.nz-settings-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.nz-settings-pill {
+  border: 1px solid var(--nz-divider-strong);
+  background: transparent;
+  color: var(--nz-text-muted);
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 140ms var(--nz-ease), color 140ms var(--nz-ease),
+    border-color 140ms var(--nz-ease);
+}
+
+.nz-settings-pill:hover {
+  color: var(--nz-text);
+  background: var(--nz-bg-hover);
+}
+
+.nz-settings-pill.active {
+  background: var(--nz-accent-soft);
+  border-color: var(--nz-accent-hot);
+  color: var(--nz-accent-hot);
+}
+
+.nz-settings-shortcut-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nz-settings-shortcut-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px 14px;
+}
+
+.nz-settings-shortcut-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--nz-text);
+}
+
+.nz-settings-shortcut-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nz-settings-shortcut-input {
+  min-width: 100px;
+  padding: 6px 12px;
+  font-family: var(--nz-font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nz-text-strong);
+  background: var(--nz-bg-hover);
+  border: 1px solid var(--nz-divider-strong);
+  border-radius: var(--nz-radius-md);
+  cursor: pointer;
+  text-align: center;
+  letter-spacing: 0.05em;
+  transition: border-color 140ms var(--nz-ease), background 140ms var(--nz-ease),
+    color 140ms var(--nz-ease);
+}
+
+.nz-settings-shortcut-input:hover {
+  border-color: var(--nz-text-faint);
+}
+
+.nz-settings-shortcut-input.recording {
+  background: var(--nz-accent-soft);
+  border-color: var(--nz-accent-hot);
+  color: var(--nz-accent-hot);
+  outline: 2px solid var(--nz-focus-ring);
+  outline-offset: -1px;
+  animation: nz-settings-pulse 1.4s var(--nz-ease) infinite;
+}
+
+@keyframes nz-settings-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--nz-accent-glow); }
+  50% { box-shadow: 0 0 0 6px transparent; }
+}
+
+.nz-settings-shortcut-reset {
+  background: transparent;
+  border: 0;
+  color: var(--nz-text-faint);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: var(--nz-radius-sm);
+  cursor: pointer;
+  transition: background 120ms var(--nz-ease), color 120ms var(--nz-ease);
+}
+
+.nz-settings-shortcut-reset:hover {
+  background: var(--nz-bg-hover);
+  color: var(--nz-text);
+}
+
+.nz-settings-color-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.nz-settings-color-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: var(--nz-radius-md);
+  border: 1px solid var(--nz-divider-strong);
+  background: var(--nz-bg-hover);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 140ms var(--nz-ease), background 140ms var(--nz-ease),
+    transform 120ms var(--nz-ease);
+}
+
+.nz-settings-color-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--nz-text-faint);
+}
+
+.nz-settings-color-card.active {
+  border-color: var(--nz-accent-hot);
+  background: var(--nz-accent-soft);
+}
+
+.nz-settings-color-swatch {
+  width: 100%;
+  height: 26px;
+  border-radius: var(--nz-radius-sm);
+  border: 1px solid var(--nz-divider);
+  margin-bottom: 4px;
+}
+
+.nz-settings-color-swatch--default {
+  background: linear-gradient(120deg, #18181b 0% 60%, #00dc82 60% 100%);
+}
+
+.nz-settings-color-swatch--mono {
+  background: linear-gradient(120deg, #0a0a0c 0% 50%, #6b6b70 50% 100%);
+}
+
+.nz-settings-color-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--nz-text-strong);
+}
+
+.nz-settings-color-meta {
+  font-size: 11px;
+  color: var(--nz-text-muted);
+}
+
+.nz-settings-error {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  color: var(--nz-danger);
+}
+
+.nz-settings-button {
+  background: transparent;
+  border: 0;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--nz-radius-sm);
+  cursor: pointer;
+  color: var(--nz-text-whisper);
+  transition: background 140ms var(--nz-ease), color 140ms var(--nz-ease);
+}
+
+.nz-settings-button:hover {
+  background: var(--nz-bg-hover);
+  color: var(--nz-text-faint);
+}

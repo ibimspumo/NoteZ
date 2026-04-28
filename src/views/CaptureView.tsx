@@ -1,4 +1,5 @@
 import { onCleanup, onMount, type Component } from "solid-js";
+import { emit } from "@tauri-apps/api/event";
 import { api } from "../lib/tauri";
 import { deriveTitle } from "../lib/format";
 
@@ -35,6 +36,7 @@ export const CaptureView: Component = () => {
       mention_target_ids: [],
       asset_ids: [],
     });
+    await emit("notez://notes/changed", { id: note.id });
     textareaRef.value = "";
     await api.hideCaptureWindow();
   };
@@ -51,16 +53,28 @@ export const CaptureView: Component = () => {
   });
 
   return (
-    <div class="nz-capture">
-      <header class="nz-capture-header" data-tauri-drag-region>
-        <span class="nz-capture-title" data-tauri-drag-region>Quick Capture</span>
-        <span class="nz-capture-hint" data-tauri-drag-region>⌘ + ↵ to save · esc to dismiss</span>
-      </header>
+    <div class="nz-capture" data-tauri-drag-region>
+      <span class="nz-capture-wordmark" aria-hidden="true">
+        Note<span class="nz-capture-wordmark-z">Z</span>
+      </span>
       <textarea
         ref={(el) => (textareaRef = el)}
         class="nz-capture-input"
         placeholder="Type a thought…"
+        rows={3}
       />
+      <div class="nz-capture-hints" data-tauri-drag-region aria-hidden="true">
+        <span class="nz-capture-hint">
+          <kbd>⌘</kbd>
+          <kbd>↵</kbd>
+          save
+        </span>
+        <span class="nz-capture-hint-sep">·</span>
+        <span class="nz-capture-hint">
+          <kbd>esc</kbd>
+          dismiss
+        </span>
+      </div>
     </div>
   );
 };
