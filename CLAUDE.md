@@ -122,6 +122,35 @@ bottom-right of the sidebar and is the user's only signal that something changed
 If you ship a change without bumping, you've shipped a regression - the user can't
 tell what version they're running. The version label is the contract.
 
+## Releases
+
+Releases are built and published by GitHub Actions
+(`.github/workflows/release.yml`). Pushing a tag matching `v*` triggers a macOS
+build matrix (`aarch64-apple-darwin` + `x86_64-apple-darwin`) via
+`tauri-apps/tauri-action`, which uploads the `.dmg` and `.app.tar.gz` artifacts
+to a GitHub Release named after the tag.
+
+**Cutting a release:**
+
+```bash
+# 1. Bump the five version files (see Versioning above) and commit
+git commit -am "chore: vX.Y.Z - <summary>"
+
+# 2. Tag and push - this triggers the release build
+git tag vX.Y.Z
+git push origin main --tags
+```
+
+The build runs unsigned (no Apple Developer cert wired up). Users open the
+`.dmg`, drag to Applications, then right-click → Open on first launch to bypass
+Gatekeeper. If/when signing is added later, set `APPLE_CERTIFICATE`,
+`APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`,
+`APPLE_PASSWORD`, `APPLE_TEAM_ID` as repo secrets - `tauri-action` picks them
+up automatically.
+
+The tag must match the `version` field in `tauri.conf.json` exactly (without
+the `v` prefix), otherwise `tauri-action` fails the build.
+
 ## Don'ts
 
 - **No `@lexical/react`.** Solid + React don't mix; vanilla-only.
