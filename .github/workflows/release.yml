@@ -49,7 +49,7 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'NoteZ ${{ github.ref_name }}'
           releaseBody: |
-            NoteZ ${{ github.ref_name }} - Apple Silicon (M1/M2/M3/M4) only.
+            NoteZ ${{ github.ref_name }} - Apple Silicon only.
 
             ## Install
 

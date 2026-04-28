@@ -87,7 +87,7 @@ disappear. Plenty of time to change your mind.
 
 ## Install
 
-NoteZ is built for **Apple Silicon Macs (M1/M2/M3/M4)**. Grab the latest
+NoteZ is built for **Apple Silicon Macs**. Grab the latest
 `.dmg` from [Releases](https://github.com/ibimspumo/NoteZ/releases).
 
 1. Open the `.dmg` and drag **NoteZ.app** into **Applications**.
