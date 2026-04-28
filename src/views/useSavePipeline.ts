@@ -6,7 +6,7 @@ import { patchCachedNote, updateNote } from "../stores/notes";
 import type { Note } from "../lib/types";
 
 export type EditorSnapshot = {
-  /** JSON string of the editor state — already stringified (cheaply, off the UI thread). */
+  /** JSON string of the editor state - already stringified (cheaply, off the UI thread). */
   contentJson: string;
   contentText: string;
   mentionTargetIds: string[];
@@ -25,7 +25,7 @@ export type SavePipeline = {
   flush: () => Promise<void>;
   /** True if there's a pending change that hasn't reached the DB yet. */
   hasPending: () => boolean;
-  /** Replace the "last saved" baseline — call after switching notes so the diff check is accurate. */
+  /** Replace the "last saved" baseline - call after switching notes so the diff check is accurate. */
   resetBaseline: (noteId: string, json: string) => void;
 };
 
@@ -38,10 +38,10 @@ const SAVED_INDICATOR_MS = 800;
  *
  * Lifecycle of an edit:
  *   1. The Editor calls `markDirty(noteId, getSnapshot)` on every keystroke.
- *      `getSnapshot` is a *deferred* callback — it does NOT compute the JSON
+ *      `getSnapshot` is a *deferred* callback - it does NOT compute the JSON
  *      stringification yet, so per-keystroke cost is O(1).
  *   2. We debounce 350 ms. After the user stops typing, we invoke `getSnapshot`
- *      *once*. That fan-in is what makes typing feel free even on huge notes —
+ *      *once*. That fan-in is what makes typing feel free even on huge notes -
  *      we stringify exactly once per save, off-thread (worker), regardless of
  *      how many keystrokes happened in the burst.
  *   3. Compare the resulting JSON to the last saved baseline. If unchanged,
@@ -56,7 +56,7 @@ const SAVED_INDICATOR_MS = 800;
  *     note we actually saved. A note switch that races a save can't poison the
  *     baseline of the other note.
  *   - `flush()` resolves only after both the pending debounce AND any in-flight
- *     save have finished — the window-blur / note-switch caller can rely on
+ *     save have finished - the window-blur / note-switch caller can rely on
  *     "after flush, nothing in this pipeline is racing."
  */
 export function useSavePipeline(opts: {
@@ -76,7 +76,7 @@ export function useSavePipeline(opts: {
     const snap = await provider();
     if (!snap) return;
     if (noteId === lastSavedNoteId && snap.contentJson === lastSavedJson) {
-      // No actual content delta — Lexical fired an update for selection or a
+      // No actual content delta - Lexical fired an update for selection or a
       // formatting toggle that round-trips to the same serialized state. Skip
       // the IPC and the FTS index churn it would cause.
       return;
@@ -113,7 +113,7 @@ export function useSavePipeline(opts: {
           await api.createSnapshot(updated.id, false);
           lastSnapshotAt = Date.now();
         } catch {
-          // expected when no changes since last snapshot — silent.
+          // expected when no changes since last snapshot - silent.
         }
       }
     } catch (e) {
@@ -147,7 +147,7 @@ export function useSavePipeline(opts: {
   }
 
   const debouncedSave = debounce((noteId: string, provider: SnapshotProvider) => {
-    // If a save is already running, queue this for after — the finally hook of
+    // If a save is already running, queue this for after - the finally hook of
     // startSave will pick the latest pending pair up.
     if (inFlight) {
       pendingNoteId = noteId;
@@ -165,7 +165,7 @@ export function useSavePipeline(opts: {
 
   const flush: SavePipeline["flush"] = async () => {
     debouncedSave.cancel();
-    // Capture pending before kicking it off — it could be cleared inside startSave.
+    // Capture pending before kicking it off - it could be cleared inside startSave.
     const pNoteId = pendingNoteId;
     const pProvider = pendingSnapshot;
     if (pNoteId && pProvider && !inFlight) {
@@ -184,7 +184,7 @@ export function useSavePipeline(opts: {
     debouncedSave.cancel();
   };
 
-  // Flush pending changes when the window loses focus — protects against
+  // Flush pending changes when the window loses focus - protects against
   // "I closed the lid before the debounce fired" data loss.
   onMount(() => {
     const onBlur = () => {

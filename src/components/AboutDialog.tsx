@@ -73,7 +73,7 @@ export const AboutDialog: Component<Props> = (props) => {
             </a>
             <p class="nz-about-blurb">
               AgentZ Media is a social media agency from Schwerin, producing 365 videos
-              a year for businesses — reach through content, not ads.
+              a year for businesses - reach through content, not ads.
             </p>
             <a
               class="nz-about-link"

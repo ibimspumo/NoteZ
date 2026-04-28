@@ -37,7 +37,7 @@ pub async fn toggle_capture_window(app: tauri::AppHandle) -> Result<()> {
     .focused(true)
     .visible(false)
     // The OS shadow on a borderless transparent window paints a square
-    // halo around the content area — fighting our rounded CSS panel.
+    // halo around the content area - fighting our rounded CSS panel.
     // We draw our own shadow via box-shadow instead.
     .shadow(false)
     // Force both NSWindow and the webview backing layer to fully transparent.
@@ -54,7 +54,7 @@ pub async fn toggle_capture_window(app: tauri::AppHandle) -> Result<()> {
     let _ = win.set_shadow(false);
     let _ = win.set_background_color(Some(Color(0, 0, 0, 0)));
 
-    // Hide the window the moment it loses focus — Spotlight-style "click
+    // Hide the window the moment it loses focus - Spotlight-style "click
     // outside to dismiss". Anything the user typed is discarded if they
     // didn't press ⌘↵; matches macOS expectations for HUD pop-ups.
     {
@@ -85,7 +85,7 @@ pub async fn hide_capture_window(app: tauri::AppHandle) -> Result<()> {
 
 /// Move the capture window to the monitor the user is currently focused on.
 ///
-/// We use the cursor position as the proxy for "focused monitor" — it works
+/// We use the cursor position as the proxy for "focused monitor" - it works
 /// across spaces and matches what the user expects when they trigger the
 /// global shortcut. We position around 1/3 from the top of the work area
 /// (above the visual centre), which is where heads-up dialogs sit on macOS.

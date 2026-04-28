@@ -13,9 +13,9 @@ import { api, assetUrl } from "../../../lib/tauri";
 
 export type SerializedImageNode = Spread<
   {
-    /** Content-addressed sha256 of the bytes — the only stable handle. */
+    /** Content-addressed sha256 of the bytes - the only stable handle. */
     assetId: string;
-    /** File extension (without dot) — needed to reconstruct the on-disk path. */
+    /** File extension (without dot) - needed to reconstruct the on-disk path. */
     ext: string;
     width: number;
     height: number;
@@ -25,7 +25,7 @@ export type SerializedImageNode = Spread<
     alt: string;
     /**
      * User-resized display width as a percentage of the editor column.
-     * `null` means "natural" — fall back to the CSS default (100% capped at 720px).
+     * `null` means "natural" - fall back to the CSS default (100% capped at 720px).
      * Old notes (pre-resize) deserialize with `null` and stay visually identical.
      */
     widthPct: number | null;
@@ -40,7 +40,7 @@ export type SerializedImageNode = Spread<
  *   1. `createDOM` builds a `<figure>` with a wrapper sized to the image's
  *      aspect ratio so layout is stable from the first paint.
  *   2. The wrapper gets a blurhash background painted to a small data-URI canvas.
- *      This makes the image look "filled in" before the real bitmap loads —
+ *      This makes the image look "filled in" before the real bitmap loads -
  *      no layout shift, no flash of empty space.
  *   3. An `<img>` is inserted on top with `loading="lazy"` and `decoding="async"`.
  *      It fades in over the blurhash once decoded.
@@ -164,7 +164,7 @@ export class ImageNode extends ElementNode {
 
     // Resize handles. Always present in the DOM so they survive Lexical
     // reconciliation, but only visible when the figure has the `.selected`
-    // class (driven by NodeSelection — see imagePlugin.ts).
+    // class (driven by NodeSelection - see imagePlugin.ts).
     for (const corner of ["nw", "ne", "sw", "se"] as const) {
       const handle = document.createElement("div");
       handle.className = `nz-image-handle nz-image-handle-${corner}`;
@@ -177,7 +177,7 @@ export class ImageNode extends ElementNode {
   }
 
   updateDOM(prev: ImageNode, dom: HTMLElement, _config: EditorConfig): boolean {
-    // Path is content-addressed (sha256) — if the assetId hasn't changed, the
+    // Path is content-addressed (sha256) - if the assetId hasn't changed, the
     // bytes haven't changed, and we can reuse the existing DOM. If the assetId
     // changes, returning true tells Lexical to recreate the DOM.
     if (prev.__assetId !== this.__assetId) return true;

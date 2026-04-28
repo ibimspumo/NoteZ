@@ -140,7 +140,7 @@ export const Sidebar: Component<Props> = (props) => {
           </button>
           <button
             class="nz-version-button"
-            aria-label={`About NoteZ — version ${APP_VERSION}`}
+            aria-label={`About NoteZ - version ${APP_VERSION}`}
             title="About NoteZ"
             onClick={() => setAboutOpen(true)}
           >

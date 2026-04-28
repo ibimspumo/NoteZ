@@ -13,7 +13,7 @@ export type ShortcutBinding = {
  * combinations (e.g. `mod+shift+p`) before broader ones (`mod+p`).
  *
  * Bindings can be passed as a static array because the hook reads them once at
- * mount — to react to dynamic state, capture signals inside the handler closures.
+ * mount - to react to dynamic state, capture signals inside the handler closures.
  */
 export function useShortcuts(bindings: ShortcutBinding[]) {
   onMount(() => {

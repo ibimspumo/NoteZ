@@ -2,7 +2,7 @@
  * Main-thread side of the editor stringify pipeline.
  *
  * Lazy-creates a single shared worker on first use. The worker outlives note
- * switches — there's no per-note state, so reuse is free.
+ * switches - there's no per-note state, so reuse is free.
  *
  * Resilience:
  *   - On any worker error, every pending request is rejected and the worker is
@@ -84,7 +84,7 @@ function getWorker(): Worker | null {
 /**
  * Stringify a Lexical editor state off the UI thread.
  *
- * The `state` argument should be the result of `editor.getEditorState().toJSON()` —
+ * The `state` argument should be the result of `editor.getEditorState().toJSON()` -
  * a plain object. Don't pass live editor instances or DOM nodes; structured
  * clone won't accept them.
  *

@@ -15,11 +15,11 @@ import type {
  *
  *   1. **Pinned notes are loaded in full, once.** Pinned counts are bounded by
  *      user behaviour (typically <50). They live in `pinned` and re-sort locally
- *      when toggled — we never refetch the whole list for a pin click.
+ *      when toggled - we never refetch the whole list for a pin click.
  *
  *   2. **Unpinned notes are cursor-paginated.** `items` holds the loaded prefix;
  *      `nextCursor` points at the next page. The sidebar calls `loadMore()` when
- *      its sentinel scrolls into view. Initial page is 100 rows — at 5 KB of
+ *      its sentinel scrolls into view. Initial page is 100 rows - at 5 KB of
  *      summary JSON each that's a 500 KB IPC, well under the 1 ms perceptual
  *      budget on a modern Mac.
  */
@@ -131,7 +131,7 @@ export async function updateNote(input: UpdateNoteInput): Promise<Note> {
   return note;
 }
 
-/** Toggle pin without a server round-trip for the list — we know the new state. */
+/** Toggle pin without a server round-trip for the list - we know the new state. */
 export async function togglePin(id: string): Promise<Note> {
   const note = await api.togglePin(id);
   cache.set(note.id, note);

@@ -73,7 +73,7 @@ export function createNoteZEditor(rootEl: HTMLElement): EditorHandles {
   );
 
   // Lexical's default text/plain serializer concatenates getTextContent()
-  // across nodes, which drops list markers — paste into another app and
+  // across nodes, which drops list markers - paste into another app and
   // bullets/numbers vanish. Run after Lexical's copy handler (attached during
   // setRootElement) and overwrite text/plain with a marker-aware version.
   // text/html and application/x-lexical-editor stay untouched.
@@ -132,7 +132,7 @@ function serializeWithListMarkers(root: HTMLElement): string {
       for (const child of Array.from(el.children)) {
         if (child.tagName.toLowerCase() !== "li") continue;
         // Lexical wraps nested lists in an empty <li class="nz-li-nested">
-        // — skip its marker and descend into the inner list.
+        // - skip its marker and descend into the inner list.
         if (child.classList.contains("nz-li-nested")) {
           walk(child, listDepth + 1);
           continue;

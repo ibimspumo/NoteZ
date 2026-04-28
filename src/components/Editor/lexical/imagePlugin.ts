@@ -52,7 +52,7 @@ type ResizeState = {
   startX: number;
   startWidthPx: number;
   parentWidthPx: number;
-  /** Last pct applied to the live DOM — committed to the node on pointerup. */
+  /** Last pct applied to the live DOM - committed to the node on pointerup. */
   lastPct: number | null;
 };
 
@@ -119,7 +119,7 @@ export function registerImagePlugin(
     editor.getEditorState().read(() => {
       const node = $getNearestNodeFromDOMNode(targetEl!);
       if (!node) return;
-      // Walk up to a direct child of the root node — that's the "block" level
+      // Walk up to a direct child of the root node - that's the "block" level
       // where reordering makes sense.
       let cur: LexicalNode | null = node;
       while (cur) {
@@ -292,7 +292,7 @@ export function registerImagePlugin(
 
   // ─── drag-reorder ─────────────────────────────────────────────────────
   const onDragStart = (e: DragEvent) => {
-    // Resize is in progress (user pressed a handle) — don't let the browser
+    // Resize is in progress (user pressed a handle) - don't let the browser
     // also start a node-move drag. The dragstart event fires on the figure
     // regardless of which descendant the mousedown originated on, so checking
     // resize state is more reliable than inspecting `e.target`.
@@ -314,7 +314,7 @@ export function registerImagePlugin(
 
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData(NOTEZ_IMAGE_MIME, key);
-    // The browser snapshots the drag image at this moment — using the figure
+    // The browser snapshots the drag image at this moment - using the figure
     // itself gives a faithful preview that follows the cursor.
     e.dataTransfer.setDragImage(figure, 16, 16);
     figure.classList.add("dragging");
@@ -379,7 +379,7 @@ export function registerImagePlugin(
             if (!moved || !anchor) return;
             if (moved === anchor) return;
             // Reorder is idempotent if dropped right next to itself; let
-            // Lexical re-parent regardless — cheap and correct.
+            // Lexical re-parent regardless - cheap and correct.
             if (target.position === "before") anchor.insertBefore(moved);
             else anchor.insertAfter(moved);
             // Re-select the moved node so the user can keep manipulating it
@@ -471,7 +471,7 @@ async function importImageFiles(
     try {
       const buf = await file.arrayBuffer();
       // Tauri 2 transports `Vec<u8>` as `number[]` over IPC. For images this
-      // dominates the cost — a 2 MB photo is 2 M numbers. That's still fast
+      // dominates the cost - a 2 MB photo is 2 M numbers. That's still fast
       // (~30 ms in Chromium) but if it becomes a bottleneck we can switch to
       // a Tauri Channel for streamed bytes.
       const bytes = Array.from(new Uint8Array(buf));

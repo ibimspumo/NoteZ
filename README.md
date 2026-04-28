@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.4.4-1f883d?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-0.4.5-1f883d?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/platform-macOS-1f883d?style=flat-square" alt="macOS" />
   <img src="https://img.shields.io/badge/storage-local%20only-1f883d?style=flat-square" alt="local-only" />
   <img src="https://img.shields.io/badge/telemetry-none-1f883d?style=flat-square" alt="no telemetry" />
@@ -21,7 +21,7 @@
 NoteZ is the note app for people who think Apple Notes is too simple and Notion is
 too much. It opens instantly, searches across thousands of notes in under a
 hundred milliseconds, and keeps every word you write in a single file on
-your Mac — no cloud, no account, no waiting.
+your Mac - no cloud, no account, no waiting.
 
 ## Why NoteZ
 
@@ -36,7 +36,7 @@ is no internet connection required, ever.
 
 **No Markdown in your face.** Type `# ` for a heading and the `# ` disappears.
 Type `**bold**` and the asterisks vanish. The shortcuts are there if you want
-them, but the screen always shows the finished page — never the source code.
+them, but the screen always shows the finished page - never the source code.
 
 **Mac-first, properly.** Translucent sidebar, hidden traffic lights, native dark
 mode, global hotkeys. It looks and feels like an Apple app because it's built
@@ -49,7 +49,7 @@ bar. Find any note by title, content, or fragment. Smart ranking puts the most
 recent and most relevant matches first.
 
 **Write without friction.** A clean editor that handles headings, bullets,
-numbered lists, bold, italic, links, and inline images — all through familiar
+numbered lists, bold, italic, links, and inline images - all through familiar
 keyboard shortcuts that get out of your way.
 
 **Link notes together.** Type `@` anywhere to link to another note. Click the

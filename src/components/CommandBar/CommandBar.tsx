@@ -163,7 +163,7 @@ export const CommandBar: Component<Props> = (props) => {
                 </div>
               </Show>
               <Show when={results().length === 0 && !showCreateAction()}>
-                <div class="nz-cb-empty">No notes yet — type to create one.</div>
+                <div class="nz-cb-empty">No notes yet - type to create one.</div>
               </Show>
             </div>
           </div>

@@ -154,7 +154,7 @@ export const EditorToolbar: Component<Props> = (props) => {
       return;
     }
 
-    // Switching out of a list back to a block-type — drop the list first.
+    // Switching out of a list back to a block-type - drop the list first.
     if (current === "ul" || current === "ol" || current === "check") {
       ed.dispatchCommand(REMOVE_LIST_COMMAND, undefined);
     }

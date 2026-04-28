@@ -185,7 +185,7 @@ const ShortcutRow: Component<ShortcutRowProps> = (props) => {
     }
     const accel = eventToAccelerator(e);
     if (!accel) {
-      // Modifier-only or bare key — show a hint while user keeps pressing.
+      // Modifier-only or bare key - show a hint while user keeps pressing.
       setPendingDisplay(buildHint(e));
       return;
     }
@@ -211,7 +211,7 @@ const ShortcutRow: Component<ShortcutRowProps> = (props) => {
     const pd = pendingDisplay();
     if (recording() && pd) return pd;
     if (recording()) return "Press keys…";
-    return formatAccelerator(props.value) || "—";
+    return formatAccelerator(props.value) || "-";
   };
 
   return (

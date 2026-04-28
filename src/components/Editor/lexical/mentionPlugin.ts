@@ -164,7 +164,7 @@ export function insertMention(
 /**
  * Pure detection: given a text node's content and the caret offset, return the
  * `@<query>` match that should drive the mention popover, or `null` if there's
- * no active match. Called on every keystroke — keep it allocation-light.
+ * no active match. Called on every keystroke - keep it allocation-light.
  *
  * Rules:
  *   - Caret must follow an `@` with no whitespace between.

@@ -53,13 +53,13 @@ pub struct UpdateNoteInput {
     pub content_text: String,
     pub mention_target_ids: Vec<String>,
     /// Asset IDs (sha256) referenced by this note's editor state. Used to keep
-    /// the asset GC safe — assets that drop to zero references can be purged.
+    /// the asset GC safe - assets that drop to zero references can be purged.
     #[serde(default)]
     pub asset_ids: Vec<String>,
 }
 
 /// Cursor-paginated page of notes. Pinned notes are returned in full on the first
-/// page only (count is small in practice — bounded by user behaviour, not corpus
+/// page only (count is small in practice - bounded by user behaviour, not corpus
 /// size). Unpinned notes are paginated by `(updated_at, id)` so the cursor stays
 /// stable across edits.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -120,7 +120,7 @@ pub struct Asset {
     pub created_at: String,
 }
 
-/// Returned by `save_asset` — what the editor needs to render the image.
+/// Returned by `save_asset` - what the editor needs to render the image.
 /// `path` is the absolute on-disk path; the frontend feeds it through Tauri's
 /// `convertFileSrc()` to build a webview-loadable URL.
 #[derive(Debug, Clone, Serialize, Deserialize)]

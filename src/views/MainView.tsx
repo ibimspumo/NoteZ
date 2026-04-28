@@ -76,7 +76,7 @@ export const MainView: Component = () => {
     const note = await createNote();
     save.resetBaseline(note.id, note.content_json);
     setSelectedId(note.id);
-    // Inject title via a fresh editor state — easiest is to call updateNote with title-only state.
+    // Inject title via a fresh editor state - easiest is to call updateNote with title-only state.
     const initialJson = {
       root: {
         children: [
@@ -138,7 +138,7 @@ export const MainView: Component = () => {
       if (next) {
         setSelectedId(next);
       } else {
-        // No notes left in the loaded prefix — try to fetch the next page
+        // No notes left in the loaded prefix - try to fetch the next page
         // before giving up, in case there are more behind the cursor.
         if (notesState.nextCursor) {
           await loadMoreNotes();
@@ -174,7 +174,7 @@ export const MainView: Component = () => {
       return;
     }
     // Wait for any save targeting the previous note to land before we hand the
-    // baseline over to the new one — otherwise the in-flight save could update
+    // baseline over to the new one - otherwise the in-flight save could update
     // the new note's baseline if its IPC resolves after this effect.
     if (save.hasPending()) await save.flush();
     const note = await loadNote(id);
@@ -227,7 +227,7 @@ export const MainView: Component = () => {
     const unlistenCmd = await onEvent("notez://global/command-bar", () => {
       openCommandBar();
     });
-    // Fired by the Quick Capture window after it persists a new note —
+    // Fired by the Quick Capture window after it persists a new note -
     // refresh the sidebar so the entry shows up live.
     const unlistenChanged = await onEvent("notez://notes/changed", () => {
       void refreshNotes();

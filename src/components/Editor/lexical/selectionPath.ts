@@ -13,7 +13,7 @@ import {
 
 export type SerializedPoint = {
   // Index path from root → leaf. Stable across `setEditorState` (node keys are
-  // not — they're regenerated when state is reloaded from JSON).
+  // not - they're regenerated when state is reloaded from JSON).
   path: number[];
   offset: number;
   type: "text" | "element";

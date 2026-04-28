@@ -1,4 +1,4 @@
-# NoteZ — Claude context
+# NoteZ - Claude context
 
 Fast, local, beautiful notes for Mac. Tauri 2 + Rust backend + Solid + TypeScript +
 Lexical editor (vanilla, custom UI). Mac-first; Windows/Linux possible later.
@@ -56,7 +56,7 @@ src/              Solid frontend (TypeScript)
 - Editor mounts on note select, fires `onChange` → debounced save (350ms) → `updateNote`
   invoke → Rust updates `notes` row + `mentions` table → trigger refreshes FTS5 row.
 - Auto-snapshot fires once every 5 minutes of editing per note (rejected if content
-  unchanged since last snapshot — that's expected, the catch is silent).
+  unchanged since last snapshot - that's expected, the catch is silent).
 - Search: frontend → `quick_lookup` or `search_notes` → FTS5 + custom ranking in Rust →
   returns `SearchHit[]` with snippets containing `<<` … `>>` highlight markers.
 - Lexical state is stored as JSON string in `notes.content_json`. Plain text
@@ -75,7 +75,7 @@ src/              Solid frontend (TypeScript)
 - **Mod key:** use `matchHotkey(e, { key, mods })` from `lib/keymap.ts`. Never check
   `e.metaKey` / `e.ctrlKey` directly in components.
 - **Solid stores:** `notes.ts` exposes signals + async actions. Components subscribe via
-  `notesState.list`, `selectedId()`. Don't `setState` from components — call store actions.
+  `notesState.list`, `selectedId()`. Don't `setState` from components - call store actions.
 
 ## Commands
 
@@ -113,13 +113,13 @@ bottom-right of the sidebar and is the user's only signal that something changed
 - Breaking schema/migration → major (when we hit `1.0.0`)
 
 **Files to update on every bump (all five must match):**
-1. `src/lib/version.ts` — `APP_VERSION` constant (drives the in-app label)
-2. `package.json` — `version` field
-3. `src-tauri/tauri.conf.json` — `version` field
-4. `src-tauri/Cargo.toml` — `[package].version`
-5. `README.md` — the `**vX.Y.Z**` line at the top
+1. `src/lib/version.ts` - `APP_VERSION` constant (drives the in-app label)
+2. `package.json` - `version` field
+3. `src-tauri/tauri.conf.json` - `version` field
+4. `src-tauri/Cargo.toml` - `[package].version`
+5. `README.md` - the `**vX.Y.Z**` line at the top
 
-If you ship a change without bumping, you've shipped a regression — the user can't
+If you ship a change without bumping, you've shipped a regression - the user can't
 tell what version they're running. The version label is the contract.
 
 ## Don'ts
@@ -135,16 +135,16 @@ tell what version they're running. The version label is the contract.
 
 - Multi-pane / split view (architecture is ready; UI is not).
 - Backlinks UI (data is captured in `mentions` table, no panel yet).
-- Tags, folders, daily notes, templates — Phase 2.
-- Image/attachment support — Phase 2.
-- Sync — Phase 3.
-- Mobile — Phase 3.
+- Tags, folders, daily notes, templates - Phase 2.
+- Image/attachment support - Phase 2.
+- Sync - Phase 3.
+- Mobile - Phase 3.
 
 ## Troubleshooting
 
-- **Vibrancy looks wrong / opaque** — make sure `body { background: transparent }`.
+- **Vibrancy looks wrong / opaque** - make sure `body { background: transparent }`.
   Tauri.conf must have `transparent: true` and `macOSPrivateApi: true`.
-- **`global-shortcut: register failed` warning** — another app holds the shortcut, or
+- **`global-shortcut: register failed` warning** - another app holds the shortcut, or
   the user denied Accessibility. Falls through silently; in-app shortcuts still work.
-- **`sqlite locked`** — should not happen with WAL + r2d2 pool. If it does, check that
+- **`sqlite locked`** - should not happen with WAL + r2d2 pool. If it does, check that
   no migration fired mid-write (migrations run once at startup inside a tx).

@@ -18,7 +18,7 @@ use tauri::State;
 ///      so the editor can paint *something* before the full bitmap loads.
 ///   3. **Insert the row first**, then write the bytes to disk. If the bytes-write
 ///      fails we DELETE the row so we never leak metadata pointing at no file.
-///      If the row insert fails we never wrote bytes — no leak.
+///      If the row insert fails we never wrote bytes - no leak.
 ///   4. Files live at `<assets_dir>/<id[0..2]>/<id>.<ext>` (sharded so directories
 ///      stay enumerable; ~256 dirs at the top level).
 #[tauri::command]
@@ -162,12 +162,12 @@ pub fn list_assets(db: State<Db>) -> Result<Vec<Asset>> {
 /// Garbage-collect assets that no live note or snapshot references.
 ///
 /// Two-stage:
-///   1. Reference set — Aho-Corasick over every `content_json` blob (notes +
+///   1. Reference set - Aho-Corasick over every `content_json` blob (notes +
 ///      snapshots), single pass per blob. O(total_json_bytes), not O(notes ×
 ///      assets).
 ///   2. Then, for each known id NOT in the reference set, remove file + row.
 ///   3. Finally, walk the on-disk shard directories and delete any orphan file
-///      whose id is not in the assets table — heals leaks from prior crash paths.
+///      whose id is not in the assets table - heals leaks from prior crash paths.
 #[tauri::command]
 pub fn gc_orphan_assets(db: State<Db>) -> Result<u64> {
     let conn = db.conn()?;
@@ -290,7 +290,7 @@ fn decode_image_metadata(bytes: &[u8]) -> std::result::Result<(u32, u32, Option<
     let img = image::load_from_memory(bytes).map_err(|e| e.to_string())?;
     let (width, height) = img.dimensions();
 
-    // Blurhash needs RGBA bytes. We downscale large images first — blurhash
+    // Blurhash needs RGBA bytes. We downscale large images first - blurhash
     // quality is independent of source resolution and the encoder is O(w*h).
     let small = if width.max(height) > 256 {
         img.thumbnail(256, 256)

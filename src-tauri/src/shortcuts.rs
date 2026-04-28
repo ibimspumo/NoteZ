@@ -74,7 +74,7 @@ pub fn parse(s: &str) -> Option<ShortcutSpec> {
     }
     let key = key?;
     if mods.is_empty() {
-        // Reject bare-key shortcuts — they would steal regular typing.
+        // Reject bare-key shortcuts - they would steal regular typing.
         return None;
     }
     Some(ShortcutSpec { mods, key })

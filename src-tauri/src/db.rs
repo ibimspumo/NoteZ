@@ -31,7 +31,7 @@ impl Db {
         //     in parallel (avoids "database is locked" races during bootstrap)
         //
         // WAL re-enable is unconditional: if the user kills the app between the page_size
-        // VACUUM and the WAL pragma, the DB stays in DELETE mode forever — running this
+        // VACUUM and the WAL pragma, the DB stays in DELETE mode forever - running this
         // on every launch is idempotent and self-healing.
         {
             let bootstrap = Connection::open(&path)?;
@@ -175,7 +175,7 @@ CREATE TABLE IF NOT EXISTS settings (
 //   - drop the now-redundant full updated_at index
 //   - add a partial index for the pinned-list query
 //   - add an explicit index on notes.created_at (used by upcoming "sort by created" UIs)
-//   - make the FTS update trigger conditional on title/content actually changing —
+//   - make the FTS update trigger conditional on title/content actually changing -
 //     toggle_pin() and other metadata-only updates no longer cause an FTS rebuild
 //   - add the assets table for image / attachment storage with content-addressed dedup
 const MIGRATION_002: &str = r#"
@@ -208,7 +208,7 @@ END;
 
 -- Conditional update: only rebuild the FTS row when the indexed columns actually
 -- change. This makes pin toggles, soft-deletes, and any other metadata-only
--- writes free w.r.t. FTS — a real win when a user is rapidly pinning/unpinning.
+-- writes free w.r.t. FTS - a real win when a user is rapidly pinning/unpinning.
 CREATE TRIGGER notes_au AFTER UPDATE OF title, content_text ON notes
 WHEN old.title IS NOT new.title OR old.content_text IS NOT new.content_text
 BEGIN

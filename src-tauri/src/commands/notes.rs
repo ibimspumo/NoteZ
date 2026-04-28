@@ -9,7 +9,7 @@ use tauri::State;
 use uuid::Uuid;
 
 /// Hard cap to keep IPC frames small even if a buggy caller asks for the moon.
-/// 500 rows ≈ 80 KB of NoteSummary JSON — that's our budget per RTT.
+/// 500 rows ≈ 80 KB of NoteSummary JSON - that's our budget per RTT.
 const MAX_PAGE_SIZE: u32 = 500;
 
 #[tauri::command]
@@ -72,7 +72,7 @@ pub fn update_note(db: State<Db>, input: UpdateNoteInput) -> Result<Note> {
 
 /// Paginated active-notes listing.
 ///
-/// First page (cursor=None) returns pinned items in full — pinned counts are
+/// First page (cursor=None) returns pinned items in full - pinned counts are
 /// bounded by user behaviour so we don't paginate them. Following pages return
 /// only unpinned items, ordered by `updated_at DESC, id DESC` for cursor stability
 /// when several notes share the same timestamp.
@@ -277,7 +277,7 @@ fn clamp_limit(requested: Option<u32>, default: u32) -> u32 {
 }
 
 /// Hard ceiling on pinned items returned to the frontend. Pinned counts are
-/// bounded by user behaviour in practice — but a misuse (or a sync bug from a
+/// bounded by user behaviour in practice - but a misuse (or a sync bug from a
 /// future feature) shouldn't be able to dump 100k summaries into the IPC.
 const MAX_PINNED: i64 = 200;
 

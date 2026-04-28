@@ -12,7 +12,7 @@ import {
 /**
  * Fixed-row-height windowed list. Renders only the visible window plus an
  * overscan buffer, so DOM size is O(viewport) regardless of the underlying
- * collection size — the sidebar stays at ~30 row nodes whether the user has
+ * collection size - the sidebar stays at ~30 row nodes whether the user has
  * 100 or 200 million notes.
  *
  * The scroll container is the component's root: it owns its own overflow.
@@ -69,7 +69,7 @@ export const VirtualList: Component<Props> = (props) => {
     return out;
   });
 
-  // loadMore trigger — runs at most one outstanding call at a time. The flag
+  // loadMore trigger - runs at most one outstanding call at a time. The flag
   // resets only after the call resolves (success or failure), so a flaky load
   // can't permanently wedge pagination: once the inner promise settles, the
   // next scroll into the trigger zone fires another attempt.
@@ -77,7 +77,7 @@ export const VirtualList: Component<Props> = (props) => {
   createEffect(() => {
     if (!props.hasMore || !props.onLoadMore) return;
     if (loadMoreInFlight) return;
-    if (viewportHeight() === 0) return; // not laid out yet — wait
+    if (viewportHeight() === 0) return; // not laid out yet - wait
     const totalHeight = props.count * props.rowHeight;
     const distFromBottom = totalHeight - (scrollTop() + viewportHeight());
     const offset = props.loadMoreOffsetPx ?? props.rowHeight * 8;

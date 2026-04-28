@@ -43,7 +43,7 @@ const PERSIST_DEBOUNCE_MS = 800;
 
 export type EditorChange = {
   /**
-   * Compute the full save payload — JSON state, plain text, mention targets,
+   * Compute the full save payload - JSON state, plain text, mention targets,
    * asset ids. Deferred so the cost only lands once per save, not once per
    * keystroke. JSON.stringify runs in a worker.
    *
@@ -155,13 +155,13 @@ export const Editor: Component<EditorProps> = (props) => {
       if (suppressChange) return;
       if (dirtyElements.size === 0 && dirtyLeaves.size === 0) return;
 
-      // Don't compute the snapshot here — pass the deferred provider to the host.
+      // Don't compute the snapshot here - pass the deferred provider to the host.
       // The save pipeline debounces and pulls the snapshot once per save burst.
       props.onChange({ snapshot });
     });
 
     onCleanup(() => {
-      // Flush any pending cursor persist before tearing down — best-effort,
+      // Flush any pending cursor persist before tearing down - best-effort,
       // since IPC during shutdown isn't guaranteed to land.
       if (persistTimer != null) {
         clearTimeout(persistTimer);
@@ -229,7 +229,7 @@ export const Editor: Component<EditorProps> = (props) => {
         .then((raw) => {
           if (lastNoteId !== id || !raw || !editorRef) return;
           // The user might have moved the caret already since the load (e.g.
-          // by clicking inside the editor) — don't stomp on a fresh selection.
+          // by clicking inside the editor) - don't stomp on a fresh selection.
           if (liveSelection) return;
           let parsed: SerializedSelection | null = null;
           try {
