@@ -111,6 +111,41 @@ path.
 - **Solid stores:** `notes.ts` exposes signals + async actions. Components subscribe via
   `notesState.list`, `selectedId()`. Don't `setState` from components - call store actions.
 
+## README maintenance
+
+This is a public open-source repo - the `README.md` is what visitors see
+first and is the canonical user-facing description of what NoteZ is and
+does. **After every set of changes, before committing, check whether the
+README still accurately reflects the app** and update it in the same commit
+if not.
+
+Trigger an update when changes touch any of:
+
+- **User-visible features** - new feature shipped, existing feature removed
+  or renamed, behavior change a user would notice. The README's feature
+  list / screenshots / "what it does" sections must match what's actually
+  in the build.
+- **Install / setup steps** - new dependency, new permission prompt,
+  changed `xattr` step, different download path, OS-version requirement.
+  If the install instructions in the workflow `releaseBody` change, the
+  README's Install section must change in lockstep.
+- **Keyboard shortcuts** - any global or in-app hotkey added, removed, or
+  rebound. The README's shortcut table is a contract; stale shortcuts in
+  the README are worse than no table.
+- **Architecture claims** - if the README says "local-only" / "no
+  telemetry" / "no auto-update" / "Mac-first", and a change would weaken
+  any of those, the README must be updated *before* shipping or the
+  change reverted.
+- **Version badge** - already covered under Versioning (the badge line
+  bumps with the rest of the five files), but flag it here so it's not
+  forgotten.
+
+Skip the update for purely internal changes: refactors with no behavior
+delta, test-only edits, build-config tweaks that don't affect users, type
+shuffles, or comments. When in doubt, ask: *would a user reading the
+README right now form an inaccurate picture of the app after this
+change?* If yes, update the README in the same commit.
+
 ## Commands
 
 ```bash
