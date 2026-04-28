@@ -238,3 +238,97 @@
   display: flex;
   justify-content: flex-end;
 }
+
+/* ─── AI activity dialog (reuses .nz-trash-* shell) ────────── */
+
+.nz-ai-activity {
+  max-width: 640px;
+}
+
+.nz-ai-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nz-ai-row {
+  display: flex;
+  align-items: flex-start;
+  padding: 10px;
+  border-radius: var(--nz-radius-md);
+  transition: background 120ms var(--nz-ease);
+}
+
+.nz-ai-row:hover {
+  background: var(--nz-bg-hover);
+}
+
+.nz-ai-row.error .nz-ai-row-cost {
+  color: var(--nz-danger);
+}
+
+.nz-ai-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nz-ai-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.nz-ai-row-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--nz-text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+}
+
+.nz-ai-row-cost {
+  font-family: var(--nz-font-mono);
+  font-size: 11.5px;
+  color: var(--nz-text);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.nz-ai-row-meta {
+  font-size: 11px;
+  color: var(--nz-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.nz-ai-row-model {
+  font-family: var(--nz-font-mono);
+  font-size: 10.5px;
+  color: var(--nz-text-faint);
+}
+
+.nz-ai-row-error {
+  font-size: 11px;
+  color: var(--nz-danger);
+  background: rgba(213, 74, 58, 0.08);
+  padding: 4px 8px;
+  border-radius: var(--nz-radius-sm);
+  font-family: var(--nz-font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

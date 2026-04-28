@@ -5,26 +5,39 @@ import { createSignal } from "solid-js";
 import { api } from "../lib/tauri";
 
 export type ColorMode = "default" | "mono";
+export type SidebarPreviewLines = 0 | 1 | 2;
 
 const KEY_TRASH_RETENTION = "trash_retention_days";
 const KEY_COLOR_MODE = "color_mode";
+const KEY_SIDEBAR_PREVIEW_LINES = "sidebar_preview_lines";
 
 const DEFAULT_TRASH_RETENTION = 30; // days; 0 = never auto-delete
 const DEFAULT_COLOR_MODE: ColorMode = "default";
+const DEFAULT_SIDEBAR_PREVIEW_LINES: SidebarPreviewLines = 2;
 
 const [trashRetentionDays, setTrashRetentionDaysSig] = createSignal<number>(
   DEFAULT_TRASH_RETENTION,
 );
 const [colorMode, setColorModeSig] = createSignal<ColorMode>(DEFAULT_COLOR_MODE);
+const [sidebarPreviewLines, setSidebarPreviewLinesSig] = createSignal<SidebarPreviewLines>(
+  DEFAULT_SIDEBAR_PREVIEW_LINES,
+);
 const [quickCaptureShortcut, setQuickCaptureShortcutSig] = createSignal<string>("");
 const [commandBarShortcut, setCommandBarShortcutSig] = createSignal<string>("");
+const [aiTitleEnabled, setAiTitleEnabledSig] = createSignal(false);
+const [aiHasKey, setAiHasKeySig] = createSignal(false);
+const [aiModel, setAiModelSig] = createSignal<string>("google/gemini-3-flash-preview");
 const [loaded, setLoaded] = createSignal(false);
 
 export {
   trashRetentionDays,
   colorMode,
+  sidebarPreviewLines,
   quickCaptureShortcut,
   commandBarShortcut,
+  aiTitleEnabled,
+  aiHasKey,
+  aiModel,
   loaded as settingsLoaded,
 };
 
@@ -45,9 +58,10 @@ export function loadSettings(): Promise<void> {
 }
 
 async function loadSettingsImpl() {
-  const [pairs, shortcuts] = await Promise.all([
+  const [pairs, shortcuts, aiCfg] = await Promise.all([
     api.listSettings(),
     api.getShortcuts(),
+    api.getAiConfig(),
   ]);
   const map = new Map(pairs);
 
@@ -62,9 +76,40 @@ async function loadSettingsImpl() {
   setColorModeSig(mode);
   applyColorModeClass(mode);
 
+  const linesRaw = map.get(KEY_SIDEBAR_PREVIEW_LINES);
+  const lines = parseSidebarPreviewLines(linesRaw);
+  setSidebarPreviewLinesSig(lines);
+
   setQuickCaptureShortcutSig(shortcuts.quick_capture);
   setCommandBarShortcutSig(shortcuts.command_bar);
+
+  setAiTitleEnabledSig(aiCfg.enabled);
+  setAiHasKeySig(aiCfg.has_key);
+  setAiModelSig(aiCfg.model);
+
   setLoaded(true);
+}
+
+export async function setAiTitleEnabled(enabled: boolean) {
+  await api.setAiEnabled(enabled);
+  setAiTitleEnabledSig(enabled);
+}
+
+export async function setOpenrouterApiKey(key: string) {
+  await api.setOpenrouterKey(key);
+  setAiHasKeySig(key.trim().length > 0);
+}
+
+export async function setAiModelChoice(model: string) {
+  await api.setAiModel(model);
+  setAiModelSig(model);
+}
+
+export async function refreshAiConfig() {
+  const cfg = await api.getAiConfig();
+  setAiTitleEnabledSig(cfg.enabled);
+  setAiHasKeySig(cfg.has_key);
+  setAiModelSig(cfg.model);
 }
 
 export async function setTrashRetentionDays(days: number) {
@@ -77,6 +122,18 @@ export async function setColorMode(mode: ColorMode) {
   await api.setSetting(KEY_COLOR_MODE, mode);
   setColorModeSig(mode);
   applyColorModeClass(mode);
+}
+
+export async function setSidebarPreviewLines(lines: SidebarPreviewLines) {
+  await api.setSetting(KEY_SIDEBAR_PREVIEW_LINES, String(lines));
+  setSidebarPreviewLinesSig(lines);
+}
+
+function parseSidebarPreviewLines(raw: string | undefined): SidebarPreviewLines {
+  if (raw == null) return DEFAULT_SIDEBAR_PREVIEW_LINES;
+  const n = Number(raw);
+  if (n === 0 || n === 1 || n === 2) return n;
+  return DEFAULT_SIDEBAR_PREVIEW_LINES;
 }
 
 export async function setQuickCaptureShortcut(accelerator: string) {

@@ -12,6 +12,8 @@
   border-right: none;
 }
 
+/* macOS draggable region above the brand row, sized to clear the
+ * traffic-light cluster. */
 .nz-sidebar-titlebar {
   flex: 0 0 18px;
 }
@@ -19,56 +21,86 @@
 .nz-sidebar-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 6px 12px 12px 80px;
+  justify-content: flex-end;
+  padding: 4px 12px 8px 80px;
+  height: 32px;
 }
 
-.nz-app-brand {
-  display: inline-flex;
-  align-items: baseline;
-  user-select: none;
-  -webkit-user-select: none;
+/* ─── Search trigger (opens command bar) ─── */
+.nz-sidebar-search {
+  padding: 4px 10px 8px;
+  flex: 0 0 auto;
 }
 
-.nz-app-name {
-  font-family: var(--nz-font-ui);
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: -0.018em;
-  color: var(--nz-text-strong);
-  user-select: none;
-  display: inline-flex;
-  align-items: baseline;
-  line-height: 1;
+.nz-search-trigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 9px;
+  border-radius: var(--nz-radius-md);
+  background: var(--nz-bg-row);
+  border: 1px solid var(--nz-divider);
+  color: var(--nz-text-faint);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  cursor: text;
+  transition: background 100ms var(--nz-ease), border-color 100ms var(--nz-ease),
+    color 100ms var(--nz-ease);
 }
 
-.nz-app-name-z {
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--nz-accent-hot);
-  letter-spacing: -0.03em;
-  margin-left: 0.5px;
-  line-height: 1;
-  text-shadow: 0 1px 8px var(--nz-accent-glow);
+.nz-search-trigger:hover {
+  background: var(--nz-bg-hover);
+  border-color: var(--nz-divider-strong);
+  color: var(--nz-text-muted);
 }
 
+.nz-search-trigger:focus-visible {
+  outline: none;
+  border-color: var(--nz-focus-ring);
+  box-shadow: 0 0 0 3px var(--nz-accent-soft);
+}
+
+.nz-search-trigger-label {
+  flex: 1;
+  text-align: left;
+}
+
+.nz-search-trigger-kbd {
+  font-family: var(--nz-font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--nz-text-whisper);
+  background: transparent;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--nz-divider);
+}
+
+.nz-search-trigger:hover .nz-search-trigger-kbd {
+  color: var(--nz-text-faint);
+  border-color: var(--nz-divider-strong);
+}
+
+/* ─── Body / lists ─── */
 .nz-sidebar-body {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 2px 6px 8px;
+  padding: 0 6px 4px;
 }
 
-/* Pinned region: regular flow, capped so it never crowds out the notes list. */
 .nz-pinned-region {
   flex: 0 0 auto;
-  max-height: 40%;
+  max-height: 36%;
   overflow-y: auto;
   padding-bottom: 4px;
 }
 
-/* Others region hosts the virtualized list and consumes the remaining height. */
 .nz-others-region {
   flex: 1 1 0;
   min-height: 0;
@@ -76,18 +108,29 @@
   flex-direction: column;
 }
 
-.nz-section-label {
-  margin: 14px 8px 4px;
+.nz-section-label,
+.nz-bucket-header {
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--nz-text-whisper);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-.nz-section-label--inline {
-  margin-top: 8px;
-  flex-shrink: 0;
+.nz-section-label {
+  margin: 8px 8px 4px;
+}
+
+/* Header row inside the virtualized list — sits at row offset, so layout
+ * via padding (height comes from real measurement). */
+.nz-bucket-header {
+  display: flex;
+  align-items: flex-end;
+  padding: 14px 8px 6px;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .nz-note-list {
@@ -99,55 +142,51 @@
   margin: 0;
 }
 
-/* Virtualized list: scroll container that mirrors the visible window only.
-   Uses absolute-positioned rows inside a tall spacer for native-smooth scrolling. */
-.nz-vlist {
+/* ─── Virtualized list shell (see components/MeasuredVirtualList.tsx) ───
+ * Only the visible window is in the DOM. Heights are measured at runtime
+ * via a Fenwick tree — see CLAUDE.md "Performance budget". */
+.nz-mvlist {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   position: relative;
-  contain: strict; /* isolate layout/paint — sidebar scroll never reflows the editor */
+  contain: strict;
 }
 
-.nz-vlist-spacer {
+.nz-mvlist-spacer {
   position: relative;
   width: 100%;
 }
 
-.nz-vlist-row {
+.nz-mvlist-row {
   position: absolute;
   left: 0;
   right: 0;
   will-change: transform;
-  padding: 2px 0;
   box-sizing: border-box;
 }
 
-.nz-others-vlist {
+.nz-others-mvlist {
   margin: 0 -2px;
   padding: 0 2px;
 }
 
+/* ─── Note rows ─── */
 .nz-note-item {
   position: relative;
-  padding: 8px 10px 9px;
+  padding: 7px 10px;
   border-radius: var(--nz-radius-md);
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  transition: background 120ms var(--nz-ease);
-  /* Fixed row height so the virtual list can measure deterministically.
-     If the design ever needs variable heights, swap to a measured-row impl. */
-  height: 56px;
+  gap: 2px;
+  transition: background 90ms var(--nz-ease);
   margin: 0;
-  overflow: hidden;
   box-sizing: border-box;
 }
 
-/* Spacing only in the regular (non-virtualized) pinned list. */
 .nz-note-list .nz-note-item + .nz-note-item {
-  margin-top: 4px;
+  margin-top: 1px;
 }
 
 .nz-note-item:hover {
@@ -162,15 +201,18 @@
   background: var(--nz-bg-active-strong);
 }
 
+/* Selected row indicator: stacked dots echoing the brand mark. */
 .nz-note-item.selected::before {
   content: "";
   position: absolute;
-  left: -6px;
-  top: 9px;
-  bottom: 9px;
-  width: 2.5px;
+  left: -2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
   border-radius: 999px;
   background: var(--nz-accent);
+  box-shadow: 0 0 8px var(--nz-accent-glow);
 }
 
 .nz-note-row {
@@ -203,13 +245,28 @@
 .nz-note-meta {
   font-size: 11.5px;
   color: var(--nz-text-faint);
-  display: flex;
-  gap: 6px;
-  align-items: baseline;
+  display: block;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.32;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.nz-note-item.preview-1 .nz-note-preview {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-variant-numeric: tabular-nums;
+  display: block;
+}
+
+.nz-note-item.preview-2 .nz-note-preview {
+  white-space: normal;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  word-break: break-word;
 }
 
 .nz-note-time {
@@ -250,50 +307,79 @@
   letter-spacing: -0.005em;
 }
 
+/* ─── Inline trash row above the footer ─── */
+.nz-trash-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: calc(100% - 12px);
+  margin: 4px 6px 2px;
+  padding: 7px 10px;
+  border-radius: var(--nz-radius-md);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: var(--nz-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  transition: background 90ms var(--nz-ease), color 90ms var(--nz-ease);
+}
+
+.nz-trash-row:hover {
+  background: var(--nz-bg-hover);
+  color: var(--nz-text-strong);
+}
+
+.nz-trash-row-label {
+  flex: 1;
+  text-align: left;
+}
+
+.nz-trash-row-count {
+  font-family: var(--nz-font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  background: var(--nz-bg-row);
+  color: var(--nz-text-faint);
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--nz-divider);
+  line-height: 1.5;
+}
+
+/* ─── Footer ─── */
 .nz-sidebar-footer {
   flex: 0 0 auto;
-  padding: 6px 10px 10px;
+  padding: 4px 12px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  border-top: 1px solid transparent;
 }
 
-.nz-trash-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.nz-settings-button {
+  width: 24px;
+  height: 24px;
+}
+
+.nz-version-button {
+  font-family: var(--nz-font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--nz-text-whisper);
   background: transparent;
   border: 0;
-  padding: 4px 7px;
-  margin: 0;
+  padding: 4px 6px;
   border-radius: 6px;
   cursor: pointer;
-  color: var(--nz-text-whisper);
-  transition: background 140ms var(--nz-ease), color 140ms var(--nz-ease);
+  transition: color 100ms var(--nz-ease), background 100ms var(--nz-ease);
 }
 
-.nz-trash-button:hover {
-  background: var(--nz-bg-hover);
+.nz-version-button:hover {
   color: var(--nz-text-faint);
-}
-
-.nz-trash-button-count {
-  font-family: var(--nz-font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  font-variant-numeric: tabular-nums;
   background: var(--nz-bg-hover);
-  color: var(--nz-text-muted);
-  padding: 1px 6px;
-  border-radius: 999px;
-  line-height: 1.4;
-}
-
-.nz-sidebar-footer-right {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
 }

@@ -1,6 +1,8 @@
 import { Show, type Component } from "solid-js";
 import type { NoteSummary } from "../../lib/types";
 import { formatRelative, truncate } from "../../lib/format";
+import { sidebarPreviewLines } from "../../stores/settings";
+import { nowTick } from "../../stores/clock";
 
 type Props = {
   note: NoteSummary;
@@ -12,12 +14,17 @@ type Props = {
 
 export const NoteListItem: Component<Props> = (props) => {
   const title = () => props.note.title.trim() || "New Note";
-  const preview = () => truncate(props.note.preview || "", 96);
+  const preview = () => truncate(props.note.preview || "", 160);
 
   return (
     <li
       class="nz-note-item"
-      classList={{ selected: props.selected, pinned: props.note.is_pinned }}
+      classList={{
+        selected: props.selected,
+        pinned: props.note.is_pinned,
+        "preview-1": sidebarPreviewLines() === 1,
+        "preview-2": sidebarPreviewLines() === 2,
+      }}
       onClick={props.onSelect}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -31,9 +38,9 @@ export const NoteListItem: Component<Props> = (props) => {
             <PinIcon />
           </span>
         </Show>
-        <span class="nz-note-time">{formatRelative(props.note.updated_at)}</span>
+        <span class="nz-note-time">{formatRelative(props.note.updated_at, nowTick())}</span>
       </div>
-      <Show when={preview()}>
+      <Show when={sidebarPreviewLines() > 0 && preview()}>
         <div class="nz-note-meta">
           <span class="nz-note-preview">{preview()}</span>
         </div>

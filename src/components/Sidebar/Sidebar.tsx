@@ -1,17 +1,34 @@
-import { createSignal, For, Show, type Component } from "solid-js";
+import {
+  createMemo,
+  createSignal,
+  For,
+  onCleanup,
+  onMount,
+  Show,
+  type Component,
+} from "solid-js";
 import {
   loadMoreNotes,
   notesState,
   selectedId,
   setSelectedId,
 } from "../../stores/notes";
-import { sidebarCollapsed } from "../../stores/ui";
+import { openCommandBar, sidebarCollapsed } from "../../stores/ui";
+import { sidebarPreviewLines } from "../../stores/settings";
+import { nowTick } from "../../stores/clock";
 import { APP_VERSION } from "../../lib/version";
-import { VirtualList } from "../VirtualList";
+import { MeasuredVirtualList } from "../MeasuredVirtualList";
 import { AboutDialog } from "../AboutDialog";
 import { SettingsDialog } from "../SettingsDialog";
 import { TrashDialog } from "../TrashDialog";
 import { NoteListItem } from "./NoteListItem";
+import { bucketFor, type Bucket } from "../../lib/buckets";
+import {
+  bindRowHeightProbeContainer,
+  rowHeightForPreview,
+  subscribeRowHeightProbe,
+} from "../../lib/rowHeightProbe";
+import type { NoteSummary } from "../../lib/types";
 
 type Props = {
   onCreate: () => void;
@@ -19,14 +36,60 @@ type Props = {
   onDelete: (id: string) => void;
 };
 
-// Keep this in sync with `.nz-note-item` in sidebar.css.
-// VirtualList needs a known fixed height to compute its window.
-const ROW_HEIGHT = 60;
+type ListRow =
+  | { kind: "header"; label: Bucket }
+  | { kind: "note"; note: NoteSummary };
+
+const HEADER_ROW_HEIGHT = 32;
 
 export const Sidebar: Component<Props> = (props) => {
   const [aboutOpen, setAboutOpen] = createSignal(false);
   const [trashOpen, setTrashOpen] = createSignal(false);
   const [settingsOpen, setSettingsOpen] = createSignal(false);
+  const [probeRevision, setProbeRevision] = createSignal(0);
+
+  onMount(() => {
+    const unsub = subscribeRowHeightProbe(() => setProbeRevision((r) => r + 1));
+    onCleanup(unsub);
+  });
+
+  // Group unpinned items into time buckets. Items arrive sorted by
+  // updated_at DESC, so a single linear scan is enough - bucket transitions
+  // happen at predictable points. O(n) on loaded items only (≤ a few page
+  // chunks at any time), and re-runs only when items mutate.
+  const rows = createMemo<ListRow[]>(() => {
+    const items = notesState.items;
+    // Reactive on nowTick so buckets re-assign as time passes (e.g. Today
+    // rolls into Yesterday at midnight). Same dependency keeps the headers
+    // in sync with the per-row time labels below.
+    const now = new Date(nowTick());
+    if (items.length === 0) return [];
+    const out: ListRow[] = [];
+    let last: Bucket | null = null;
+    for (let i = 0; i < items.length; i++) {
+      const note = items[i];
+      const b = bucketFor(note.updated_at, now);
+      if (b !== last) {
+        out.push({ kind: "header", label: b });
+        last = b;
+      }
+      out.push({ kind: "note", note });
+    }
+    return out;
+  });
+
+  // Bumped when something outside row data invalidates heights (density
+  // setting, font load, sidebar resize). MeasuredVirtualList re-estimates
+  // every row when this changes.
+  const estimateVersion = createMemo(
+    () => sidebarPreviewLines() * 1_000_003 + probeRevision(),
+  );
+
+  const handleSearchTrigger = (e?: Event) => {
+    if (e) e.preventDefault();
+    openCommandBar();
+  };
+
   return (
     <aside
       class="nz-sidebar"
@@ -34,11 +97,6 @@ export const Sidebar: Component<Props> = (props) => {
     >
       <div class="nz-sidebar-titlebar" data-tauri-drag-region />
       <div class="nz-sidebar-header" data-tauri-drag-region>
-        <div class="nz-app-brand" data-tauri-drag-region>
-          <span class="nz-app-name" data-tauri-drag-region>
-            Note<span class="nz-app-name-z">Z</span>
-          </span>
-        </div>
         <button
           class="nz-icon-btn"
           aria-label="New note"
@@ -49,7 +107,20 @@ export const Sidebar: Component<Props> = (props) => {
         </button>
       </div>
 
-      <div class="nz-sidebar-body">
+      <div class="nz-sidebar-search">
+        <button
+          type="button"
+          class="nz-search-trigger"
+          onClick={handleSearchTrigger}
+          aria-label="Search notes · ⌘K"
+        >
+          <SearchIcon />
+          <span class="nz-search-trigger-label">Search notes</span>
+          <kbd class="nz-search-trigger-kbd">⌘K</kbd>
+        </button>
+      </div>
+
+      <div class="nz-sidebar-body" classList={{ "has-rows": rows().length > 0 }}>
         <Show when={notesState.pinned.length > 0}>
           <div class="nz-pinned-region">
             <div class="nz-section-label">Pinned</div>
@@ -70,11 +141,8 @@ export const Sidebar: Component<Props> = (props) => {
         </Show>
 
         <div class="nz-others-region">
-          <Show when={notesState.pinned.length > 0 && notesState.items.length > 0}>
-            <div class="nz-section-label nz-section-label--inline">Notes</div>
-          </Show>
           <Show
-            when={notesState.items.length > 0}
+            when={rows().length > 0}
             fallback={
               <Show
                 when={
@@ -90,26 +158,41 @@ export const Sidebar: Component<Props> = (props) => {
               </Show>
             }
           >
-            <VirtualList
-              class="nz-others-vlist"
-              count={notesState.items.length}
-              rowHeight={ROW_HEIGHT}
+            <MeasuredVirtualList
+              class="nz-others-mvlist"
+              ref={(el) => bindRowHeightProbeContainer(el)}
+              count={rows().length}
+              estimateVersion={estimateVersion()}
+              estimateHeight={(i) => {
+                const r = rows()[i];
+                if (!r) return HEADER_ROW_HEIGHT;
+                if (r.kind === "header") return HEADER_ROW_HEIGHT;
+                const lines = sidebarPreviewLines();
+                return rowHeightForPreview(r.note.preview ?? "", lines);
+              }}
               hasMore={!!notesState.nextCursor}
               onLoadMore={loadMoreNotes}
               renderRow={(i) => (
-                /* `<Show>` keeps `note` reactive: when the store mutates
-                   `items[i]` (e.g. updateNote re-sorts, togglePin hoists a row),
-                   the inner closure re-runs with the fresh value. */
-                <Show when={notesState.items[i]}>
-                  {(note) => (
-                    <NoteListItem
-                      note={note()}
-                      selected={note().id === selectedId()}
-                      onSelect={() => setSelectedId(note().id)}
-                      onTogglePin={() => props.onTogglePin(note().id)}
-                      onDelete={() => props.onDelete(note().id)}
-                    />
-                  )}
+                <Show when={rows()[i]}>
+                  {(row) => {
+                    const r = row();
+                    if (r.kind === "header") {
+                      return (
+                        <div class="nz-bucket-header">
+                          <span>{r.label}</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <NoteListItem
+                        note={r.note}
+                        selected={r.note.id === selectedId()}
+                        onSelect={() => setSelectedId(r.note.id)}
+                        onTogglePin={() => props.onTogglePin(r.note.id)}
+                        onDelete={() => props.onDelete(r.note.id)}
+                      />
+                    );
+                  }}
                 </Show>
               )}
             />
@@ -117,43 +200,50 @@ export const Sidebar: Component<Props> = (props) => {
         </div>
       </div>
 
+      <button
+        class="nz-trash-row"
+        onClick={() => setTrashOpen(true)}
+        aria-label="Open Trash"
+      >
+        <TrashIcon />
+        <span class="nz-trash-row-label">Trash</span>
+        <Show when={notesState.trashLoaded && notesState.trash.length > 0}>
+          <span class="nz-trash-row-count">{notesState.trash.length}</span>
+        </Show>
+      </button>
+
       <div class="nz-sidebar-footer">
         <button
-          class="nz-trash-button"
-          aria-label="Open Trash"
-          title="Trash"
-          onClick={() => setTrashOpen(true)}
+          class="nz-icon-btn nz-settings-button"
+          aria-label="Open settings"
+          title="Settings"
+          onClick={() => setSettingsOpen(true)}
         >
-          <TrashIcon />
-          <Show when={notesState.trashLoaded && notesState.trash.length > 0}>
-            <span class="nz-trash-button-count">{notesState.trash.length}</span>
-          </Show>
+          <SettingsGearIcon />
         </button>
-        <div class="nz-sidebar-footer-right">
-          <button
-            class="nz-settings-button"
-            aria-label="Open settings"
-            title="Settings"
-            onClick={() => setSettingsOpen(true)}
-          >
-            <SettingsGearIcon />
-          </button>
-          <button
-            class="nz-version-button"
-            aria-label={`About NoteZ - version ${APP_VERSION}`}
-            title="About NoteZ"
-            onClick={() => setAboutOpen(true)}
-          >
-            v{APP_VERSION}
-          </button>
-        </div>
+        <button
+          class="nz-version-button"
+          aria-label={`About NoteZ - version ${APP_VERSION}`}
+          title="About NoteZ"
+          onClick={() => setAboutOpen(true)}
+        >
+          v{APP_VERSION}
+        </button>
       </div>
+
       <AboutDialog open={aboutOpen()} onClose={() => setAboutOpen(false)} />
       <SettingsDialog open={settingsOpen()} onClose={() => setSettingsOpen(false)} />
       <TrashDialog open={trashOpen()} onClose={() => setTrashOpen(false)} />
     </aside>
   );
 };
+
+const SearchIcon: Component = () => (
+  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.4" />
+    <path d="M11 11L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+  </svg>
+);
 
 const TrashIcon: Component = () => (
   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">

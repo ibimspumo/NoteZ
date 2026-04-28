@@ -80,6 +80,7 @@ impl Db {
         let migrations: &[(i64, &str)] = &[
             (1, MIGRATION_001),
             (2, MIGRATION_002),
+            (3, MIGRATION_003),
         ];
 
         let tx = conn.transaction()?;
@@ -239,6 +240,27 @@ CREATE TABLE IF NOT EXISTS assets (
 );
 
 CREATE INDEX IF NOT EXISTS idx_assets_created_at ON assets(created_at DESC);
+"#;
+
+// v3: AI call ledger for OpenRouter integration. Every call (success or failure)
+// gets a row with token counts, USD cost, and a loose note_id reference (no FK
+// CASCADE - call history must outlive a deleted note so spend stays auditable).
+const MIGRATION_003: &str = r#"
+CREATE TABLE IF NOT EXISTS ai_calls (
+    id TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL,
+    model TEXT NOT NULL,
+    purpose TEXT NOT NULL,
+    note_id TEXT,
+    prompt_tokens INTEGER NOT NULL DEFAULT 0,
+    completion_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_usd REAL NOT NULL DEFAULT 0,
+    duration_ms INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL,
+    error TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_calls_created_at ON ai_calls(created_at DESC);
 "#;
 
 pub fn now_iso() -> String {

@@ -35,6 +35,7 @@ import {
   sidebarCollapsed,
   toggleSidebar,
 } from "../stores/ui";
+import { nowTick } from "../stores/clock";
 import { api } from "../lib/tauri";
 import type { Note } from "../lib/types";
 import { loadSettings, trashRetentionDays } from "../stores/settings";
@@ -171,6 +172,7 @@ export const MainView: Component = () => {
     const id = selectedId();
     if (!id) {
       setActiveNote(null);
+      setEditorInstance(null);
       return;
     }
     // Wait for any save targeting the previous note to land before we hand the
@@ -256,32 +258,15 @@ export const MainView: Component = () => {
           >
             <SidebarIcon />
           </button>
-          <div class="nz-main-header-spacer" data-tauri-drag-region />
-          <Show when={activeNote()}>
-            {(note) => (
-              <div
-                class="nz-main-header-title"
-                classList={{ "is-untitled": !note().title.trim() }}
-                data-tauri-drag-region
-                title={note().title.trim() || "Untitled"}
-              >
-                {note().title.trim() || "Untitled"}
-              </div>
-            )}
-          </Show>
-          <div class="nz-main-header-spacer" data-tauri-drag-region />
+          <div class="nz-main-header-toolbar">
+            <Show when={editorInstance()}>
+              {(ed) => <EditorToolbar editor={ed()} />}
+            </Show>
+          </div>
           <div class="nz-saving-indicator" data-state={save.savingState()}>
             <Show when={save.savingState() === "saving"}>Saving…</Show>
             <Show when={save.savingState() === "saved"}>Saved</Show>
           </div>
-          <button
-            class="nz-icon-btn"
-            aria-label="Search · ⌘K"
-            title="Search · ⌘K"
-            onClick={openCommandBar}
-          >
-            <CmdKIcon />
-          </button>
         </header>
         <Show
           when={activeNote()}
@@ -295,9 +280,6 @@ export const MainView: Component = () => {
         >
           {(note) => (
             <>
-              <Show when={editorInstance()}>
-                {(ed) => <EditorToolbar editor={ed()} />}
-              </Show>
               <div class="nz-editor-wrap">
                 <div class="nz-meta-bar">
                   <span class="nz-meta-primary">
@@ -305,7 +287,7 @@ export const MainView: Component = () => {
                   </span>
                   <span class="nz-meta-dot" aria-hidden="true">·</span>
                   <span class="nz-meta-secondary">
-                    Last edited {formatRelative(note().updated_at)}
+                    Last edited {formatRelative(note().updated_at, nowTick())}
                   </span>
                   <Show when={note().is_pinned}>
                     <span class="nz-meta-dot" aria-hidden="true">·</span>
@@ -341,12 +323,5 @@ const SidebarIcon: Component = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
     <rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3" />
     <line x1="6.5" y1="3" x2="6.5" y2="13" stroke="currentColor" stroke-width="1.3" />
-  </svg>
-);
-
-const CmdKIcon: Component = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.3" />
-    <path d="M11 11L14 14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
   </svg>
 );

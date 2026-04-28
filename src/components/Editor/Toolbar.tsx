@@ -2,7 +2,6 @@ import {
   createEffect,
   createSignal,
   onCleanup,
-  Show,
   type Component,
 } from "solid-js";
 import {
@@ -19,9 +18,7 @@ import {
 } from "lexical";
 import {
   $createHeadingNode,
-  $createQuoteNode,
   $isHeadingNode,
-  $isQuoteNode,
 } from "@lexical/rich-text";
 import {
   $isListNode,
@@ -35,21 +32,10 @@ import { $isLinkNode, TOGGLE_LINK_COMMAND } from "@lexical/link";
 import { $setBlocksType } from "@lexical/selection";
 import { $getNearestNodeOfType, mergeRegister } from "@lexical/utils";
 
-type BlockKind = "paragraph" | "h1" | "h2" | "h3" | "quote" | "ul" | "ol" | "check";
+type BlockKind = "paragraph" | "h1" | "h2" | "h3" | "ul" | "ol" | "check";
 
 type Props = {
   editor: LexicalEditor;
-};
-
-const HEADING_LABELS: Record<BlockKind, string> = {
-  paragraph: "Text",
-  h1: "Heading 1",
-  h2: "Heading 2",
-  h3: "Heading 3",
-  quote: "Quote",
-  ul: "Bulleted list",
-  ol: "Numbered list",
-  check: "Checklist",
 };
 
 export const EditorToolbar: Component<Props> = (props) => {
@@ -59,9 +45,6 @@ export const EditorToolbar: Component<Props> = (props) => {
   const [codeFmt, setCodeFmt] = createSignal(false);
   const [link, setLink] = createSignal(false);
   const [block, setBlock] = createSignal<BlockKind>("paragraph");
-  const [menuOpen, setMenuOpen] = createSignal(false);
-
-  let menuRef: HTMLDivElement | undefined;
 
   const refreshFromState = () => {
     props.editor.getEditorState().read(() => {
@@ -87,8 +70,6 @@ export const EditorToolbar: Component<Props> = (props) => {
       } else if ($isHeadingNode(topLevel)) {
         const tag = topLevel.getTag();
         kind = tag === "h1" ? "h1" : tag === "h2" ? "h2" : "h3";
-      } else if ($isQuoteNode(topLevel)) {
-        kind = "quote";
       }
       setBlock(kind);
 
@@ -120,25 +101,25 @@ export const EditorToolbar: Component<Props> = (props) => {
     onCleanup(cleanup);
   });
 
-  // Close the heading menu on outside click.
-  createEffect(() => {
-    if (!menuOpen()) return;
-    const onDown = (e: MouseEvent) => {
-      if (menuRef && !menuRef.contains(e.target as Node)) setMenuOpen(false);
-    };
-    window.addEventListener("mousedown", onDown);
-    onCleanup(() => window.removeEventListener("mousedown", onDown));
-  });
-
   const applyBlock = (kind: BlockKind) => {
-    setMenuOpen(false);
     const ed = props.editor;
     const current = block();
 
-    // Toggle off lists/quote when re-clicking the active one.
-    if (kind === current && (kind === "ul" || kind === "ol" || kind === "check")) {
-      ed.dispatchCommand(REMOVE_LIST_COMMAND, undefined);
-      return;
+    // Toggle off lists/headings when re-clicking the active one — drops back
+    // to a plain paragraph for headings, removes the list for lists.
+    if (kind === current) {
+      if (kind === "ul" || kind === "ol" || kind === "check") {
+        ed.dispatchCommand(REMOVE_LIST_COMMAND, undefined);
+        return;
+      }
+      if (kind === "h1" || kind === "h2" || kind === "h3") {
+        ed.update(() => {
+          const sel = $getSelection();
+          if (!$isRangeSelection(sel)) return;
+          $setBlocksType(sel, () => $createParagraphNode());
+        });
+        return;
+      }
     }
 
     if (kind === "ul") {
@@ -154,7 +135,7 @@ export const EditorToolbar: Component<Props> = (props) => {
       return;
     }
 
-    // Switching out of a list back to a block-type - drop the list first.
+    // Switching out of a list back to a block-type — drop the list first.
     if (current === "ul" || current === "ol" || current === "check") {
       ed.dispatchCommand(REMOVE_LIST_COMMAND, undefined);
     }
@@ -166,8 +147,6 @@ export const EditorToolbar: Component<Props> = (props) => {
         $setBlocksType(selection, () => $createParagraphNode());
       } else if (kind === "h1" || kind === "h2" || kind === "h3") {
         $setBlocksType(selection, () => $createHeadingNode(kind));
-      } else if (kind === "quote") {
-        $setBlocksType(selection, () => $createQuoteNode());
       }
     });
   };
@@ -197,176 +176,97 @@ export const EditorToolbar: Component<Props> = (props) => {
   return (
     <div class="nz-toolbar" role="toolbar" aria-label="Formatting">
       <div class="nz-toolbar-group">
-        <button
-          class="nz-tb-btn nz-tb-icon"
-          aria-label="Undo"
-          title="Undo · ⌘Z"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={undo}
-        >
-          <IconUndo />
-        </button>
-        <button
-          class="nz-tb-btn nz-tb-icon"
-          aria-label="Redo"
-          title="Redo · ⌘⇧Z"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={redo}
-        >
-          <IconRedo />
-        </button>
-      </div>
-
-      <span class="nz-toolbar-sep" aria-hidden="true" />
-
-      <div class="nz-toolbar-group" ref={(el) => (menuRef = el)}>
-        <button
-          class="nz-tb-btn nz-tb-block"
-          classList={{ open: menuOpen() }}
-          aria-label="Block type"
-          aria-haspopup="menu"
-          aria-expanded={menuOpen()}
-          title="Block type"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => setMenuOpen((v) => !v)}
-        >
-          <span class="nz-tb-block-label">{HEADING_LABELS[block()]}</span>
-          <IconChevron />
-        </button>
-        <Show when={menuOpen()}>
-          <div class="nz-toolbar-menu" role="menu">
-            <BlockMenuItem label="Text" hint="Body" active={block() === "paragraph"} onPick={() => applyBlock("paragraph")} />
-            <BlockMenuItem label="Heading 1" hint="# " active={block() === "h1"} onPick={() => applyBlock("h1")} />
-            <BlockMenuItem label="Heading 2" hint="## " active={block() === "h2"} onPick={() => applyBlock("h2")} />
-            <BlockMenuItem label="Heading 3" hint="### " active={block() === "h3"} onPick={() => applyBlock("h3")} />
-            <BlockMenuItem label="Quote" hint="> " active={block() === "quote"} onPick={() => applyBlock("quote")} />
-          </div>
-        </Show>
+        <ToolbarBtn label="Undo" hint="Undo · ⌘Z" onPress={undo}><IconUndo /></ToolbarBtn>
+        <ToolbarBtn label="Redo" hint="Redo · ⌘⇧Z" onPress={redo}><IconRedo /></ToolbarBtn>
       </div>
 
       <span class="nz-toolbar-sep" aria-hidden="true" />
 
       <div class="nz-toolbar-group">
-        <button
-          class="nz-tb-btn nz-tb-icon"
-          classList={{ active: block() === "ul" }}
-          aria-label="Bulleted list"
-          aria-pressed={block() === "ul"}
-          title="Bulleted list"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => applyBlock("ul")}
-        >
-          <IconBullet />
-        </button>
-        <button
-          class="nz-tb-btn nz-tb-icon"
-          classList={{ active: block() === "ol" }}
-          aria-label="Numbered list"
-          aria-pressed={block() === "ol"}
-          title="Numbered list"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => applyBlock("ol")}
-        >
-          <IconOrdered />
-        </button>
-        <button
-          class="nz-tb-btn nz-tb-icon"
-          classList={{ active: block() === "check" }}
-          aria-label="Checklist"
-          aria-pressed={block() === "check"}
-          title="Checklist"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => applyBlock("check")}
-        >
-          <IconCheck />
-        </button>
+        <ToolbarBtn
+          label="Body text"
+          hint="Body"
+          active={block() === "paragraph"}
+          onPress={() => applyBlock("paragraph")}
+        ><IconParagraph /></ToolbarBtn>
+        <ToolbarBtn
+          label="Heading 1"
+          hint="Heading 1"
+          active={block() === "h1"}
+          onPress={() => applyBlock("h1")}
+        ><IconH1 /></ToolbarBtn>
+        <ToolbarBtn
+          label="Heading 2"
+          hint="Heading 2"
+          active={block() === "h2"}
+          onPress={() => applyBlock("h2")}
+        ><IconH2 /></ToolbarBtn>
+        <ToolbarBtn
+          label="Heading 3"
+          hint="Heading 3"
+          active={block() === "h3"}
+          onPress={() => applyBlock("h3")}
+        ><IconH3 /></ToolbarBtn>
       </div>
 
       <span class="nz-toolbar-sep" aria-hidden="true" />
 
       <div class="nz-toolbar-group">
-        <button
-          class="nz-tb-btn nz-tb-icon"
-          classList={{ active: bold() }}
-          aria-label="Bold"
-          aria-pressed={bold()}
-          title="Bold · ⌘B"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => fmt("bold")}
-        >
-          <IconBold />
-        </button>
-        <button
-          class="nz-tb-btn nz-tb-icon"
-          classList={{ active: italic() }}
-          aria-label="Italic"
-          aria-pressed={italic()}
-          title="Italic · ⌘I"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => fmt("italic")}
-        >
-          <IconItalic />
-        </button>
-        <button
-          class="nz-tb-btn nz-tb-icon"
-          classList={{ active: underline() }}
-          aria-label="Underline"
-          aria-pressed={underline()}
-          title="Underline · ⌘U"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => fmt("underline")}
-        >
-          <IconUnderline />
-        </button>
+        <ToolbarBtn
+          label="Bulleted list"
+          hint="Bulleted list"
+          active={block() === "ul"}
+          onPress={() => applyBlock("ul")}
+        ><IconBullet /></ToolbarBtn>
+        <ToolbarBtn
+          label="Numbered list"
+          hint="Numbered list"
+          active={block() === "ol"}
+          onPress={() => applyBlock("ol")}
+        ><IconOrdered /></ToolbarBtn>
+        <ToolbarBtn
+          label="Checklist"
+          hint="Checklist"
+          active={block() === "check"}
+          onPress={() => applyBlock("check")}
+        ><IconCheck /></ToolbarBtn>
       </div>
 
       <span class="nz-toolbar-sep" aria-hidden="true" />
 
       <div class="nz-toolbar-group">
-        <button
-          class="nz-tb-btn nz-tb-icon"
-          classList={{ active: link() }}
-          aria-label="Link"
-          aria-pressed={link()}
-          title="Link"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={handleLink}
-        >
-          <IconLink />
-        </button>
-        <button
-          class="nz-tb-btn nz-tb-icon"
-          classList={{ active: codeFmt() }}
-          aria-label="Inline code"
-          aria-pressed={codeFmt()}
-          title="Inline code"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => fmt("code")}
-        >
-          <IconCode />
-        </button>
+        <ToolbarBtn label="Bold" hint="Bold · ⌘B" active={bold()} onPress={() => fmt("bold")}><IconBold /></ToolbarBtn>
+        <ToolbarBtn label="Italic" hint="Italic · ⌘I" active={italic()} onPress={() => fmt("italic")}><IconItalic /></ToolbarBtn>
+        <ToolbarBtn label="Underline" hint="Underline · ⌘U" active={underline()} onPress={() => fmt("underline")}><IconUnderline /></ToolbarBtn>
+      </div>
+
+      <span class="nz-toolbar-sep" aria-hidden="true" />
+
+      <div class="nz-toolbar-group">
+        <ToolbarBtn label="Link" hint="Link" active={link()} onPress={handleLink}><IconLink /></ToolbarBtn>
+        <ToolbarBtn label="Inline code" hint="Inline code" active={codeFmt()} onPress={() => fmt("code")}><IconCode /></ToolbarBtn>
       </div>
     </div>
   );
 };
 
-const BlockMenuItem: Component<{
+const ToolbarBtn: Component<{
   label: string;
   hint?: string;
-  active: boolean;
-  onPick: () => void;
+  active?: boolean;
+  onPress: () => void;
+  children: any;
 }> = (props) => (
   <button
-    class="nz-toolbar-menu-item"
-    classList={{ active: props.active }}
-    role="menuitem"
+    class="nz-tb-btn nz-tb-icon"
+    classList={{ active: !!props.active }}
+    aria-label={props.label}
+    aria-pressed={props.active ? true : undefined}
+    title={props.hint ?? props.label}
     onMouseDown={(e) => e.preventDefault()}
-    onClick={props.onPick}
+    onClick={props.onPress}
   >
-    <span>{props.label}</span>
-    <Show when={props.hint}>
-      <span class="nz-toolbar-menu-hint">{props.hint}</span>
-    </Show>
+    {props.children}
   </button>
 );
 
@@ -382,9 +282,33 @@ const IconRedo: Component = () => (
     <path d="M10.5 5 13 7.5 10.5 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
   </svg>
 );
-const IconChevron: Component = () => (
-  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-    <path d="M2.5 4 5 6.5 7.5 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+const IconParagraph: Component = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <path d="M3.5 4.5h9M3.5 8h9M3.5 11.5h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+  </svg>
+);
+const IconH1: Component = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <text x="1.5" y="11" font-size="9" font-weight="800" fill="currentColor"
+      font-family="-apple-system, system-ui, sans-serif" letter-spacing="-0.02em">H</text>
+    <text x="9" y="12.6" font-size="5.4" font-weight="700" fill="currentColor"
+      font-family="-apple-system, system-ui, sans-serif">1</text>
+  </svg>
+);
+const IconH2: Component = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <text x="2" y="11" font-size="8" font-weight="800" fill="currentColor"
+      font-family="-apple-system, system-ui, sans-serif" letter-spacing="-0.02em">H</text>
+    <text x="9" y="12.6" font-size="5.4" font-weight="700" fill="currentColor"
+      font-family="-apple-system, system-ui, sans-serif">2</text>
+  </svg>
+);
+const IconH3: Component = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <text x="2.5" y="11" font-size="7" font-weight="800" fill="currentColor"
+      font-family="-apple-system, system-ui, sans-serif" letter-spacing="-0.02em">H</text>
+    <text x="9" y="12.6" font-size="5.4" font-weight="700" fill="currentColor"
+      font-family="-apple-system, system-ui, sans-serif">3</text>
   </svg>
 );
 const IconBold: Component = () => (

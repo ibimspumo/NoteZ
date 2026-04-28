@@ -4,6 +4,12 @@
   --nz-accent-soft: rgba(0, 220, 130, 0.16);
   --nz-accent-glow: rgba(0, 220, 130, 0.32);
   --nz-danger: #d54a3a;
+
+  /* Brand mark dots — match the app icon. Two shades for depth. */
+  --nz-brand-bright: #1AD592;
+  --nz-brand-deep: #08885A;
+  --nz-brand-glow: rgba(26, 213, 146, 0.28);
+
   --nz-radius-sm: 6px;
   --nz-radius-md: 8px;
   --nz-radius-lg: 12px;
@@ -59,6 +65,10 @@
   --nz-accent-soft: rgba(255, 255, 255, 0.10);
   --nz-accent-glow: rgba(255, 255, 255, 0.16);
   --nz-danger: #c46a5e;
+
+  --nz-brand-bright: #d4d4d8;
+  --nz-brand-deep: #71717a;
+  --nz-brand-glow: rgba(255, 255, 255, 0.16);
 
   --nz-bg-app: rgba(14, 14, 16, 0.0);
   --nz-bg-sidebar: transparent;

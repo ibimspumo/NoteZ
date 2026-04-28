@@ -1,6 +1,11 @@
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  AiCallsCursor,
+  AiCallsPage,
+  AiConfig,
+  AiModel,
+  AiStats,
   Asset,
   AssetRef,
   Note,
@@ -86,6 +91,20 @@ export const api = {
   // capture window
   toggleCaptureWindow: () => invoke<void>("toggle_capture_window"),
   hideCaptureWindow: () => invoke<void>("hide_capture_window"),
+
+  // ai
+  getAiConfig: () => invoke<AiConfig>("get_ai_config"),
+  setAiEnabled: (enabled: boolean) => invoke<void>("set_ai_enabled", { enabled }),
+  setAiModel: (model: string) => invoke<void>("set_ai_model", { model }),
+  setOpenrouterKey: (key: string) => invoke<void>("set_openrouter_key", { key }),
+  listAiModels: (forceRefresh?: boolean) =>
+    invoke<AiModel[]>("list_ai_models", { forceRefresh }),
+  generateTitle: (text: string, noteId?: string | null) =>
+    invoke<string>("generate_title", { text, noteId: noteId ?? null }),
+  listAiCalls: (cursor?: AiCallsCursor | null, limit?: number) =>
+    invoke<AiCallsPage>("list_ai_calls", { cursor: cursor ?? null, limit }),
+  getAiStats: () => invoke<AiStats>("get_ai_stats"),
+  clearAiCalls: () => invoke<number>("clear_ai_calls"),
 };
 
 /** Convert an absolute on-disk asset path to a webview-loadable URL. */

@@ -62,6 +62,40 @@ src/              Solid frontend (TypeScript)
 - Lexical state is stored as JSON string in `notes.content_json`. Plain text
   (`getTextContent()`) is mirrored to `notes.content_text` for FTS5 + previews.
 
+## Performance budget
+
+**Always design for 1,000,000 notes.** Not "typical user has hundreds" - the
+target is a power user with a million entries, and the UI must stay snappy
+with that load. This is non-negotiable; don't ship code that degrades at
+scale even if the current dev DB has 4 notes. When in doubt, imagine the
+user has 1M notes and is searching, scrolling, or filtering them - if the
+code would noticeably stutter, redesign before shipping.
+
+Concretely, this rules out:
+
+- Rendering all rows of an unbounded list into the DOM (sidebar, search
+  results, trash, snapshots). Always virtualize / window the visible slice.
+- Recomputing O(n) prefix sums or offset arrays on every measurement /
+  scroll / settings change. Use a Fenwick tree (binary indexed tree) for
+  prefix sums with O(log n) point updates so a single row's height change
+  doesn't reflow the whole list math.
+- Loading the whole `notes` table at once. Pagination is mandatory; the
+  cursor-based `notesState.nextCursor` flow exists for this. Never write
+  `SELECT ... FROM notes` without a `LIMIT`.
+- Per-keystroke / per-scroll work that scans the full list in JS. If you
+  find yourself iterating `notesState.items` inside a Solid effect that
+  re-runs on every store mutation, push the work to Rust + an index, or
+  cache by id in a Map.
+- DOM `querySelectorAll` against the sidebar / list to find a row. Keep
+  id → index mappings in JS state instead.
+- Loading note `content_json` for the sidebar list. The `NoteSummary` type
+  carries only what the list needs (title, preview, updated_at). Never
+  hydrate full notes just to render row metadata.
+
+If a feature genuinely needs O(n) work over all notes (full-text indexing,
+export, etc.), it belongs in Rust on a worker thread, not in the render
+path.
+
 ## Conventions
 
 - **Rust holds the truth.** Frontend never writes SQL. All persistence goes through

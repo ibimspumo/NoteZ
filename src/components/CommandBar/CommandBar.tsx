@@ -9,6 +9,7 @@ import {
 import { Portal } from "solid-js/web";
 import { api } from "../../lib/tauri";
 import { formatRelative } from "../../lib/format";
+import { nowTick } from "../../stores/clock";
 import type { SearchHit } from "../../lib/types";
 
 type Props = {
@@ -141,7 +142,7 @@ export const CommandBar: Component<Props> = (props) => {
                         innerHTML={highlight(hit.snippet)}
                       />
                     </Show>
-                    <div class="nz-cb-row-time">{formatRelative(hit.updated_at)}</div>
+                    <div class="nz-cb-row-time">{formatRelative(hit.updated_at, nowTick())}</div>
                   </div>
                 )}
               </For>

@@ -108,3 +108,52 @@ export type AssetRef = {
   /** Absolute on-disk path. Use `convertFileSrc()` from `@tauri-apps/api/core` to get a webview-loadable URL. */
   path: string;
 };
+
+export type AiConfig = {
+  enabled: boolean;
+  has_key: boolean;
+  model: string;
+};
+
+export type AiModel = {
+  id: string;
+  name: string;
+  context_length: number;
+  /** USD per 1M prompt tokens. */
+  prompt_per_m: number;
+  /** USD per 1M completion tokens. */
+  completion_per_m: number;
+};
+
+export type AiCallStatus = "ok" | "error";
+
+export type AiCall = {
+  id: string;
+  created_at: string;
+  model: string;
+  purpose: string;
+  note_id: string | null;
+  note_title: string | null;
+  prompt_tokens: number;
+  completion_tokens: number;
+  cost_usd: number;
+  duration_ms: number;
+  status: AiCallStatus;
+  error: string | null;
+};
+
+export type AiCallsCursor = {
+  created_at: string;
+  id: string;
+};
+
+export type AiCallsPage = {
+  items: AiCall[];
+  next_cursor: AiCallsCursor | null;
+};
+
+export type AiStats = {
+  total_calls: number;
+  total_cost_usd: number;
+  error_calls: number;
+};

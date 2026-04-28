@@ -248,6 +248,16 @@ pub fn run() {
             // capture
             commands::capture::toggle_capture_window,
             commands::capture::hide_capture_window,
+            // ai
+            commands::ai::get_ai_config,
+            commands::ai::set_ai_enabled,
+            commands::ai::set_ai_model,
+            commands::ai::set_openrouter_key,
+            commands::ai::list_ai_models,
+            commands::ai::generate_title,
+            commands::ai::list_ai_calls,
+            commands::ai::get_ai_stats,
+            commands::ai::clear_ai_calls,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
