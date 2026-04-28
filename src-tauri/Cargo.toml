@@ -1,6 +1,6 @@
 [package]
 name = "notez"
-version = "0.4.5"
+version = "0.5.1"
 description = "NoteZ - fast, local, beautiful notes for Mac."
 authors = ["NoteZ Contributors"]
 edition = "2021"
