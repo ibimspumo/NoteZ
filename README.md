@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="app-icon.png" width="160" alt="NoteZ" />
+  <img src="app-icon-readme.png" width="160" alt="NoteZ" />
 </p>
 
 <h1 align="center">NoteZ</h1>
