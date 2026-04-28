@@ -11,5 +11,6 @@ import "./styles/capture.css";
 import "./styles/about.css";
 import "./styles/settings.css";
 import "./styles/trash.css";
+import "./styles/dev-panel.css";
 
 render(() => <App />, document.getElementById("root") as HTMLElement);

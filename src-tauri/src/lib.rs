@@ -258,6 +258,13 @@ pub fn run() {
             commands::ai::list_ai_calls,
             commands::ai::get_ai_stats,
             commands::ai::clear_ai_calls,
+            // dev-only stress-test helpers (cfg'd out in release)
+            #[cfg(debug_assertions)]
+            commands::dev::dev_generate_notes,
+            #[cfg(debug_assertions)]
+            commands::dev::dev_count_generated_notes,
+            #[cfg(debug_assertions)]
+            commands::dev::dev_delete_generated_notes,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -64,6 +64,26 @@ export async function refreshNotes() {
   );
 }
 
+/** Catastrophic reset. Clears the per-note cache, all loaded list state, and
+ *  trash, then refetches the first page from scratch. Used after bulk
+ *  server-side mutations (the dev panel's "delete all generated" flow) where
+ *  patching local state row-by-row would be wrong-or-slow and any stale entry
+ *  in `cache` would resurrect a deleted note when re-selected. */
+export async function hardRefreshNotes() {
+  cache.clear();
+  setState({
+    pinned: [],
+    items: [],
+    nextCursor: null,
+    initialLoaded: false,
+    loadingMore: false,
+    trash: [],
+    trashCursor: null,
+    trashLoaded: false,
+  });
+  await refreshNotes();
+}
+
 /** Load the next page of unpinned items. No-op if there's nothing more. */
 export async function loadMoreNotes() {
   if (state.loadingMore || !state.nextCursor) return;

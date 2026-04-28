@@ -10,6 +10,7 @@ import { Sidebar } from "../components/Sidebar/Sidebar";
 import { Editor, type EditorChange } from "../components/Editor/Editor";
 import { EditorToolbar } from "../components/Editor/Toolbar";
 import { CommandBar } from "../components/CommandBar/CommandBar";
+import { DevPanel } from "../components/DevPanel";
 import { onEvent } from "../lib/tauri";
 import { formatAbsoluteDate, formatRelative } from "../lib/format";
 import type { LexicalEditor } from "lexical";
@@ -46,6 +47,7 @@ export const MainView: Component = () => {
   const [activeNote, setActiveNote] = createSignal<Note | null>(null);
   const [editorKey, setEditorKey] = createSignal(0);
   const [editorInstance, setEditorInstance] = createSignal<LexicalEditor | null>(null);
+  const [devPanelOpen, setDevPanelOpen] = createSignal(false);
 
   const save = useSavePipeline({
     onSaved: (updated) => {
@@ -223,6 +225,15 @@ export const MainView: Component = () => {
         if (id) void handleDelete(id);
       },
     },
+    // Dev-only: open the stress-test panel. The handler returns false in
+    // release so the keypress falls through to whatever else might use it.
+    {
+      hotkey: { key: "d", mods: ["mod", "shift"] },
+      handler: () => {
+        if (!import.meta.env.DEV) return false;
+        setDevPanelOpen((v) => !v);
+      },
+    },
   ]);
 
   onMount(async () => {
@@ -315,6 +326,9 @@ export const MainView: Component = () => {
         onOpenNote={handleOpenNote}
         onCreateWithTitle={handleCreateWithTitle}
       />
+      <Show when={import.meta.env.DEV}>
+        <DevPanel open={devPanelOpen()} onClose={() => setDevPanelOpen(false)} />
+      </Show>
     </div>
   );
 };

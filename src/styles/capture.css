@@ -30,31 +30,17 @@ body {
   overflow: hidden;
 }
 
-/* Wordmark sits in the top-right corner, very subtle. The textarea gets
+/* App icon sits in the top-right corner, very subtle. The textarea gets
  * matching padding-right so wrapped text never crosses under it. */
-.nz-capture-wordmark {
+.nz-capture-icon {
   position: absolute;
-  top: 10px;
-  right: 14px;
-  display: inline-flex;
-  align-items: baseline;
-  font-family: var(--nz-font-ui);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: rgba(255, 255, 255, 0.32);
-  line-height: 1;
+  top: 8px;
+  right: 12px;
+  width: 22px;
+  height: 22px;
+  opacity: 0.6;
   pointer-events: none;
   user-select: none;
-}
-
-.nz-capture-wordmark-z {
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--nz-accent-hot);
-  opacity: 0.55;
-  margin-left: 1px;
-  line-height: 1;
 }
 
 .nz-capture-input {

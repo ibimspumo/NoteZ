@@ -2,6 +2,7 @@ import { Show, createSignal, onCleanup, onMount, type Component } from "solid-js
 import { emit } from "@tauri-apps/api/event";
 import { api } from "../lib/tauri";
 import { deriveTitle } from "../lib/format";
+import zIcon from "../assets/Z.svg";
 
 type Status = "idle" | "saving" | "generating";
 
@@ -108,9 +109,7 @@ export const CaptureView: Component = () => {
 
   return (
     <div class="nz-capture" classList={{ busy: isBusy() }} data-tauri-drag-region>
-      <span class="nz-capture-wordmark" aria-hidden="true">
-        Note<span class="nz-capture-wordmark-z">Z</span>
-      </span>
+      <img class="nz-capture-icon" src={zIcon} alt="" aria-hidden="true" />
       <textarea
         ref={(el) => (textareaRef = el)}
         class="nz-capture-input"

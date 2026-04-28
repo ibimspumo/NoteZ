@@ -105,6 +105,16 @@ export const api = {
     invoke<AiCallsPage>("list_ai_calls", { cursor: cursor ?? null, limit }),
   getAiStats: () => invoke<AiStats>("get_ai_stats"),
   clearAiCalls: () => invoke<number>("clear_ai_calls"),
+
+  // dev-only stress-test helpers. The backend commands are #[cfg(debug_assertions)]
+  // so these will fail in production builds - callers must gate on import.meta.env.DEV.
+  devGenerateNotes: (options: {
+    count: number;
+    style: "plain" | "mixed" | "long";
+    pinPercent: number;
+  }) => invoke<number>("dev_generate_notes", { options }),
+  devCountGeneratedNotes: () => invoke<number>("dev_count_generated_notes"),
+  devDeleteGeneratedNotes: () => invoke<number>("dev_delete_generated_notes"),
 };
 
 /** Convert an absolute on-disk asset path to a webview-loadable URL. */
@@ -119,4 +129,25 @@ export type NoteZEvent =
 
 export function onEvent(event: NoteZEvent, handler: () => void): Promise<UnlistenFn> {
   return listen(event, handler);
+}
+
+// Dev-only stress-test progress payload, emitted by `dev_generate_notes` /
+// `dev_delete_generated_notes`. Listen via `onDevProgress` rather than the
+// regular `onEvent` so the payload is typed and the production bundle has
+// nothing to listen for.
+export type DevProgress = {
+  phase: "start" | "progress" | "done";
+  done: number;
+  total: number;
+};
+
+export function onDevProgress(
+  kind: "generate" | "delete",
+  handler: (p: DevProgress) => void,
+): Promise<UnlistenFn> {
+  const event =
+    kind === "generate"
+      ? "notez://dev/generate-progress"
+      : "notez://dev/delete-progress";
+  return listen<DevProgress>(event, (e) => handler(e.payload));
 }
