@@ -85,6 +85,27 @@ disappear. Plenty of time to change your mind.
 | `**text**` | Bold |
 | `_text_` | Italic |
 
+## Install
+
+NoteZ is built for **Apple Silicon Macs (M1/M2/M3/M4)**. Grab the latest
+`.dmg` from [Releases](https://github.com/ibimspumo/NoteZ/releases).
+
+1. Open the `.dmg` and drag **NoteZ.app** into **Applications**.
+2. The app is unsigned (no Apple Developer account), so macOS Gatekeeper
+   will block it on first launch. Run this once in Terminal to clear the
+   quarantine flag:
+
+   ```bash
+   xattr -cr /Applications/NoteZ.app
+   ```
+
+3. Open NoteZ from Applications - it will launch normally from now on.
+
+If you skip step 2, you'll see *"NoteZ is damaged and can't be opened"* or
+*"cannot be opened because the developer cannot be verified"*. That's macOS,
+not the app. The `xattr` command is safe - it just removes the
+quarantine attribute that Safari/Finder added to the download.
+
 ## Where your notes live
 
 One SQLite file:

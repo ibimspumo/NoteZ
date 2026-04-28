@@ -7,16 +7,8 @@ on:
 
 jobs:
   build:
-    name: Build macOS (${{ matrix.target }})
+    name: Build macOS (Apple Silicon)
     runs-on: macos-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: aarch64-apple-darwin
-            arch: arm64
-          - target: x86_64-apple-darwin
-            arch: x64
 
     steps:
       - name: Checkout
@@ -25,13 +17,12 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: aarch64-apple-darwin
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-          key: ${{ matrix.target }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -55,13 +46,25 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'NoteZ ${{ github.ref_name }}'
           releaseBody: |
-            NoteZ ${{ github.ref_name }}
+            NoteZ ${{ github.ref_name }} - Apple Silicon (M1/M2/M3/M4) only.
 
-            Download the `.dmg` for your Mac:
-            - Apple Silicon (M1/M2/M3/M4): `*_aarch64.dmg`
-            - Intel: `*_x64.dmg`
+            ## Install
 
-            The app is unsigned, so on first launch right-click the app and choose "Open".
+            1. Download the `.dmg` below and open it.
+            2. Drag **NoteZ.app** into your **Applications** folder.
+            3. The app is **unsigned** (no Apple Developer account), so macOS
+               will refuse to open it. Run this once in Terminal to remove the
+               quarantine flag:
+
+               ```bash
+               xattr -cr /Applications/NoteZ.app
+               ```
+
+            4. Open NoteZ from Applications - it will now launch normally.
+
+            If you skip step 3, you'll see "NoteZ is damaged and can't be opened"
+            or "cannot be opened because the developer cannot be verified".
+            That's macOS Gatekeeper, not the app.
           releaseDraft: false
           prerelease: false
-          args: --target ${{ matrix.target }}
+          args: --target aarch64-apple-darwin
