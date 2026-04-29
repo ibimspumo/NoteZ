@@ -9,16 +9,14 @@ import {
 } from "@lexical/list";
 import { $createHeadingNode, $isHeadingNode } from "@lexical/rich-text";
 import { $setBlocksType } from "@lexical/selection";
-import { $findMatchingParent, $getNearestNodeOfType, mergeRegister } from "@lexical/utils";
+import { $findMatchingParent, $getNearestNodeOfType } from "@lexical/utils";
 import {
   $createParagraphNode,
   $getSelection,
   $isRangeSelection,
-  COMMAND_PRIORITY_LOW,
   FORMAT_TEXT_COMMAND,
   type LexicalEditor,
   REDO_COMMAND,
-  SELECTION_CHANGE_COMMAND,
   UNDO_COMMAND,
 } from "lexical";
 import { type Component, createEffect, createSignal, onCleanup } from "solid-js";
@@ -70,23 +68,18 @@ export const EditorToolbar: Component<Props> = (props) => {
   };
 
   createEffect(() => {
-    // We deliberately do NOT subscribe to registerUpdateListener here. That
-    // listener fires on every keystroke (Lexical fires it once per
-    // transaction), and the toolbar state only changes when the *selection*
-    // moves or when a format command runs. SELECTION_CHANGE_COMMAND covers
-    // both cases (Lexical dispatches it after format toggles too) - and
-    // saves us a $getEditorState().read() + tree walk per keystroke, which
-    // for 100k-node notes is a measurable jank source.
-    const cleanup = mergeRegister(
-      props.editor.registerCommand(
-        SELECTION_CHANGE_COMMAND,
-        () => {
-          refreshFromState();
-          return false;
-        },
-        COMMAND_PRIORITY_LOW,
-      ),
-    );
+    // registerUpdateListener fires after every committed editor transaction.
+    // We previously tried to optimise this by only listening to
+    // SELECTION_CHANGE_COMMAND, but Lexical doesn't reliably dispatch that
+    // for format-only toggles where the selection range stays identical
+    // (e.g. pressing ⌘B a second time un-bolds and merges the node back),
+    // which left the toolbar stuck on "active". The per-update cost here
+    // is one editor-state read plus a parent-chain walk from the anchor
+    // node - bounded by block-nesting depth, not note size - and Solid's
+    // signal equality dedupes unchanged values so the DOM doesn't churn.
+    const cleanup = props.editor.registerUpdateListener(() => {
+      refreshFromState();
+    });
     // Initial sync - the command listener above only fires on subsequent
     // selection changes, but the toolbar should reflect the current cursor
     // immediately after mount.
