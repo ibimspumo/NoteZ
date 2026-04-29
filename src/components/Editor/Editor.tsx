@@ -1,41 +1,23 @@
-import {
-  createEffect,
-  createSignal,
-  onCleanup,
-  Show,
-  type Component,
-} from "solid-js";
-import {
-  $createParagraphNode,
-  $getRoot,
-  $isParagraphNode,
-  type LexicalEditor,
-} from "lexical";
+import { $createParagraphNode, $getRoot, $isParagraphNode, type LexicalEditor } from "lexical";
+import { type Component, Show, createEffect, createSignal, onCleanup } from "solid-js";
+import { stringifyEditorState } from "../../lib/editorStringify";
+import { api } from "../../lib/tauri";
+import type { EditorSnapshot } from "../../views/useSavePipeline";
+import { MentionPopover } from "./MentionPopover";
 import {
   createNoteZEditor,
   getEditorStateSnapshot,
   getPlainText,
   loadEditorStateFromJSON,
 } from "./lexical/createEditor";
+import { collectAssetIds } from "./lexical/imageNode";
+import { attachMentionClickHandler, collectMentionTargets } from "./lexical/mentionNode";
+import { type MentionMatch, insertMention, registerMentionPlugin } from "./lexical/mentionPlugin";
 import {
+  type SerializedSelection,
   captureSelection,
   restoreSelection,
-  type SerializedSelection,
 } from "./lexical/selectionPath";
-import {
-  attachMentionClickHandler,
-  collectMentionTargets,
-} from "./lexical/mentionNode";
-import { collectAssetIds } from "./lexical/imageNode";
-import {
-  insertMention,
-  registerMentionPlugin,
-  type MentionMatch,
-} from "./lexical/mentionPlugin";
-import { MentionPopover } from "./MentionPopover";
-import { stringifyEditorState } from "../../lib/editorStringify";
-import { api } from "../../lib/tauri";
-import type { EditorSnapshot } from "../../views/useSavePipeline";
 
 // Settings-table key namespace for per-note cursor persistence.
 const cursorKey = (noteId: string) => `cursor:${noteId}`;
@@ -122,43 +104,45 @@ export const Editor: Component<EditorProps> = (props) => {
       return { contentJson, contentText: text, mentionTargetIds, assetIds };
     };
 
-    const cleanupChange = handles.editor.registerUpdateListener(({ dirtyElements, dirtyLeaves, editorState }) => {
-      // Cheap: track empty state for the placeholder, no stringify here.
-      editorState.read(() => {
-        const root = $getRoot();
-        const size = root.getChildrenSize();
-        if (size === 0) {
-          setIsEmpty(true);
-        } else if (size === 1) {
-          const first = root.getFirstChild();
-          if (first && $isParagraphNode(first) && first.getTextContentSize() === 0) {
+    const cleanupChange = handles.editor.registerUpdateListener(
+      ({ dirtyElements, dirtyLeaves, editorState }) => {
+        // Cheap: track empty state for the placeholder, no stringify here.
+        editorState.read(() => {
+          const root = $getRoot();
+          const size = root.getChildrenSize();
+          if (size === 0) {
             setIsEmpty(true);
+          } else if (size === 1) {
+            const first = root.getFirstChild();
+            if (first && $isParagraphNode(first) && first.getTextContentSize() === 0) {
+              setIsEmpty(true);
+            } else {
+              setIsEmpty(false);
+            }
           } else {
             setIsEmpty(false);
           }
-        } else {
-          setIsEmpty(false);
+        });
+
+        // Track latest caret position for per-note cursor memory. Skipped during
+        // state-load (`suppressChange`) so we don't capture the loaded state's
+        // default selection right after switching.
+        if (!suppressChange) {
+          const captured = captureSelection(handles.editor);
+          if (captured) {
+            liveSelection = captured;
+            schedulePersist();
+          }
         }
-      });
 
-      // Track latest caret position for per-note cursor memory. Skipped during
-      // state-load (`suppressChange`) so we don't capture the loaded state's
-      // default selection right after switching.
-      if (!suppressChange) {
-        const captured = captureSelection(handles.editor);
-        if (captured) {
-          liveSelection = captured;
-          schedulePersist();
-        }
-      }
+        if (suppressChange) return;
+        if (dirtyElements.size === 0 && dirtyLeaves.size === 0) return;
 
-      if (suppressChange) return;
-      if (dirtyElements.size === 0 && dirtyLeaves.size === 0) return;
-
-      // Don't compute the snapshot here - pass the deferred provider to the host.
-      // The save pipeline debounces and pulls the snapshot once per save burst.
-      props.onChange({ snapshot });
-    });
+        // Don't compute the snapshot here - pass the deferred provider to the host.
+        // The save pipeline debounces and pulls the snapshot once per save burst.
+        props.onChange({ snapshot });
+      },
+    );
 
     onCleanup(() => {
       // Flush any pending cursor persist before tearing down - best-effort,

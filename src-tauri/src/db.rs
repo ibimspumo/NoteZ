@@ -1,3 +1,4 @@
+use crate::constants::{DB_BUSY_TIMEOUT_SECS, DB_POOL_SIZE, PREVIEW_MAX_CHARS};
 use crate::error::Result;
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
@@ -35,7 +36,7 @@ impl Db {
         // on every launch is idempotent and self-healing.
         {
             let bootstrap = Connection::open(&path)?;
-            bootstrap.busy_timeout(std::time::Duration::from_secs(5))?;
+            bootstrap.busy_timeout(std::time::Duration::from_secs(DB_BUSY_TIMEOUT_SECS))?;
 
             let current_page_size: i64 =
                 bootstrap.query_row("PRAGMA page_size", [], |r| r.get(0))?;
@@ -48,7 +49,7 @@ impl Db {
         }
 
         let manager = SqliteConnectionManager::file(&path).with_init(|c| {
-            c.busy_timeout(std::time::Duration::from_secs(5))?;
+            c.busy_timeout(std::time::Duration::from_secs(DB_BUSY_TIMEOUT_SECS))?;
             c.execute_batch(
                 "PRAGMA synchronous=NORMAL;
                  PRAGMA foreign_keys=ON;
@@ -59,7 +60,7 @@ impl Db {
                  PRAGMA journal_size_limit=67108864;",
             )
         });
-        let pool = Pool::builder().max_size(8).build(manager)?;
+        let pool = Pool::builder().max_size(DB_POOL_SIZE).build(manager)?;
 
         let db = Self {
             pool: Arc::new(pool),
@@ -267,12 +268,27 @@ pub fn now_iso() -> String {
     chrono::Utc::now().to_rfc3339()
 }
 
+/// Force a WAL checkpoint with TRUNCATE - merge the WAL back into the main DB
+/// and shrink it to zero. Call after a bulk operation that produced a large
+/// WAL (`empty_trash`, `dev_delete_generated_notes`, big migrations) so the
+/// WAL doesn't keep eating disk between auto-checkpoints.
+///
+/// Best-effort: the result is logged but never bubbles up - failure means the
+/// WAL stays large until the next auto-checkpoint, which is harmless.
+pub fn wal_checkpoint(db: &Db) -> Result<()> {
+    let conn = db.conn()?;
+    if let Err(e) = conn.pragma_update(None, "wal_checkpoint", "TRUNCATE") {
+        tracing::warn!("wal_checkpoint(TRUNCATE) failed: {e}");
+    }
+    Ok(())
+}
+
 pub fn note_row_to_summary(
     _conn: &Connection,
     row: &rusqlite::Row,
 ) -> rusqlite::Result<crate::models::NoteSummary> {
     let content_text: String = row.get("content_text")?;
-    let preview = make_preview(&content_text, 140);
+    let preview = make_preview(&content_text, PREVIEW_MAX_CHARS);
     Ok(crate::models::NoteSummary {
         id: row.get("id")?,
         title: row.get("title")?,
@@ -295,5 +311,44 @@ pub fn make_preview(content_text: &str, max_len: usize) -> String {
     } else {
         let truncated: String = cleaned.chars().take(max_len).collect();
         format!("{}…", truncated)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn make_preview_collapses_newlines_to_dots() {
+        let text = "First line\nSecond line\n\nThird line";
+        assert_eq!(make_preview(text, 100), "First line · Second line · Third line");
+    }
+
+    #[test]
+    fn make_preview_skips_blank_lines() {
+        let text = "\n\nFirst\n\n  \nSecond\n";
+        assert_eq!(make_preview(text, 100), "First · Second");
+    }
+
+    #[test]
+    fn make_preview_truncates_with_ellipsis() {
+        let text = "x".repeat(200);
+        let preview = make_preview(&text, 50);
+        assert_eq!(preview.chars().count(), 51); // 50 chars + ellipsis
+        assert!(preview.ends_with('…'));
+    }
+
+    #[test]
+    fn make_preview_handles_unicode_boundaries() {
+        // 4-char-wide emoji should not split mid-codepoint.
+        let text = "😀".repeat(60);
+        let preview = make_preview(&text, 10);
+        assert_eq!(preview.chars().count(), 11); // 10 emoji + ellipsis
+    }
+
+    #[test]
+    fn make_preview_is_short_circuit_when_under_limit() {
+        let text = "Short";
+        assert_eq!(make_preview(text, 100), "Short");
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "notez"
-version = "0.6.2"
+version = "0.7.0"
 description = "NoteZ - fast, local, beautiful notes for Mac."
 authors = ["NoteZ Contributors"]
 edition = "2021"
@@ -51,6 +51,11 @@ aho-corasick = "1"
 # the bundle stays self-contained.
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 
+# Secure storage for the OpenRouter API key. Uses macOS Keychain on Mac
+# (and the OS-native equivalents on Windows/Linux). Key never lands in the
+# SQLite DB - just a "has_key" boolean so the UI knows to show "Stored".
+keyring = { version = "3", features = ["apple-native"] }
+
 # Dev-only stress-test note generator. `rand` is only used by the dev module
 # (gated on debug_assertions), but Cargo features can't gate deps on
 # debug_assertions so it's unconditional - tiny payload, dead-stripped from
@@ -63,6 +68,13 @@ window-vibrancy = "0.6"
 [profile.release]
 panic = "abort"
 codegen-units = 1
-lto = true
-opt-level = "s"
+# Fat LTO (cross-crate inlining + dead-code elimination across the whole
+# dep graph). Slower link, but ~5-10 % faster runtime - hot paths cross
+# rusqlite/serde_json/lexical-state-stringify boundaries every save.
+lto = "fat"
+# Speed > size. For a desktop notes app the user pays the .dmg download
+# once but the runtime hot-loop on every keystroke. opt-level=3 is ~10 %
+# faster than "s" on the FTS / BM25 / json-serialize paths and adds 2-3 MB
+# to the bundle - well worth it.
+opt-level = 3
 strip = true

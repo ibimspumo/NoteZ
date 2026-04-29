@@ -1,10 +1,12 @@
+use crate::constants::{
+    MAX_AUTO_SNAPSHOTS_PER_NOTE, MAX_MANUAL_SNAPSHOTS_PER_NOTE, MAX_SNAPSHOTS_PAGE,
+};
 use crate::db::{now_iso, Db};
 use crate::error::{NoteZError, Result};
 use crate::models::{Snapshot, SnapshotsCursor, SnapshotsPage};
+use crate::pagination::{collect_page, next_cursor};
 use tauri::State;
 use uuid::Uuid;
-
-const MAX_SNAPSHOTS_PAGE: u32 = 200;
 
 #[tauri::command]
 pub fn create_snapshot(
@@ -15,6 +17,24 @@ pub fn create_snapshot(
 ) -> Result<Snapshot> {
     let conn = db.conn()?;
     let manual = is_manual.unwrap_or(false);
+
+    // Cap manual snapshots per note - defense against a stuck "save snapshot"
+    // loop or future automation. Hard reject if we're at the cap so the user
+    // gets a clear error rather than silently overwriting old snapshots.
+    if manual {
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(1) FROM snapshots WHERE note_id = ?1 AND is_manual = 1",
+                rusqlite::params![note_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        if count >= MAX_MANUAL_SNAPSHOTS_PER_NOTE {
+            return Err(NoteZError::InvalidInput(format!(
+                "manual snapshot cap reached ({MAX_MANUAL_SNAPSHOTS_PER_NOTE}); delete some first"
+            )));
+        }
+    }
 
     let (title, content_json, content_text): (String, String, String) = conn
         .query_row(
@@ -68,9 +88,9 @@ pub fn create_snapshot(
                    SELECT id FROM snapshots
                    WHERE note_id = ?1 AND is_manual = 0
                    ORDER BY created_at DESC
-                   LIMIT 50
+                   LIMIT ?2
                )",
-            rusqlite::params![note_id],
+            rusqlite::params![note_id, MAX_AUTO_SNAPSHOTS_PER_NOTE],
         )?;
     }
 
@@ -101,7 +121,7 @@ pub fn list_snapshots(
         })
     };
 
-    let rows: Vec<Snapshot> = if let Some(c) = cursor.as_ref() {
+    let (items, has_more) = if let Some(c) = cursor.as_ref() {
         let mut stmt = conn.prepare(
             "SELECT id, note_id, title, content_json, content_text, created_at, is_manual, manual_label
              FROM snapshots
@@ -110,12 +130,12 @@ pub fn list_snapshots(
              ORDER BY created_at DESC, id DESC
              LIMIT ?4",
         )?;
-        let mapped = stmt.query_map(
+        collect_page(
+            &mut stmt,
             rusqlite::params![note_id, c.created_at, c.id, fetch],
+            limit,
             map_row,
-        )?;
-        let collected: rusqlite::Result<Vec<_>> = mapped.collect();
-        collected?
+        )?
     } else {
         let mut stmt = conn.prepare(
             "SELECT id, note_id, title, content_json, content_text, created_at, is_manual, manual_label
@@ -124,24 +144,15 @@ pub fn list_snapshots(
              ORDER BY created_at DESC, id DESC
              LIMIT ?2",
         )?;
-        let mapped = stmt.query_map(rusqlite::params![note_id, fetch], map_row)?;
-        let collected: rusqlite::Result<Vec<_>> = mapped.collect();
-        collected?
+        collect_page(&mut stmt, rusqlite::params![note_id, fetch], limit, map_row)?
     };
 
-    let has_more = rows.len() > limit as usize;
-    let mut items = rows;
-    items.truncate(limit as usize);
-    let next_cursor = if has_more {
-        items.last().map(|s| SnapshotsCursor {
-            created_at: s.created_at.clone(),
-            id: s.id.clone(),
-        })
-    } else {
-        None
-    };
+    let next = next_cursor(&items, has_more, |s| SnapshotsCursor {
+        created_at: s.created_at.clone(),
+        id: s.id.clone(),
+    });
 
-    Ok(SnapshotsPage { items, next_cursor })
+    Ok(SnapshotsPage { items, next_cursor: next })
 }
 
 #[tauri::command]

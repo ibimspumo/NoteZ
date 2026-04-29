@@ -1,12 +1,5 @@
-import {
-  Show,
-  createEffect,
-  createSignal,
-  For,
-  onCleanup,
-  type Component,
-} from "solid-js";
-import { api, onDevProgress, type DevProgress } from "../lib/tauri";
+import { type Component, For, Show, createEffect, createSignal, onCleanup } from "solid-js";
+import { type DevProgress, api, onDevProgress } from "../lib/tauri";
 import { hardRefreshNotes, setSelectedId } from "../stores/notes";
 
 type Props = {
@@ -15,7 +8,7 @@ type Props = {
 };
 
 type Style = "plain" | "mixed" | "long";
-type RunningKind = "generate" | "delete";
+type RunningKind = "generate" | "delete" | "seed";
 type Status =
   | { kind: "idle" }
   | { kind: "running"; op: RunningKind; done: number; total: number }
@@ -64,7 +57,12 @@ export const DevPanel: Component<Props> = (props) => {
       setStatus({ kind: "running", op, done: p.done, total: p.total });
     };
 
-    onDevProgress("generate", (p) => apply("generate", p)).then((u) => {
+    // The seed flow reuses the "generate" event channel since it's also a
+    // bulk insert - same start/done frames, just a fixed total of 20.
+    onDevProgress("generate", (p) => {
+      apply("generate", p);
+      apply("seed", p);
+    }).then((u) => {
       unGen = u;
     });
     onDevProgress("delete", (p) => apply("delete", p)).then((u) => {
@@ -96,6 +94,26 @@ export const DevPanel: Component<Props> = (props) => {
       setStatus({
         kind: "done",
         message: `Created ${created.toLocaleString()} notes in ${ms} ms`,
+      });
+    } catch (e) {
+      setStatus({ kind: "error", message: String(e) });
+    }
+  };
+
+  const onSeedDemo = async () => {
+    // Fixed-size predefined set: 20 hand-authored marketing notes for
+    // screenshots. They land in `dev_generated_notes` so "Delete all
+    // generated" cleans them up alongside stress-test rows.
+    setStatus({ kind: "running", op: "seed", done: 0, total: 20 });
+    const t0 = performance.now();
+    try {
+      const created = await api.devSeedDemoNotes();
+      const ms = Math.round(performance.now() - t0);
+      await hardRefreshNotes();
+      await refreshTracked();
+      setStatus({
+        kind: "done",
+        message: `Seeded ${created.toLocaleString()} demo notes in ${ms} ms`,
       });
     } catch (e) {
       setStatus({ kind: "error", message: String(e) });
@@ -160,16 +178,13 @@ export const DevPanel: Component<Props> = (props) => {
                 max="100000"
                 step="1"
                 value={count()}
-                onInput={(e) => setCount(parseInt(e.currentTarget.value, 10) || 0)}
+                onInput={(e) => setCount(Number.parseInt(e.currentTarget.value, 10) || 0)}
               />
             </label>
 
             <label class="nz-dev-row">
               <span>Style</span>
-              <select
-                value={style()}
-                onChange={(e) => setStyle(e.currentTarget.value as Style)}
-              >
+              <select value={style()} onChange={(e) => setStyle(e.currentTarget.value as Style)}>
                 <option value="plain">Plain (1-3 paragraphs)</option>
                 <option value="mixed">Mixed (headings, lists, formatting)</option>
                 <option value="long">Long (heading + 8-20 paragraphs)</option>
@@ -184,9 +199,7 @@ export const DevPanel: Component<Props> = (props) => {
                 max="100"
                 step="1"
                 value={pinPercent()}
-                onInput={(e) =>
-                  setPinPercent(parseInt(e.currentTarget.value, 10) || 0)
-                }
+                onInput={(e) => setPinPercent(Number.parseInt(e.currentTarget.value, 10) || 0)}
               />
             </label>
 
@@ -221,6 +234,19 @@ export const DevPanel: Component<Props> = (props) => {
               </button>
             </div>
 
+            <div class="nz-dev-divider" />
+
+            <div class="nz-dev-section-label">Marketing screenshots</div>
+            <div class="nz-dev-actions">
+              <button
+                class="nz-dev-btn"
+                disabled={status().kind === "running"}
+                onClick={onSeedDemo}
+              >
+                Seed 20 demo notes
+              </button>
+            </div>
+
             <Show when={status().kind === "running"}>
               {(() => {
                 const s = status() as Extract<Status, { kind: "running" }>;
@@ -234,7 +260,11 @@ export const DevPanel: Component<Props> = (props) => {
                     </div>
                     <div class="nz-dev-progress-meta">
                       <span>
-                        {s.op === "generate" ? "Generating" : "Deleting"}
+                        {s.op === "generate"
+                          ? "Generating"
+                          : s.op === "seed"
+                            ? "Seeding"
+                            : "Deleting"}
                       </span>
                       <span>
                         {s.done.toLocaleString()} / {s.total.toLocaleString()}
@@ -248,16 +278,13 @@ export const DevPanel: Component<Props> = (props) => {
             </Show>
 
             <div class="nz-dev-status" data-kind={status().kind}>
-              {status().kind === "done" &&
-                (status() as { message: string }).message}
-              {status().kind === "error" &&
-                "Error: " + (status() as { message: string }).message}
+              {status().kind === "done" && (status() as { message: string }).message}
+              {status().kind === "error" && `Error: ${(status() as { message: string }).message}`}
               {status().kind === "idle" && (
                 <span class="nz-dev-hint">
-                  Generates random Lexical content with bold/italic/code spans,
-                  headings, lists, and quotes. Writes commit in batches of 250
-                  so the UI stays responsive. "Delete all" only removes notes
-                  tracked in <code>dev_generated_notes</code>.
+                  Generates random Lexical content with bold/italic/code spans, headings, lists, and
+                  quotes. Writes commit in batches of 250 so the UI stays responsive. "Delete all"
+                  only removes notes tracked in <code>dev_generated_notes</code>.
                 </span>
               )}
             </div>

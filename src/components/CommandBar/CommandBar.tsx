@@ -1,16 +1,9 @@
-import {
-  createEffect,
-  createSignal,
-  For,
-  onCleanup,
-  Show,
-  type Component,
-} from "solid-js";
+import { type Component, For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import { Portal } from "solid-js/web";
-import { api } from "../../lib/tauri";
 import { formatRelative } from "../../lib/format";
-import { nowTick } from "../../stores/clock";
+import { api } from "../../lib/tauri";
 import type { SearchHit } from "../../lib/types";
+import { nowTick } from "../../stores/clock";
 
 type Props = {
   open: boolean;
@@ -30,7 +23,10 @@ export const CommandBar: Component<Props> = (props) => {
       setQuery("");
       setActiveIdx(0);
       setTimeout(() => inputRef?.focus(), 0);
-      api.quickLookup("", 8).then(setResults).catch(() => setResults([]));
+      api
+        .quickLookup("", 8)
+        .then(setResults)
+        .catch(() => setResults([]));
     }
   });
 
@@ -90,18 +86,13 @@ export const CommandBar: Component<Props> = (props) => {
 
   const showCreateAction = () =>
     query().trim().length > 0 &&
-    !results().some(
-      (r) => (r.title || "").toLowerCase() === query().trim().toLowerCase(),
-    );
+    !results().some((r) => (r.title || "").toLowerCase() === query().trim().toLowerCase());
 
   return (
     <Show when={props.open}>
       <Portal>
         <div class="nz-cb-backdrop" onMouseDown={props.onClose}>
-          <div
-            class="nz-cb-shell"
-            onMouseDown={(e) => e.stopPropagation()}
-          >
+          <div class="nz-cb-shell" onMouseDown={(e) => e.stopPropagation()}>
             <div class="nz-cb-input-row">
               <SearchIcon />
               <input
@@ -137,10 +128,7 @@ export const CommandBar: Component<Props> = (props) => {
                       </Show>
                     </div>
                     <Show when={hit.snippet}>
-                      <div
-                        class="nz-cb-row-snippet"
-                        innerHTML={highlight(hit.snippet)}
-                      />
+                      <div class="nz-cb-row-snippet" innerHTML={highlight(hit.snippet)} />
                     </Show>
                     <div class="nz-cb-row-time">{formatRelative(hit.updated_at, nowTick())}</div>
                   </div>
@@ -157,9 +145,7 @@ export const CommandBar: Component<Props> = (props) => {
                 >
                   <div class="nz-cb-row-main">
                     <span class="nz-cb-create-icon">+</span>
-                    <span class="nz-cb-row-title">
-                      Create &ldquo;{query().trim()}&rdquo;
-                    </span>
+                    <span class="nz-cb-row-title">Create &ldquo;{query().trim()}&rdquo;</span>
                   </div>
                 </div>
               </Show>
@@ -175,16 +161,11 @@ export const CommandBar: Component<Props> = (props) => {
 };
 
 function highlight(snippet: string): string {
-  return escapeHtml(snippet)
-    .replaceAll("&lt;&lt;", "<mark>")
-    .replaceAll("&gt;&gt;", "</mark>");
+  return escapeHtml(snippet).replaceAll("&lt;&lt;", "<mark>").replaceAll("&gt;&gt;", "</mark>");
 }
 
 function escapeHtml(text: string): string {
-  return text
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
+  return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
 const SearchIcon: Component = () => (

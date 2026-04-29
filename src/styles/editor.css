@@ -79,8 +79,8 @@
   gap: 4px;
   border-radius: 6px;
   color: var(--nz-text-muted);
-  transition: background 120ms var(--nz-ease), color 120ms var(--nz-ease),
-    transform 80ms var(--nz-ease);
+  transition: background 120ms var(--nz-ease), color 120ms var(--nz-ease), transform 80ms
+    var(--nz-ease);
 }
 
 .nz-tb-btn:hover {
@@ -327,18 +327,28 @@
 }
 
 .nz-mention {
-  display: inline;
+  display: inline-flex;
+  align-items: center;
   background: var(--nz-mention-bg);
   border: 1px solid var(--nz-mention-border);
   color: var(--nz-mention-text);
   font-weight: 600;
   font-size: 0.94em;
+  line-height: 1.2;
   padding: 1px 5px;
   margin: 0 1px;
   border-radius: 4px;
   text-decoration: none;
   cursor: pointer;
   letter-spacing: -0.003em;
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  vertical-align: middle;
+  transform: translateY(-1.5px);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   transition: background 140ms var(--nz-ease), border-color 140ms var(--nz-ease);
 }
 
@@ -531,10 +541,26 @@ mark {
   pointer-events: auto;
 }
 
-.nz-image-handle-nw { top: -6px;    left: -6px;   cursor: nwse-resize; }
-.nz-image-handle-ne { top: -6px;    right: -6px;  cursor: nesw-resize; }
-.nz-image-handle-sw { bottom: -6px; left: -6px;   cursor: nesw-resize; }
-.nz-image-handle-se { bottom: -6px; right: -6px;  cursor: nwse-resize; }
+.nz-image-handle-nw {
+  top: -6px;
+  left: -6px;
+  cursor: nwse-resize;
+}
+.nz-image-handle-ne {
+  top: -6px;
+  right: -6px;
+  cursor: nesw-resize;
+}
+.nz-image-handle-sw {
+  bottom: -6px;
+  left: -6px;
+  cursor: nesw-resize;
+}
+.nz-image-handle-se {
+  bottom: -6px;
+  right: -6px;
+  cursor: nwse-resize;
+}
 
 /* Drop indicator — a 3 px line that previews the insertion point.
    Lives inside .nz-editor-shell (position: relative) and is positioned
@@ -547,6 +573,5 @@ mark {
   pointer-events: none;
   z-index: 100;
   box-shadow: 0 0 8px var(--nz-accent-glow);
-  transition: top 80ms var(--nz-ease), left 80ms var(--nz-ease),
-    width 80ms var(--nz-ease);
+  transition: top 80ms var(--nz-ease), left 80ms var(--nz-ease), width 80ms var(--nz-ease);
 }

@@ -1,3 +1,7 @@
+use crate::constants::{
+    DEFAULT_QUICK_LOOKUP_LIMIT, DEFAULT_SEARCH_LIMIT, FTS_CANDIDATE_POOL,
+    MAX_QUICK_LOOKUP_LIMIT, MAX_SEARCH_LIMIT,
+};
 use crate::db::Db;
 use crate::error::Result;
 use crate::models::SearchHit;
@@ -18,12 +22,12 @@ use tauri::State;
 ///   - title-substring bonus (medium)
 ///   - recency decay (notes touched recently rank higher; halves every 14 days)
 ///   - pinned bonus (small: keeps order intuitive when scores are close)
-const FTS_CANDIDATE_POOL: i64 = 500;
-
 #[tauri::command]
 pub fn search_notes(db: State<Db>, query: String, limit: Option<u32>) -> Result<Vec<SearchHit>> {
     let q = query.trim();
-    let limit = limit.unwrap_or(50).min(200) as usize;
+    let limit = limit
+        .unwrap_or(DEFAULT_SEARCH_LIMIT as u32)
+        .min(MAX_SEARCH_LIMIT) as usize;
 
     if q.is_empty() {
         return Ok(Vec::new());
@@ -116,7 +120,9 @@ pub fn search_notes(db: State<Db>, query: String, limit: Option<u32>) -> Result<
 #[tauri::command]
 pub fn quick_lookup(db: State<Db>, query: String, limit: Option<u32>) -> Result<Vec<SearchHit>> {
     let q = query.trim();
-    let limit = limit.unwrap_or(8).min(20);
+    let limit = limit
+        .unwrap_or(DEFAULT_QUICK_LOOKUP_LIMIT)
+        .min(MAX_QUICK_LOOKUP_LIMIT);
 
     let conn = db.conn()?;
 

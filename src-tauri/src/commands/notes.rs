@@ -1,16 +1,14 @@
-use crate::db::{make_preview, note_row_to_summary, now_iso, Db};
+use crate::constants::{DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_PINNED, PREVIEW_MAX_CHARS};
+use crate::db::{make_preview, note_row_to_summary, now_iso, wal_checkpoint, Db};
 use crate::error::{NoteZError, Result};
 use crate::models::{
     Note, NoteSummary, NotesCursor, NotesPage, TrashCursor, TrashPage, TrashSummary,
     UpdateNoteInput,
 };
+use crate::pagination::{collect_page, next_cursor};
 use rusqlite::Connection;
 use tauri::State;
 use uuid::Uuid;
-
-/// Hard cap to keep IPC frames small even if a buggy caller asks for the moon.
-/// 500 rows ≈ 80 KB of NoteSummary JSON - that's our budget per RTT.
-const MAX_PAGE_SIZE: u32 = 500;
 
 #[tauri::command]
 pub fn create_note(db: State<Db>) -> Result<Note> {
@@ -83,7 +81,7 @@ pub fn list_notes(
     limit: Option<u32>,
 ) -> Result<NotesPage> {
     let conn = db.conn()?;
-    let limit = clamp_limit(limit, 100);
+    let limit = clamp_limit(limit, DEFAULT_PAGE_SIZE);
 
     // Pinned notes only on the first page.
     let pinned = if cursor.is_none() {
@@ -92,14 +90,13 @@ pub fn list_notes(
         Vec::new()
     };
 
-    let items = load_unpinned_page(&conn, cursor.as_ref(), limit + 1)?;
-
-    let (items, next_cursor) = split_page(items, limit, |last| NotesCursor {
+    let (items, has_more) = load_unpinned_page(&conn, cursor.as_ref(), limit)?;
+    let next = next_cursor(&items, has_more, |last| NotesCursor {
         updated_at: last.updated_at.clone(),
         id: last.id.clone(),
     });
 
-    Ok(NotesPage { pinned, items, next_cursor })
+    Ok(NotesPage { pinned, items, next_cursor: next })
 }
 
 #[tauri::command]
@@ -109,11 +106,23 @@ pub fn list_trash(
     limit: Option<u32>,
 ) -> Result<TrashPage> {
     let conn = db.conn()?;
-    let limit = clamp_limit(limit, 100);
+    let limit = clamp_limit(limit, DEFAULT_PAGE_SIZE);
 
     // Trash uses a separate cursor (deleted_at instead of updated_at).
     // The partial index `idx_notes_trash_deleted` makes this a covered range scan.
-    let rows: Vec<TrashSummary> = if let Some(c) = cursor.as_ref() {
+    let map_row = |row: &rusqlite::Row<'_>| -> rusqlite::Result<TrashSummary> {
+        let content_text: String = row.get("content_text")?;
+        Ok(TrashSummary {
+            id: row.get("id")?,
+            title: row.get("title")?,
+            preview: make_preview(&content_text, PREVIEW_MAX_CHARS),
+            updated_at: row.get("updated_at")?,
+            deleted_at: row.get("deleted_at")?,
+        })
+    };
+    let fetch = (limit + 1) as i64;
+
+    let (items, has_more) = if let Some(c) = cursor.as_ref() {
         let mut stmt = conn.prepare(
             "SELECT id, title, content_text, updated_at, deleted_at
              FROM notes
@@ -122,21 +131,12 @@ pub fn list_trash(
              ORDER BY deleted_at DESC, id DESC
              LIMIT ?3",
         )?;
-        let mapped = stmt.query_map(
-            rusqlite::params![c.deleted_at, c.id, (limit + 1) as i64],
-            |row| {
-                let content_text: String = row.get("content_text")?;
-                Ok(TrashSummary {
-                    id: row.get("id")?,
-                    title: row.get("title")?,
-                    preview: make_preview(&content_text, 140),
-                    updated_at: row.get("updated_at")?,
-                    deleted_at: row.get("deleted_at")?,
-                })
-            },
-        )?;
-        let collected: rusqlite::Result<Vec<_>> = mapped.collect();
-        collected?
+        collect_page(
+            &mut stmt,
+            rusqlite::params![c.deleted_at, c.id, fetch],
+            limit,
+            map_row,
+        )?
     } else {
         let mut stmt = conn.prepare(
             "SELECT id, title, content_text, updated_at, deleted_at
@@ -145,33 +145,15 @@ pub fn list_trash(
              ORDER BY deleted_at DESC, id DESC
              LIMIT ?1",
         )?;
-        let mapped = stmt.query_map(rusqlite::params![(limit + 1) as i64], |row| {
-            let content_text: String = row.get("content_text")?;
-            Ok(TrashSummary {
-                id: row.get("id")?,
-                title: row.get("title")?,
-                preview: make_preview(&content_text, 140),
-                updated_at: row.get("updated_at")?,
-                deleted_at: row.get("deleted_at")?,
-            })
-        })?;
-        let collected: rusqlite::Result<Vec<_>> = mapped.collect();
-        collected?
+        collect_page(&mut stmt, rusqlite::params![fetch], limit, map_row)?
     };
 
-    let has_more = rows.len() > limit as usize;
-    let items: Vec<TrashSummary> = rows.into_iter().take(limit as usize).collect();
+    let next = next_cursor(&items, has_more, |t| TrashCursor {
+        deleted_at: t.deleted_at.clone(),
+        id: t.id.clone(),
+    });
 
-    let next_cursor = if has_more {
-        items.last().map(|t| TrashCursor {
-            deleted_at: t.deleted_at.clone(),
-            id: t.id.clone(),
-        })
-    } else {
-        None
-    };
-
-    Ok(TrashPage { items, next_cursor })
+    Ok(TrashPage { items, next_cursor: next })
 }
 
 #[tauri::command]
@@ -230,16 +212,37 @@ pub fn purge_note(db: State<Db>, id: String) -> Result<()> {
 pub fn empty_trash(db: State<Db>) -> Result<u64> {
     let conn = db.conn()?;
     let n = conn.execute("DELETE FROM notes WHERE deleted_at IS NOT NULL", [])?;
+    drop(conn);
+    // Bulk delete - reclaim WAL pages so the working set doesn't bloat
+    // (FTS triggers fired per row, that's a lot of journal traffic).
+    let _ = wal_checkpoint(&db);
     Ok(n as u64)
 }
 
+/// Purge soft-deleted notes older than `days` days.
+///
+/// `days == 0` is rejected as a mistake at the IPC boundary - the frontend
+/// already gates on this, but accepting 0 here would silently delete the
+/// entire trash on any future caller.
+///
+/// The comparison uses `julianday()` rather than `datetime('now', ...)` -
+/// `deleted_at` is RFC3339 (`2026-04-29T10:00:00+00:00`) and `datetime('now', ...)`
+/// returns SQL-format (`2026-03-30 10:00:00`). String comparison between the
+/// two is wrong because `T` (0x54) > space (0x20) - bug observed at exact day
+/// boundaries. `julianday()` parses both formats to a numeric Julian day and
+/// compares them as numbers, which is unambiguously correct.
 #[tauri::command]
 pub fn purge_old_trash(db: State<Db>, days: u32) -> Result<u64> {
+    if days == 0 {
+        return Err(NoteZError::InvalidInput(
+            "purge_old_trash: days must be > 0 (use empty_trash to delete all)".into(),
+        ));
+    }
     let conn = db.conn()?;
     let n = conn.execute(
         "DELETE FROM notes
          WHERE deleted_at IS NOT NULL
-           AND deleted_at < datetime('now', ?1)",
+           AND julianday(deleted_at) < julianday('now', ?1)",
         rusqlite::params![format!("-{} days", days)],
     )?;
     Ok(n as u64)
@@ -276,11 +279,6 @@ fn clamp_limit(requested: Option<u32>, default: u32) -> u32 {
     requested.unwrap_or(default).clamp(1, MAX_PAGE_SIZE)
 }
 
-/// Hard ceiling on pinned items returned to the frontend. Pinned counts are
-/// bounded by user behaviour in practice - but a misuse (or a sync bug from a
-/// future feature) shouldn't be able to dump 100k summaries into the IPC.
-const MAX_PINNED: i64 = 200;
-
 fn load_pinned_summaries(conn: &Connection) -> Result<Vec<NoteSummary>> {
     let mut stmt = conn.prepare(
         "SELECT id, title, content_text, is_pinned, pinned_at, updated_at
@@ -302,9 +300,10 @@ fn load_pinned_summaries(conn: &Connection) -> Result<Vec<NoteSummary>> {
 fn load_unpinned_page(
     conn: &Connection,
     cursor: Option<&NotesCursor>,
-    limit_plus_one: u32,
-) -> Result<Vec<NoteSummary>> {
-    let rows = if let Some(c) = cursor {
+    limit: u32,
+) -> Result<(Vec<NoteSummary>, bool)> {
+    let fetch = (limit + 1) as i64;
+    if let Some(c) = cursor {
         let mut stmt = conn.prepare(
             "SELECT id, title, content_text, is_pinned, pinned_at, updated_at
              FROM notes
@@ -314,12 +313,12 @@ fn load_unpinned_page(
              ORDER BY updated_at DESC, id DESC
              LIMIT ?3",
         )?;
-        let mapped = stmt.query_map(
-            rusqlite::params![c.updated_at, c.id, limit_plus_one as i64],
+        Ok(collect_page(
+            &mut stmt,
+            rusqlite::params![c.updated_at, c.id, fetch],
+            limit,
             |row| note_row_to_summary(conn, row),
-        )?;
-        let collected: rusqlite::Result<Vec<_>> = mapped.collect();
-        collected?
+        )?)
     } else {
         let mut stmt = conn.prepare(
             "SELECT id, title, content_text, is_pinned, pinned_at, updated_at
@@ -329,28 +328,11 @@ fn load_unpinned_page(
              ORDER BY updated_at DESC, id DESC
              LIMIT ?1",
         )?;
-        let mapped = stmt.query_map(rusqlite::params![limit_plus_one as i64], |row| {
-            note_row_to_summary(conn, row)
-        })?;
-        let collected: rusqlite::Result<Vec<_>> = mapped.collect();
-        collected?
-    };
-    Ok(rows)
-}
-
-fn split_page<F>(
-    mut rows: Vec<NoteSummary>,
-    limit: u32,
-    make_cursor: F,
-) -> (Vec<NoteSummary>, Option<NotesCursor>)
-where
-    F: Fn(&NoteSummary) -> NotesCursor,
-{
-    if rows.len() > limit as usize {
-        rows.truncate(limit as usize);
-        let cursor = rows.last().map(&make_cursor);
-        (rows, cursor)
-    } else {
-        (rows, None)
+        Ok(collect_page(
+            &mut stmt,
+            rusqlite::params![fetch],
+            limit,
+            |row| note_row_to_summary(conn, row),
+        )?)
     }
 }

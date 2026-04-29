@@ -1,12 +1,12 @@
 import {
+  type Component,
   For,
+  type JSX,
   createEffect,
   createMemo,
   createSignal,
   onCleanup,
   onMount,
-  type JSX,
-  type Component,
 } from "solid-js";
 
 /**
@@ -103,7 +103,7 @@ export const MeasuredVirtualList: Component<Props> = (props) => {
     if (n === 0) return 0;
     let i = 0;
     let bit = 1;
-    while ((bit << 1) <= n) bit <<= 1;
+    while (bit << 1 <= n) bit <<= 1;
     let remaining = target;
     for (; bit > 0; bit >>= 1) {
       const next = i + bit;

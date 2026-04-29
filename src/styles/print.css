@@ -1,0 +1,179 @@
+/**
+ * Print stylesheet.
+ *
+ * What we print: the *content* of the open note - title, body, no chrome.
+ * What we don't: sidebar, command bar, toolbar, dialogs, version label,
+ * meta bar (modification time is uninteresting on paper), drop indicators,
+ * resize handles, anything decorative.
+ *
+ * Strategy: hide the chrome with a single sweep, then re-style the editor
+ * surface for paper. We *don't* try to repaginate manually - the browser's
+ * own page-break heuristics handle that better than any CSS we'd write.
+ *
+ * The contenteditable surface is restored to a normal block: print drivers
+ * sometimes refuse to render `outline:none` properly, and we want hyperlinks
+ * to print their URL inline so a printout is self-contained.
+ */
+
+@media print {
+  /* Force light, opaque background regardless of the user's color mode. The
+   * vibrancy / translucent backdrops are gorgeous on screen and unreadable
+   * on paper. We don't strip the user's text color preferences though - the
+   * chosen accent for headings shows up as black-on-paper anyway because
+   * inkjet/laser print neutral greys; for true monochrome printers all
+   * the variables resolve to dark anyway. */
+  html,
+  body,
+  #root,
+  .nz-app,
+  .nz-main {
+    background: white !important;
+    color: black !important;
+    height: auto !important;
+    width: auto !important;
+    overflow: visible !important;
+  }
+
+  /* The grid collapses: only the main column survives, and it's not a
+   * flex/grid child anymore so it can flow to multiple pages. */
+  .nz-app {
+    display: block !important;
+    grid-template-columns: none !important;
+  }
+
+  .nz-main {
+    display: block !important;
+    border: 0 !important;
+  }
+
+  /* All the chrome goes away. */
+  .nz-sidebar,
+  .nz-main-header,
+  .nz-meta-bar,
+  .nz-toast-host,
+  .nz-cb-backdrop,
+  .nz-trash-backdrop,
+  .nz-settings-backdrop,
+  .nz-about-backdrop,
+  .nz-dev-backdrop,
+  .nz-mention-popover,
+  .nz-row-menu,
+  .nz-drop-indicator,
+  .nz-image-handle,
+  .nz-saving-indicator {
+    display: none !important;
+  }
+
+  /* The editor scrollbox becomes a plain document flow. */
+  .nz-editor-wrap {
+    overflow: visible !important;
+    height: auto !important;
+    padding: 0 !important;
+  }
+
+  .nz-editor-content {
+    color: black !important;
+    caret-color: transparent !important;
+    padding: 0 !important;
+    font-size: 12pt !important;
+    line-height: 1.5 !important;
+    letter-spacing: 0 !important;
+    /* Re-enable text selection in case the OS print preview supports it. */
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    min-height: 0 !important;
+  }
+
+  /* Drop the Apple-Notes "first paragraph is title" sizing - the print
+   * font scale is already smaller, and an oversized title pushes content
+   * onto a second page for short notes. Use a clear hierarchy instead. */
+  .nz-editor-content > p:first-child,
+  .nz-editor-content > .nz-paragraph:first-child {
+    font-size: 18pt !important;
+    line-height: 1.25 !important;
+    margin: 0 0 12pt !important;
+    color: black !important;
+    page-break-after: avoid;
+  }
+
+  .nz-h1 {
+    font-size: 16pt !important;
+    margin: 14pt 0 6pt !important;
+    color: black !important;
+    page-break-after: avoid;
+  }
+
+  .nz-h2 {
+    font-size: 13pt !important;
+    margin: 12pt 0 4pt !important;
+    color: black !important;
+    page-break-after: avoid;
+  }
+
+  .nz-h3 {
+    font-size: 12pt !important;
+    margin: 10pt 0 3pt !important;
+    color: black !important;
+    page-break-after: avoid;
+  }
+
+  /* Avoid orphan headings: a heading should never be the last visible line
+   * before a page break. */
+  .nz-h1,
+  .nz-h2,
+  .nz-h3 {
+    break-after: avoid-page;
+  }
+
+  /* Code spans look weird with the screen background pill. Invert to a
+   * subtle box that survives black-only printing. */
+  .nz-code-inline {
+    background: transparent !important;
+    border: 1px solid #999 !important;
+    color: black !important;
+  }
+
+  /* Mentions: print the title plain, like a normal anchor. The token
+   * styling is screen-only. */
+  .nz-mention {
+    background: transparent !important;
+    border: 0 !important;
+    padding: 0 !important;
+    color: black !important;
+    font-weight: 600 !important;
+  }
+
+  /* Show the URL after a printed link so paper readers know where it goes. */
+  .nz-link::after {
+    content: " (" attr(href) ")";
+    font-weight: normal;
+    font-size: 0.85em;
+    color: #555;
+  }
+
+  /* Suppress the "selected/dragging" image rings - ink on paper, not a
+   * UI element. */
+  .nz-image {
+    outline: none !important;
+    cursor: default !important;
+    page-break-inside: avoid;
+  }
+
+  .nz-image-img {
+    /* Ensure the printed image is fully opaque even if the load animation
+     * left it mid-fade in the live editor. */
+    opacity: 1 !important;
+  }
+
+  /* Lists: keep markers, drop hover backgrounds. */
+  .nz-li-checked,
+  .nz-li-unchecked {
+    cursor: default !important;
+  }
+
+  /* Page margins. CSS Paged Media is broadly supported now and matches
+   * what the user gets in the macOS print dialog. */
+  @page {
+    margin: 1.5cm 2cm;
+  }
+}

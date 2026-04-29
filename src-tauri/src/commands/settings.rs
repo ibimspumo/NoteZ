@@ -1,6 +1,18 @@
+use crate::constants::{KNOWN_SETTING_KEYS, KNOWN_SETTING_PREFIXES};
 use crate::db::{now_iso, Db};
-use crate::error::Result;
-use tauri::State;
+use crate::error::{NoteZError, Result};
+use tauri::{AppHandle, State};
+
+/// Validate that a settings key is one we know about. The allowlist is the
+/// defense-in-depth boundary: the frontend already only writes well-known keys,
+/// but an unrelated XSS or extension would otherwise inherit our `set_setting`
+/// command and could overwrite e.g. shortcut bindings or trash retention.
+fn is_allowed_key(key: &str) -> bool {
+    if KNOWN_SETTING_KEYS.contains(&key) {
+        return true;
+    }
+    KNOWN_SETTING_PREFIXES.iter().any(|p| key.starts_with(p))
+}
 
 #[tauri::command]
 pub fn get_setting(db: State<Db>, key: String) -> Result<Option<String>> {
@@ -16,7 +28,17 @@ pub fn get_setting(db: State<Db>, key: String) -> Result<Option<String>> {
 }
 
 #[tauri::command]
-pub fn set_setting(db: State<Db>, key: String, value: String) -> Result<()> {
+pub fn set_setting(
+    app: AppHandle,
+    db: State<Db>,
+    key: String,
+    value: String,
+) -> Result<()> {
+    if !is_allowed_key(&key) {
+        return Err(NoteZError::InvalidInput(format!(
+            "setting key not allowed: {key}"
+        )));
+    }
     let conn = db.conn()?;
     let now = now_iso();
     conn.execute(
@@ -25,6 +47,7 @@ pub fn set_setting(db: State<Db>, key: String, value: String) -> Result<()> {
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
         rusqlite::params![key, value, now],
     )?;
+    crate::events::emit_settings_changed(&app, &key);
     Ok(())
 }
 

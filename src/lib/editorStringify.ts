@@ -53,10 +53,9 @@ function getWorker(): Worker | null {
   if (worker) return worker;
   if (typeof Worker === "undefined") return null;
   try {
-    worker = new Worker(
-      new URL("./editorStringify.worker.ts", import.meta.url),
-      { type: "module" },
-    );
+    worker = new Worker(new URL("./editorStringify.worker.ts", import.meta.url), {
+      type: "module",
+    });
     worker.addEventListener("message", (e: MessageEvent<{ id: number; json: string }>) => {
       const { id, json } = e.data;
       const resolver = pending.get(id);

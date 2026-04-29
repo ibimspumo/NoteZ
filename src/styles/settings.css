@@ -1,3 +1,79 @@
+/* Full-page Settings view (replaces the editor pane). The model picker
+   and other modals still use the .nz-settings-backdrop class below. */
+
+.nz-settings-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--nz-bg-main);
+  color: var(--nz-text);
+  animation: nz-fade-in 160ms var(--nz-ease);
+}
+
+.nz-settings-view-header {
+  height: 44px;
+  flex: 0 0 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px 0 8px;
+  border-bottom: 1px solid var(--nz-divider);
+  background: transparent;
+}
+
+.nz-settings-view-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px 5px 8px;
+  border: 0;
+  background: transparent;
+  border-radius: var(--nz-radius-sm);
+  color: var(--nz-text-muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 140ms var(--nz-ease), color 140ms var(--nz-ease);
+}
+
+.nz-settings-view-back:hover {
+  background: var(--nz-bg-hover);
+  color: var(--nz-text-strong);
+}
+
+.nz-settings-view-title {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--nz-text-strong);
+}
+
+.nz-settings-view-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.nz-settings-view-inner {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 40px 64px;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 720px) {
+  .nz-settings-view-inner {
+    padding: 24px 20px 48px;
+  }
+}
+
+/* Modal subdialog styles (still used by the model picker that opens
+   on top of the settings page). */
+
 .nz-settings-backdrop {
   position: fixed;
   inset: 0;
@@ -12,57 +88,10 @@
   padding: 24px;
 }
 
-.nz-settings-dialog {
-  position: relative;
-  width: 100%;
-  max-width: 460px;
-  background: var(--nz-bg-overlay);
-  backdrop-filter: blur(32px) saturate(200%);
-  -webkit-backdrop-filter: blur(32px) saturate(200%);
-  border: 1px solid var(--nz-divider-strong);
-  border-radius: var(--nz-radius-lg);
-  box-shadow: var(--nz-shadow-lg);
-  padding: 26px 26px 22px;
-  animation: nz-rise 200ms var(--nz-ease);
-  color: var(--nz-text);
-  max-height: calc(100vh - 48px);
-  overflow-y: auto;
-}
-
-.nz-settings-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 26px;
-  height: 26px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  background: transparent;
-  border-radius: var(--nz-radius-sm);
-  color: var(--nz-text-faint);
-  cursor: pointer;
-  transition: background 120ms var(--nz-ease), color 120ms var(--nz-ease);
-}
-
-.nz-settings-close:hover {
-  background: var(--nz-bg-hover);
-  color: var(--nz-text-strong);
-}
-
-.nz-settings-title {
-  margin: 0 0 18px;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.015em;
-  color: var(--nz-text-strong);
-}
-
 .nz-settings-divider {
   height: 1px;
   background: var(--nz-divider);
-  margin: 18px -6px;
+  margin: 22px 0;
 }
 
 .nz-settings-section {
@@ -101,8 +130,8 @@
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 140ms var(--nz-ease), color 140ms var(--nz-ease),
-    border-color 140ms var(--nz-ease);
+  transition: background 140ms var(--nz-ease), color 140ms var(--nz-ease), border-color 140ms
+    var(--nz-ease);
 }
 
 .nz-settings-pill:hover {
@@ -154,8 +183,8 @@
   cursor: pointer;
   text-align: center;
   letter-spacing: 0.05em;
-  transition: border-color 140ms var(--nz-ease), background 140ms var(--nz-ease),
-    color 140ms var(--nz-ease);
+  transition: border-color 140ms var(--nz-ease), background 140ms var(--nz-ease), color 140ms
+    var(--nz-ease);
 }
 
 .nz-settings-shortcut-input:hover {
@@ -172,8 +201,13 @@
 }
 
 @keyframes nz-settings-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 var(--nz-accent-glow); }
-  50% { box-shadow: 0 0 0 6px transparent; }
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--nz-accent-glow);
+  }
+  50% {
+    box-shadow: 0 0 0 6px transparent;
+  }
 }
 
 .nz-settings-shortcut-reset {
@@ -210,8 +244,8 @@
   background: var(--nz-bg-hover);
   cursor: pointer;
   text-align: left;
-  transition: border-color 140ms var(--nz-ease), background 140ms var(--nz-ease),
-    transform 120ms var(--nz-ease);
+  transition: border-color 140ms var(--nz-ease), background 140ms var(--nz-ease), transform 120ms
+    var(--nz-ease);
 }
 
 .nz-settings-color-card:hover {
@@ -274,6 +308,11 @@
 .nz-settings-button:hover {
   background: var(--nz-bg-hover);
   color: var(--nz-text-faint);
+}
+
+.nz-settings-button.active {
+  background: var(--nz-accent-soft);
+  color: var(--nz-accent-hot);
 }
 
 /* ─── AI title section ─────────────────────────────────────── */

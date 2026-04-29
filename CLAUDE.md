@@ -200,12 +200,13 @@ every published build - never auto-decide the release version. Patch bumps
 (no tag) need no such confirmation since they don't publish anything; just
 do them.
 
-**Files to update on every bump (all five must match):**
-1. `src/lib/version.ts` - `APP_VERSION` constant (drives the in-app label)
-2. `package.json` - `version` field
-3. `src-tauri/tauri.conf.json` - `version` field
-4. `src-tauri/Cargo.toml` - `[package].version`
-5. `README.md` - the `**vX.Y.Z**` line + badge at the top
+**Files to update on every bump (all four must match):**
+1. `package.json` - `version` field (canonical; Vite's `define` injects this
+   into the renderer as `__APP_VERSION__`, so `src/lib/version.ts` no longer
+   needs touching - it just re-exports the global)
+2. `src-tauri/tauri.conf.json` - `version` field
+3. `src-tauri/Cargo.toml` - `[package].version`
+4. `README.md` - the `**vX.Y.Z**` line + badge at the top
 
 If you ship a change without bumping, you've shipped a regression - the user
 can't tell what version they're running. The version label is the contract.

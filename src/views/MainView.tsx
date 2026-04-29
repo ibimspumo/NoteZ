@@ -1,45 +1,44 @@
-import {
-  createEffect,
-  createSignal,
-  onCleanup,
-  onMount,
-  Show,
-  type Component,
-} from "solid-js";
-import { Sidebar } from "../components/Sidebar/Sidebar";
-import { Editor, type EditorChange } from "../components/Editor/Editor";
-import { EditorToolbar } from "../components/Editor/Toolbar";
+import type { LexicalEditor } from "lexical";
+import { type Component, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import { CommandBar } from "../components/CommandBar/CommandBar";
 import { DevPanel } from "../components/DevPanel";
-import { onEvent } from "../lib/tauri";
+import { Editor, type EditorChange } from "../components/Editor/Editor";
+import { EditorToolbar } from "../components/Editor/Toolbar";
+import { Sidebar } from "../components/Sidebar/Sidebar";
+import { SnapshotsDialog } from "../components/SnapshotsDialog";
+import { HistoryIcon, SidebarIcon } from "../components/icons";
 import { formatAbsoluteDate, formatRelative } from "../lib/format";
-import type { LexicalEditor } from "lexical";
+import { onEvent } from "../lib/tauri";
+import { api } from "../lib/tauri";
+import type { Note } from "../lib/types";
+import { nowTick } from "../stores/clock";
 import {
   createNote,
   ensureSelection,
   getCachedNote,
+  loadMoreNotes,
   loadNote,
+  notesState,
   patchCachedNote,
   refreshNotes,
+  reloadNote,
   selectedId,
   setSelectedId,
   softDeleteNote,
   togglePin,
   updateNote,
-  loadMoreNotes,
-  notesState,
 } from "../stores/notes";
+import { loadSettings, trashRetentionDays } from "../stores/settings";
 import {
   closeCommandBar,
+  closeSettings,
   commandBarOpen,
   openCommandBar,
+  settingsOpen,
   sidebarCollapsed,
   toggleSidebar,
 } from "../stores/ui";
-import { nowTick } from "../stores/clock";
-import { api } from "../lib/tauri";
-import type { Note } from "../lib/types";
-import { loadSettings, trashRetentionDays } from "../stores/settings";
+import { SettingsView } from "./SettingsView";
 import { useSavePipeline } from "./useSavePipeline";
 import { useShortcuts } from "./useShortcuts";
 
@@ -48,6 +47,7 @@ export const MainView: Component = () => {
   const [editorKey, setEditorKey] = createSignal(0);
   const [editorInstance, setEditorInstance] = createSignal<LexicalEditor | null>(null);
   const [devPanelOpen, setDevPanelOpen] = createSignal(false);
+  const [snapshotsOpen, setSnapshotsOpen] = createSignal(false);
 
   const save = useSavePipeline({
     onSaved: (updated) => {
@@ -64,11 +64,13 @@ export const MainView: Component = () => {
 
   const handleOpenNote = async (id: string) => {
     if (save.hasPending()) await save.flush();
+    closeSettings();
     setSelectedId(id);
   };
 
   const handleCreateNote = async () => {
     await save.flush();
+    closeSettings();
     const note = await createNote();
     save.resetBaseline(note.id, note.content_json);
     setSelectedId(note.id);
@@ -76,6 +78,7 @@ export const MainView: Component = () => {
 
   const handleCreateWithTitle = async (title: string) => {
     await save.flush();
+    closeSettings();
     const note = await createNote();
     save.resetBaseline(note.id, note.content_json);
     setSelectedId(note.id);
@@ -126,18 +129,48 @@ export const MainView: Component = () => {
     setEditorKey((k) => k + 1);
   };
 
+  /** After a snapshot restores onto a note, reload that note from the DB and
+   *  remount the editor with the post-restore content. Cache + sidebar
+   *  summary are patched too so the user doesn't see stale title/preview. */
+  const handleSnapshotRestored = async (noteId: string) => {
+    // Cancel any in-flight save for the previous (now-stale) editor state.
+    // The restore replaced what was on disk; we don't want a debounced save
+    // of the pre-restore state to land afterwards and clobber it.
+    await save.flush();
+    const note = await reloadNote(noteId);
+    if (selectedId() === noteId) {
+      setActiveNote(note);
+      save.resetBaseline(note.id, note.content_json);
+      setEditorKey((k) => k + 1);
+    }
+  };
+
   const handleTogglePin = async (id: string) => {
     await togglePin(id);
     const cached = getCachedNote(id);
     if (cached && activeNote()?.id === id) setActiveNote(cached);
   };
 
+  /** Move the sidebar selection by `step` rows. Wraps the combined
+   *  `[pinned, ...items]` view, since that's how the user perceives the list. */
+  const navigateSelection = (step: 1 | -1) => {
+    const all = [...notesState.pinned, ...notesState.items];
+    if (all.length === 0) return;
+    const cur = selectedId();
+    const idx = cur ? all.findIndex((n) => n.id === cur) : -1;
+    let next = idx + step;
+    // Clamp instead of wrap - wrapping at the bottom would teleport the user
+    // back to the pinned section, which is disorienting.
+    if (next < 0) next = 0;
+    if (next > all.length - 1) next = all.length - 1;
+    void handleOpenNote(all[next].id);
+  };
+
   const handleDelete = async (id: string) => {
     if (save.hasPending()) await save.flush();
     await softDeleteNote(id);
     if (selectedId() === id) {
-      const next =
-        notesState.pinned[0]?.id ?? notesState.items[0]?.id ?? null;
+      const next = notesState.pinned[0]?.id ?? notesState.items[0]?.id ?? null;
       if (next) {
         setSelectedId(next);
       } else {
@@ -225,6 +258,25 @@ export const MainView: Component = () => {
         if (id) void handleDelete(id);
       },
     },
+    // ⌘⇧H: open snapshot history for the active note. Mirrors macOS Notes /
+    // browser conventions (Cmd-Y is taken by Lexical for redo).
+    {
+      hotkey: { key: "h", mods: ["mod", "shift"] },
+      handler: () => {
+        if (selectedId()) setSnapshotsOpen(true);
+      },
+    },
+    // Cmd-Up/Down: navigate the sidebar list without leaving the editor.
+    // Skipped if the user is mid-mention (`@…` popover catches up/down first
+    // because Lexical's KEY_ARROW commands run before window keydown).
+    {
+      hotkey: { key: "ArrowDown", mods: ["mod", "alt"] },
+      handler: () => navigateSelection(1),
+    },
+    {
+      hotkey: { key: "ArrowUp", mods: ["mod", "alt"] },
+      handler: () => navigateSelection(-1),
+    },
     // Dev-only: open the stress-test panel. The handler returns false in
     // release so the keypress falls through to whatever else might use it.
     {
@@ -253,55 +305,68 @@ export const MainView: Component = () => {
 
   return (
     <div class="nz-app" classList={{ "sidebar-collapsed": sidebarCollapsed() }}>
-      <Sidebar
-        onCreate={handleCreateNote}
-        onTogglePin={handleTogglePin}
-        onDelete={handleDelete}
-      />
+      <Sidebar onCreate={handleCreateNote} onTogglePin={handleTogglePin} onDelete={handleDelete} />
       <main class="nz-main">
-        <header class="nz-main-header" data-tauri-drag-region>
-          <div class="nz-traffic-light-spacer" data-tauri-drag-region />
-          <button
-            class="nz-icon-btn"
-            aria-label="Toggle sidebar"
-            title="Toggle sidebar · ⌘\\"
-            onClick={toggleSidebar}
-          >
-            <SidebarIcon />
-          </button>
-          <div class="nz-main-header-toolbar">
-            <Show when={editorInstance()}>
-              {(ed) => <EditorToolbar editor={ed()} />}
-            </Show>
-          </div>
-          <div class="nz-saving-indicator" data-state={save.savingState()}>
-            <Show when={save.savingState() === "saving"}>Saving…</Show>
-            <Show when={save.savingState() === "saved"}>Saved</Show>
-          </div>
-        </header>
-        <Show
-          when={activeNote()}
-          fallback={
-            <div class="nz-empty-editor">
-              <button class="nz-pill-btn primary" onClick={handleCreateNote}>
-                Create your first note
-              </button>
+        <Show when={!settingsOpen()} fallback={<SettingsView />}>
+          <header class="nz-main-header" data-tauri-drag-region>
+            <div class="nz-traffic-light-spacer" data-tauri-drag-region />
+            <button
+              class="nz-icon-btn"
+              aria-label="Toggle sidebar"
+              title="Toggle sidebar · ⌘\\"
+              onClick={toggleSidebar}
+            >
+              <SidebarIcon />
+            </button>
+            <div class="nz-main-header-toolbar" data-tauri-drag-region>
+              <Show when={editorInstance()}>{(ed) => <EditorToolbar editor={ed()} />}</Show>
             </div>
-          }
-        >
-          {(note) => (
-            <>
+            <div
+              class="nz-saving-indicator"
+              data-tauri-drag-region
+              data-state={save.savingState()}
+              title={save.savingState() === "error" ? "Last save failed" : undefined}
+            >
+              <Show when={save.savingState() === "saving"}>Saving…</Show>
+              <Show when={save.savingState() === "saved"}>Saved</Show>
+              <Show when={save.savingState() === "error"}>Save failed</Show>
+            </div>
+            <Show when={selectedId()}>
+              <button
+                type="button"
+                class="nz-icon-btn"
+                aria-label="Snapshot history"
+                title="Snapshot history · ⌘⇧H"
+                onClick={() => setSnapshotsOpen(true)}
+              >
+                <HistoryIcon width="15" height="15" />
+              </button>
+            </Show>
+          </header>
+          <Show
+            when={activeNote()}
+            fallback={
+              <div class="nz-empty-editor">
+                <button class="nz-pill-btn primary" onClick={handleCreateNote}>
+                  Create your first note
+                </button>
+              </div>
+            }
+          >
+            {(note) => (
               <div class="nz-editor-wrap">
                 <div class="nz-meta-bar">
-                  <span class="nz-meta-primary">
-                    {formatAbsoluteDate(note().created_at)}
+                  <span class="nz-meta-primary">{formatAbsoluteDate(note().created_at)}</span>
+                  <span class="nz-meta-dot" aria-hidden="true">
+                    ·
                   </span>
-                  <span class="nz-meta-dot" aria-hidden="true">·</span>
                   <span class="nz-meta-secondary">
                     Last edited {formatRelative(note().updated_at, nowTick())}
                   </span>
                   <Show when={note().is_pinned}>
-                    <span class="nz-meta-dot" aria-hidden="true">·</span>
+                    <span class="nz-meta-dot" aria-hidden="true">
+                      ·
+                    </span>
                     <span class="nz-meta-pin">Pinned</span>
                   </Show>
                 </div>
@@ -316,8 +381,8 @@ export const MainView: Component = () => {
                   />
                 </div>
               </div>
-            </>
-          )}
+            )}
+          </Show>
         </Show>
       </main>
       <CommandBar
@@ -326,16 +391,15 @@ export const MainView: Component = () => {
         onOpenNote={handleOpenNote}
         onCreateWithTitle={handleCreateWithTitle}
       />
+      <SnapshotsDialog
+        open={snapshotsOpen()}
+        noteId={selectedId()}
+        onClose={() => setSnapshotsOpen(false)}
+        onRestored={handleSnapshotRestored}
+      />
       <Show when={import.meta.env.DEV}>
         <DevPanel open={devPanelOpen()} onClose={() => setDevPanelOpen(false)} />
       </Show>
     </div>
   );
 };
-
-const SidebarIcon: Component = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3" />
-    <line x1="6.5" y1="3" x2="6.5" y2="13" stroke="currentColor" stroke-width="1.3" />
-  </svg>
-);

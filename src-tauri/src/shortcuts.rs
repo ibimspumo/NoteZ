@@ -171,3 +171,65 @@ impl ShortcutsState {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_canonical_super_alt_keyn() {
+        let s = parse("super+alt+KeyN").unwrap();
+        assert!(s.mods.contains(Modifiers::SUPER));
+        assert!(s.mods.contains(Modifiers::ALT));
+        assert!(!s.mods.contains(Modifiers::SHIFT));
+        assert_eq!(s.key, Code::KeyN);
+    }
+
+    #[test]
+    fn accepts_friendly_aliases() {
+        let from_alias = parse("cmd+option+n").unwrap();
+        let canonical = parse("super+alt+KeyN").unwrap();
+        assert_eq!(from_alias, canonical);
+    }
+
+    #[test]
+    fn rejects_bare_key() {
+        // Bare letters would steal regular typing.
+        assert!(parse("n").is_none());
+        assert!(parse("KeyN").is_none());
+    }
+
+    #[test]
+    fn rejects_unknown_key() {
+        assert!(parse("super+nope").is_none());
+    }
+
+    #[test]
+    fn rejects_two_keys() {
+        assert!(parse("super+a+b").is_none());
+    }
+
+    #[test]
+    fn rejects_empty() {
+        assert!(parse("").is_none());
+        assert!(parse("+++").is_none());
+    }
+
+    #[test]
+    fn canonical_round_trips() {
+        for input in ["super+KeyK", "super+alt+KeyN", "super+shift+KeyP"] {
+            let parsed = parse(input).unwrap();
+            assert_eq!(parsed.to_canonical(), input);
+        }
+    }
+
+    #[test]
+    fn matches_strict_modifier_set() {
+        let s = parse("super+KeyK").unwrap();
+        assert!(s.matches(Modifiers::SUPER, Code::KeyK));
+        // Extra modifier should NOT match.
+        assert!(!s.matches(Modifiers::SUPER | Modifiers::SHIFT, Code::KeyK));
+        // Wrong key should NOT match.
+        assert!(!s.matches(Modifiers::SUPER, Code::KeyJ));
+    }
+}

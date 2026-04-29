@@ -11,13 +11,7 @@
  *   Today / Yesterday / This week / Last week / This month / Older
  */
 
-export type Bucket =
-  | "Today"
-  | "Yesterday"
-  | "This week"
-  | "Last week"
-  | "This month"
-  | "Older";
+export type Bucket = "Today" | "Yesterday" | "This week" | "Last week" | "This month" | "Older";
 
 const DAY_MS = 86_400_000;
 

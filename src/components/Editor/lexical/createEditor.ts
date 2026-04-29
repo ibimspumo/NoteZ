@@ -1,21 +1,17 @@
 import { CodeNode } from "@lexical/code";
+import { createEmptyHistoryState, registerHistory } from "@lexical/history";
 import { LinkNode } from "@lexical/link";
-import {
-  ListItemNode,
-  ListNode,
-  registerCheckList,
-  registerList,
-} from "@lexical/list";
+import { ListItemNode, ListNode, registerCheckList, registerList } from "@lexical/list";
 import { TRANSFORMERS, registerMarkdownShortcuts } from "@lexical/markdown";
 import { HeadingNode, QuoteNode, registerRichText } from "@lexical/rich-text";
 import { mergeRegister } from "@lexical/utils";
-import { registerHistory, createEmptyHistoryState } from "@lexical/history";
 import {
   $createParagraphNode,
   $getRoot,
-  createEditor as lexicalCreateEditor,
   type LexicalEditor,
+  createEditor as lexicalCreateEditor,
 } from "lexical";
+import { registerEditorRefs } from "./editorRefs";
 import { ImageNode } from "./imageNode";
 import { registerImagePlugin } from "./imagePlugin";
 import { MentionNode } from "./mentionNode";
@@ -70,6 +66,9 @@ export function createNoteZEditor(rootEl: HTMLElement): EditorHandles {
     registerCheckList(editor),
     registerMarkdownShortcuts(editor, TRANSFORMERS),
     registerImagePlugin(editor, rootEl),
+    // Mutation-based tracking of mention/image refs - replaces the old
+    // O(node-map) scan in collectMentionTargets / collectAssetIds.
+    registerEditorRefs(editor),
   );
 
   // Lexical's default text/plain serializer concatenates getTextContent()
@@ -114,8 +113,7 @@ function registerListAwareCopy(rootEl: HTMLElement): () => void {
 
 function serializeWithListMarkers(root: HTMLElement): string {
   const out: string[] = [];
-  const endsWithNewline = () =>
-    out.length > 0 && out[out.length - 1].endsWith("\n");
+  const endsWithNewline = () => out.length > 0 && out[out.length - 1].endsWith("\n");
 
   const walk = (node: Node, listDepth: number) => {
     if (node.nodeType === Node.TEXT_NODE) {
@@ -199,4 +197,3 @@ export function loadEditorStateFromJSON(editor: LexicalEditor, json: string) {
     console.warn("failed to parse editor state, leaving blank", e);
   }
 }
-

@@ -1,0 +1,82 @@
+.nz-toast-host {
+  position: fixed;
+  bottom: var(--nz-space-6);
+  right: var(--nz-space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nz-space-3);
+  z-index: 10000;
+  pointer-events: none;
+  max-width: min(420px, calc(100vw - 2 * var(--nz-space-6)));
+}
+
+.nz-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--nz-space-4);
+  padding: var(--nz-space-4) var(--nz-space-5);
+  background: var(--nz-bg-overlay);
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  border: 1px solid var(--nz-divider-strong);
+  border-radius: var(--nz-radius-md);
+  box-shadow: var(--nz-shadow);
+  font-size: var(--nz-text-base);
+  color: var(--nz-text-strong);
+  letter-spacing: -0.005em;
+  animation: nz-rise var(--nz-dur) var(--nz-ease);
+}
+
+.nz-toast[data-kind="error"] {
+  border-color: rgba(213, 74, 58, 0.5);
+}
+
+.nz-toast[data-kind="success"] {
+  border-color: var(--nz-accent-hot);
+}
+
+.nz-toast-message {
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.nz-toast-action {
+  flex-shrink: 0;
+  padding: var(--nz-space-1) var(--nz-space-4);
+  background: var(--nz-bg-row);
+  border: 1px solid var(--nz-divider-strong);
+  border-radius: var(--nz-radius-sm);
+  color: var(--nz-text-strong);
+  font-size: var(--nz-text-md);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--nz-dur) var(--nz-ease);
+}
+
+.nz-toast[data-kind="error"] .nz-toast-action {
+  border-color: rgba(213, 74, 58, 0.5);
+  color: var(--nz-danger);
+}
+
+.nz-toast-action:hover {
+  background: var(--nz-bg-hover);
+}
+
+.nz-toast-close {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--nz-radius-sm);
+  color: var(--nz-text-faint);
+  transition: background var(--nz-dur-fast) var(--nz-ease), color var(--nz-dur-fast) var(--nz-ease);
+}
+
+.nz-toast-close:hover {
+  background: var(--nz-bg-hover);
+  color: var(--nz-text-strong);
+}

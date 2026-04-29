@@ -1,9 +1,11 @@
 import { createSignal, onCleanup, onMount } from "solid-js";
-import { api } from "../lib/tauri";
+import { SAVED_INDICATOR_MS, SAVE_DEBOUNCE_MS, SNAPSHOT_INTERVAL_MS } from "../lib/constants";
 import { debounce } from "../lib/debounce";
 import { deriveTitle } from "../lib/format";
-import { patchCachedNote, updateNote } from "../stores/notes";
+import { api } from "../lib/tauri";
 import type { Note } from "../lib/types";
+import { patchCachedNote, updateNote } from "../stores/notes";
+import { toast } from "../stores/toasts";
 
 export type EditorSnapshot = {
   /** JSON string of the editor state - already stringified (cheaply, off the UI thread). */
@@ -15,7 +17,7 @@ export type EditorSnapshot = {
 
 export type SnapshotProvider = () => Promise<EditorSnapshot | null>;
 
-export type SavingState = "idle" | "saving" | "saved";
+export type SavingState = "idle" | "saving" | "saved" | "error";
 
 export type SavePipeline = {
   savingState: () => SavingState;
@@ -28,10 +30,6 @@ export type SavePipeline = {
   /** Replace the "last saved" baseline - call after switching notes so the diff check is accurate. */
   resetBaseline: (noteId: string, json: string) => void;
 };
-
-const SAVE_DEBOUNCE_MS = 350;
-const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
-const SAVED_INDICATOR_MS = 800;
 
 /**
  * Save pipeline.
@@ -65,12 +63,14 @@ export function useSavePipeline(opts: {
   const [savingState, setSavingState] = createSignal<SavingState>("idle");
   let pendingNoteId: string | null = null;
   let pendingSnapshot: SnapshotProvider | null = null;
-  let lastSavedJson: string = "";
+  let lastSavedJson = "";
   let lastSavedNoteId: string | null = null;
   let lastSnapshotAt = 0;
   let savedTimer: number | undefined;
   /** A save is in flight iff this is non-null. Lets `flush()` await it. */
   let inFlight: Promise<void> | null = null;
+  /** When the next save succeeds, call this to clear any sticky error toast. */
+  let pendingErrorDismiss: (() => void) | null = null;
 
   async function performSave(noteId: string, provider: SnapshotProvider): Promise<void> {
     const snap = await provider();
@@ -103,6 +103,11 @@ export function useSavePipeline(opts: {
       }
       opts.onSaved?.(updated);
       setSavingState("saved");
+      // Recovered after a previous failure: drop the sticky error toast.
+      if (pendingErrorDismiss) {
+        pendingErrorDismiss();
+        pendingErrorDismiss = null;
+      }
       window.clearTimeout(savedTimer);
       savedTimer = window.setTimeout(() => {
         if (savingState() === "saved") setSavingState("idle");
@@ -118,7 +123,29 @@ export function useSavePipeline(opts: {
       }
     } catch (e) {
       console.error("save failed:", e);
-      setSavingState("idle");
+      // Surface a sticky error toast with a retry. Without this, saves fail
+      // silently and the user doesn't realise their last edits never landed.
+      // We keep the snapshot provider live so the retry uses the up-to-date
+      // editor state, not a stale one.
+      setSavingState("error");
+      const retryProvider = provider;
+      const retryNoteId = noteId;
+      let retryToastId: number | null = null;
+      retryToastId = toast.error("Saving failed - your changes are not on disk yet.", {
+        action: {
+          label: "Retry",
+          onPress: () => {
+            void startSave(retryNoteId, retryProvider);
+          },
+        },
+      });
+      // If a subsequent save lands successfully, dismiss the failure toast.
+      const dismissOnRecover = () => {
+        if (retryToastId != null) toast.dismiss(retryToastId);
+      };
+      // Stash the dismiss so the next successful save can call it. We piggyback
+      // on the existing "saved" state transition by deferring through a microtask.
+      pendingErrorDismiss = dismissOnRecover;
     }
   }
 

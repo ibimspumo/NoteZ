@@ -1,4 +1,4 @@
-import { Show, createEffect, onCleanup, type Component } from "solid-js";
+import { type Component, Show, createEffect, onCleanup } from "solid-js";
 import { APP_VERSION } from "../lib/version";
 import { AgentZLogo } from "./AgentZLogo";
 
@@ -43,7 +43,12 @@ export const AboutDialog: Component<Props> = (props) => {
             onClick={props.onClose}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="m3.5 3.5 7 7M10.5 3.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              <path
+                d="m3.5 3.5 7 7M10.5 3.5l-7 7"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              />
             </svg>
           </button>
 
@@ -72,24 +77,28 @@ export const AboutDialog: Component<Props> = (props) => {
               <AgentZLogo class="nz-about-logo" height={28} />
             </a>
             <p class="nz-about-blurb">
-              AgentZ Media is a social media agency from Schwerin, producing 365 videos
-              a year for businesses - reach through content, not ads.
+              AgentZ Media is a social media agency from Schwerin, producing 365 videos a year for
+              businesses - reach through content, not ads.
             </p>
-            <a
-              class="nz-about-link"
-              href={AGENTZ_URL}
-              onClick={openAgentZ}
-            >
+            <a class="nz-about-link" href={AGENTZ_URL} onClick={openAgentZ}>
               www.agent-z.de
               <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
-                <path d="M4 2H9V7M9 2 3 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+                <path
+                  d="M4 2H9V7M9 2 3 8"
+                  stroke="currentColor"
+                  stroke-width="1.4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
               </svg>
             </a>
           </div>
 
           <div class="nz-about-footer">
             <span>© {new Date().getFullYear()} AgentZ Media</span>
-            <span class="nz-about-footer-dot" aria-hidden="true">·</span>
+            <span class="nz-about-footer-dot" aria-hidden="true">
+              ·
+            </span>
             <span>All rights reserved</span>
           </div>
         </div>

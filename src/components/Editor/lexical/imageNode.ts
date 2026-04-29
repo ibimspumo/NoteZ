@@ -1,14 +1,15 @@
 import { decode as decodeBlurhash } from "blurhash";
 import {
   $applyNodeReplacement,
-  ElementNode,
   type EditorConfig,
-  type LexicalEditor,
+  ElementNode,
   type LexicalNode,
   type NodeKey,
   type SerializedElementNode,
   type Spread,
 } from "lexical";
+import { BLURHASH_CACHE_MAX } from "../../../lib/constants";
+import { LRU } from "../../../lib/lru";
 import { api, assetUrl } from "../../../lib/tauri";
 
 export type SerializedImageNode = Spread<
@@ -141,11 +142,7 @@ export class ImageNode extends ElementNode {
     img.decoding = "async";
     img.draggable = false;
     img.className = "nz-image-img";
-    img.addEventListener(
-      "load",
-      () => img.classList.add("loaded"),
-      { once: true },
-    );
+    img.addEventListener("load", () => img.classList.add("loaded"), { once: true });
 
     // Sync path resolution from the cached assets dir; falls back to an async
     // IPC lookup if the cache wasn't initialized yet.
@@ -274,21 +271,10 @@ export function $isImageNode(n: LexicalNode | null | undefined): n is ImageNode 
   return n instanceof ImageNode;
 }
 
-/**
- * Walk the editor state and collect every asset id referenced by an `ImageNode`.
- * Used by the save pipeline to populate `UpdateNoteInput.asset_ids` so the
- * Rust-side garbage collector knows what's live.
- */
-export function collectAssetIds(editor: LexicalEditor): string[] {
-  const ids = new Set<string>();
-  editor.getEditorState().read(() => {
-    const nodeMap = editor.getEditorState()._nodeMap;
-    for (const node of nodeMap.values()) {
-      if (node instanceof ImageNode) ids.add(node.getAssetId());
-    }
-  });
-  return Array.from(ids);
-}
+// `collectAssetIds` is now backed by `editorRefs` mutation tracking - O(refs)
+// instead of O(nodes) and free of the `_nodeMap` private API. Re-exported here
+// so existing call sites don't have to change their import path.
+export { collectAssetIds } from "./editorRefs";
 
 // --- assets dir cache ---
 
@@ -298,14 +284,26 @@ let assetsDirLoad: Promise<string> | null = null;
 /**
  * Initialize the cached assets directory. Call once at app startup (in App.tsx).
  * Subsequent calls are deduped, so it's safe to call from multiple call sites.
+ *
+ * On failure we deliberately reset `assetsDirLoad` back to `null` so the next
+ * call gets a fresh chance. Without this, a single transient IPC error at
+ * boot (e.g. the backend hadn't finished `setup()` yet) would stick the
+ * promise in a rejected state forever, and every image render afterward would
+ * fall through to the slow per-image `getAsset` IPC.
  */
 export function initAssetsDir(): Promise<string> {
   if (cachedAssetsDir) return Promise.resolve(cachedAssetsDir);
   if (assetsDirLoad) return assetsDirLoad;
-  assetsDirLoad = api.getAssetsDir().then((dir) => {
-    cachedAssetsDir = dir;
-    return dir;
-  });
+  assetsDirLoad = api
+    .getAssetsDir()
+    .then((dir) => {
+      cachedAssetsDir = dir;
+      return dir;
+    })
+    .catch((err) => {
+      assetsDirLoad = null;
+      throw err;
+    });
   return assetsDirLoad;
 }
 
@@ -318,20 +316,12 @@ function resolveAssetPathSync(id: string, ext: string): string | null {
 
 // --- blurhash → data URL ---
 
-const blurhashCache = new Map<string, string>();
-const BLURHASH_CACHE_CAP = 200;
+const blurhashCache = new LRU<string, string>(BLURHASH_CACHE_MAX);
 
 function blurhashToDataUrl(hash: string, w: number, h: number): string | null {
   const cacheKey = `${hash}|${w}x${h}`;
-  // Move-to-end LRU: a hit makes the entry "newest" so frequently-viewed
-  // blurhashes survive evictions even when many fresh hashes pass through.
   const cached = blurhashCache.get(cacheKey);
-  if (cached !== undefined) {
-    blurhashCache.delete(cacheKey);
-    blurhashCache.set(cacheKey, cached);
-    return cached;
-  }
-
+  if (cached !== undefined) return cached;
   try {
     const pixels = decodeBlurhash(hash, w, h);
     const canvas = document.createElement("canvas");
@@ -344,10 +334,6 @@ function blurhashToDataUrl(hash: string, w: number, h: number): string | null {
     ctx.putImageData(imgData, 0, 0);
     const url = canvas.toDataURL("image/png");
     blurhashCache.set(cacheKey, url);
-    if (blurhashCache.size > BLURHASH_CACHE_CAP) {
-      const oldest = blurhashCache.keys().next().value;
-      if (oldest) blurhashCache.delete(oldest);
-    }
     return url;
   } catch {
     return null;

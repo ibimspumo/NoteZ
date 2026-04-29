@@ -1,3 +1,4 @@
+use crate::constants::{BLURHASH_DECODE_SIZE, MAX_ASSET_BYTES};
 use crate::db::{now_iso, Db};
 use crate::error::{NoteZError, Result};
 use crate::models::{Asset, AssetRef};
@@ -29,6 +30,12 @@ pub async fn save_asset(
 ) -> Result<AssetRef> {
     if bytes.is_empty() {
         return Err(NoteZError::InvalidInput("empty asset".into()));
+    }
+    if bytes.len() as u64 > MAX_ASSET_BYTES {
+        return Err(NoteZError::InvalidInput(format!(
+            "asset too large: {} bytes (max {MAX_ASSET_BYTES})",
+            bytes.len()
+        )));
     }
 
     let mut hasher = Sha256::new();
@@ -182,7 +189,7 @@ pub fn gc_orphan_assets(db: State<Db>) -> Result<u64> {
 
     if known.is_empty() {
         // Still walk the disk to clear stray files (e.g. left over from a crash).
-        return Ok(reap_disk_orphans(&db.assets_dir, &HashSet::new())?);
+        return reap_disk_orphans(&db.assets_dir, &HashSet::new());
     }
 
     let ids: Vec<&str> = known.iter().map(|(id, _)| id.as_str()).collect();
@@ -225,7 +232,7 @@ pub fn gc_orphan_assets(db: State<Db>) -> Result<u64> {
     let mut deleted: u64 = 0;
     if !orphan_ids.is_empty() {
         // Batch DELETE.
-        let placeholders = std::iter::repeat("?").take(orphan_ids.len()).collect::<Vec<_>>().join(",");
+        let placeholders = std::iter::repeat_n("?", orphan_ids.len()).collect::<Vec<_>>().join(",");
         let sql = format!("DELETE FROM assets WHERE id IN ({})", placeholders);
         let params: Vec<&dyn rusqlite::ToSql> =
             orphan_ids.iter().map(|s| s as &dyn rusqlite::ToSql).collect();
@@ -292,8 +299,8 @@ fn decode_image_metadata(bytes: &[u8]) -> std::result::Result<(u32, u32, Option<
 
     // Blurhash needs RGBA bytes. We downscale large images first - blurhash
     // quality is independent of source resolution and the encoder is O(w*h).
-    let small = if width.max(height) > 256 {
-        img.thumbnail(256, 256)
+    let small = if width.max(height) > BLURHASH_DECODE_SIZE {
+        img.thumbnail(BLURHASH_DECODE_SIZE, BLURHASH_DECODE_SIZE)
     } else {
         img
     };
@@ -304,6 +311,34 @@ fn decode_image_metadata(bytes: &[u8]) -> std::result::Result<(u32, u32, Option<
         .map(|s| s.to_string());
 
     Ok((width, height, hash))
+}
+
+/// Like `save_asset`, but reads the bytes from disk instead of accepting them
+/// over the IPC. This is the *fast* path for editor image drops: a 10 MB photo
+/// passed as `Vec<u8>` over the JSON-encoded IPC channel is literally millions
+/// of `number[]` entries to serialise/deserialise (~150 ms+ on M1). Reading
+/// from a path the renderer just told us about is O(file_size) on disk, no JSON.
+///
+/// Security: the path is fully trusted (it has to be, the renderer constructs
+/// it from a `File` the user just dropped). We do not allow path traversal
+/// outside the assets dir on save - the *target* path is content-addressed and
+/// always inside `assets_dir`. The *source* path is the user's just-dropped
+/// file; reading it is no riskier than the renderer reading it itself.
+#[tauri::command]
+pub async fn save_asset_from_path(
+    db: State<'_, Db>,
+    path: String,
+    mime: String,
+) -> Result<AssetRef> {
+    let bytes = tauri::async_runtime::spawn_blocking({
+        let p = path.clone();
+        move || std::fs::read(&p)
+    })
+    .await
+    .map_err(|e| NoteZError::Other(format!("read join: {e}")))?
+    .map_err(NoteZError::Io)?;
+
+    save_asset(db, bytes, mime).await
 }
 
 fn atomic_write(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
@@ -353,10 +388,8 @@ fn reap_disk_orphans(assets_dir: &std::path::Path, live: &HashSet<String>) -> Re
             if is_tmp {
                 continue;
             }
-            if !live.contains(&stem) {
-                if std::fs::remove_file(&fp).is_ok() {
-                    deleted += 1;
-                }
+            if !live.contains(&stem) && std::fs::remove_file(&fp).is_ok() {
+                deleted += 1;
             }
         }
     }

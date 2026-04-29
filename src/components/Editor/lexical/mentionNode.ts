@@ -1,8 +1,7 @@
 import {
   $applyNodeReplacement,
-  ElementNode,
   type EditorConfig,
-  type LexicalEditor,
+  ElementNode,
   type LexicalNode,
   type NodeKey,
   type RangeSelection,
@@ -59,6 +58,7 @@ export class MentionNode extends ElementNode {
     el.setAttribute("data-note-id", this.__noteId);
     el.setAttribute("data-lexical-mention", "true");
     el.setAttribute("href", `notez://note/${this.__noteId}`);
+    el.setAttribute("title", `@${this.__title}`);
     el.className = "nz-mention";
     el.contentEditable = "false";
     return el;
@@ -68,6 +68,9 @@ export class MentionNode extends ElementNode {
     if (prev.__noteId !== this.__noteId) {
       dom.setAttribute("data-note-id", this.__noteId);
       dom.setAttribute("href", `notez://note/${this.__noteId}`);
+    }
+    if (prev.__title !== this.__title) {
+      dom.setAttribute("title", `@${this.__title}`);
     }
     return false;
   }
@@ -148,15 +151,7 @@ export function attachMentionClickHandler(
   return () => rootEl.removeEventListener("click", handler);
 }
 
-export function collectMentionTargets(editor: LexicalEditor): string[] {
-  const ids = new Set<string>();
-  editor.getEditorState().read(() => {
-    const nodeMap = editor.getEditorState()._nodeMap;
-    for (const node of nodeMap.values()) {
-      if (node instanceof MentionNode) {
-        ids.add(node.getNoteId());
-      }
-    }
-  });
-  return Array.from(ids);
-}
+// `collectMentionTargets` lives in `editorRefs.ts` now - it's backed by an
+// incremental mutation listener instead of a full node-map scan, so saves on
+// huge notes don't pay an O(n) traversal cost.
+export { collectMentionTargets } from "./editorRefs";

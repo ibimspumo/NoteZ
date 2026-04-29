@@ -47,8 +47,8 @@
   font-weight: 500;
   letter-spacing: -0.005em;
   cursor: text;
-  transition: background 100ms var(--nz-ease), border-color 100ms var(--nz-ease),
-    color 100ms var(--nz-ease);
+  transition: background 100ms var(--nz-ease), border-color 100ms var(--nz-ease), color 100ms
+    var(--nz-ease);
 }
 
 .nz-search-trigger:hover {

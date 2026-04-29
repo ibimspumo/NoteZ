@@ -10,23 +10,27 @@
 //      row to ai_calls with status='error' so the user can see what
 //      went wrong in the activity dialog.
 
+use crate::constants::{
+    AI_CALLS_RETENTION, AI_HTTP_TIMEOUT_SECS, AI_MODELS_CACHE_TTL_SECS,
+    AI_TITLE_MAX_CHARS, AI_TITLE_MAX_INPUT_CHARS, AI_TITLE_MAX_TOKENS, MAX_AI_PAGE,
+    SETTING_AI_ENABLED, SETTING_AI_MODEL, SETTING_OPENROUTER_KEY_PRESENT,
+};
 use crate::db::{now_iso, Db};
 use crate::error::{NoteZError, Result};
+use crate::keychain;
+use crate::pagination::{collect_page, next_cursor};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use tauri::State;
+use tauri::{AppHandle, State};
 use uuid::Uuid;
 
-const SETTING_AI_ENABLED: &str = "ai_title_enabled";
-const SETTING_AI_MODEL: &str = "ai_model";
-const SETTING_OPENROUTER_KEY: &str = "openrouter_api_key";
 pub const DEFAULT_AI_MODEL: &str = "google/gemini-3-flash-preview";
 
 const OPENROUTER_BASE: &str = "https://openrouter.ai/api/v1";
-const HTTP_TIMEOUT: Duration = Duration::from_secs(30);
-const MODELS_CACHE_TTL: Duration = Duration::from_secs(3600);
+const HTTP_TIMEOUT: Duration = Duration::from_secs(AI_HTTP_TIMEOUT_SECS);
+const MODELS_CACHE_TTL: Duration = Duration::from_secs(AI_MODELS_CACHE_TTL_SECS);
 
 const TITLE_SYSTEM_PROMPT: &str = "You generate short, descriptive titles for personal notes.\n\nRules:\n- Output ONLY the title.\n- Maximum 8 words / about 60 characters.\n- Match the language of the note exactly.\n- Capture the gist, be concrete.\n- No emojis, no quotes, no trailing punctuation.";
 
@@ -40,8 +44,8 @@ static HTTP: Lazy<reqwest::Client> = Lazy::new(|| {
         .expect("reqwest client")
 });
 
-static MODELS_CACHE: Lazy<Mutex<Option<(Vec<AiModel>, Instant)>>> =
-    Lazy::new(|| Mutex::new(None));
+type ModelsCacheEntry = (Vec<AiModel>, Instant);
+static MODELS_CACHE: Lazy<Mutex<Option<ModelsCacheEntry>>> = Lazy::new(|| Mutex::new(None));
 
 // ─── Public API types (serialized to frontend) ──────────────────────────────
 
@@ -107,28 +111,57 @@ pub fn get_ai_config(db: State<Db>) -> Result<AiConfig> {
         .map(|v| v == "1")
         .unwrap_or(false);
     let model = read_setting(&conn, SETTING_AI_MODEL).unwrap_or_else(|| DEFAULT_AI_MODEL.to_string());
-    let has_key = read_setting(&conn, SETTING_OPENROUTER_KEY)
-        .map(|v| !v.is_empty())
+    // Read the SQLite presence marker, NOT the keychain. Touching the keychain
+    // here would force a macOS password prompt every time settings load -
+    // and `loadSettings` fires on app start AND on every cross-window
+    // settings-changed event AND from the capture window's own bootstrap,
+    // which adds up to ~8 prompts per launch on unsigned dev builds.
+    // The marker is written by `set_openrouter_key` in lockstep with the
+    // keychain, so it accurately reflects "is there a key?" without the
+    // privileged read.
+    let has_key = read_setting(&conn, SETTING_OPENROUTER_KEY_PRESENT)
+        .map(|v| v == "1")
         .unwrap_or(false);
     Ok(AiConfig { enabled, has_key, model })
 }
 
 #[tauri::command]
-pub fn set_ai_enabled(db: State<Db>, enabled: bool) -> Result<()> {
-    write_setting(&db, SETTING_AI_ENABLED, if enabled { "1" } else { "0" })
+pub fn set_ai_enabled(app: AppHandle, db: State<Db>, enabled: bool) -> Result<()> {
+    write_setting(&db, SETTING_AI_ENABLED, if enabled { "1" } else { "0" })?;
+    crate::events::emit_settings_changed(&app, SETTING_AI_ENABLED);
+    Ok(())
 }
 
 #[tauri::command]
-pub fn set_ai_model(db: State<Db>, model: String) -> Result<()> {
+pub fn set_ai_model(app: AppHandle, db: State<Db>, model: String) -> Result<()> {
     if model.trim().is_empty() {
         return Err(NoteZError::InvalidInput("model cannot be empty".into()));
     }
-    write_setting(&db, SETTING_AI_MODEL, model.trim())
+    write_setting(&db, SETTING_AI_MODEL, model.trim())?;
+    crate::events::emit_settings_changed(&app, SETTING_AI_MODEL);
+    Ok(())
 }
 
+/// Store the OpenRouter API key in the OS keychain. An empty `key` clears it.
+///
+/// Why the keychain: a plain SQLite column would let any process with read
+/// access to `~/Library/Application Support/de.agent-z.notez/notez.db`
+/// (Time Machine backups, malware running as the user, other users sharing
+/// the Mac) read the credential. The keychain is encrypted-at-rest and
+/// scoped to the bundle id, so even another tool running as the same user
+/// has to prompt for permission on first read.
 #[tauri::command]
-pub fn set_openrouter_key(db: State<Db>, key: String) -> Result<()> {
-    write_setting(&db, SETTING_OPENROUTER_KEY, key.trim())
+pub fn set_openrouter_key(app: AppHandle, db: State<Db>, key: String) -> Result<()> {
+    let trimmed = key.trim();
+    if trimmed.is_empty() {
+        keychain::delete_openrouter_key()?;
+        write_setting(&db, SETTING_OPENROUTER_KEY_PRESENT, "0")?;
+    } else {
+        keychain::set_openrouter_key(trimmed)?;
+        write_setting(&db, SETTING_OPENROUTER_KEY_PRESENT, "1")?;
+    }
+    crate::events::emit_settings_changed(&app, SETTING_OPENROUTER_KEY_PRESENT);
+    Ok(())
 }
 
 // ─── Models catalog ────────────────────────────────────────────────────────
@@ -244,7 +277,7 @@ async fn fetch_openrouter_models() -> Result<Vec<AiModel>> {
             completion_per_m,
         });
     }
-    out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    out.sort_by_key(|a| a.name.to_lowercase());
     Ok(out)
 }
 
@@ -333,27 +366,42 @@ pub async fn generate_title(
         return Err(NoteZError::InvalidInput("empty text".into()));
     }
 
-    let (enabled, model, key) = {
+    let (enabled, model) = {
         let conn = db.conn()?;
         let enabled = read_setting(&conn, SETTING_AI_ENABLED).map(|v| v == "1").unwrap_or(false);
         let model = read_setting(&conn, SETTING_AI_MODEL)
             .unwrap_or_else(|| DEFAULT_AI_MODEL.to_string());
-        let key = read_setting(&conn, SETTING_OPENROUTER_KEY).unwrap_or_default();
-        (enabled, model, key)
+        (enabled, model)
     };
+    // Pull the key from the OS keychain. A missing keychain entry is treated
+    // as "no key configured" - identical to the legacy SQLite-backed empty
+    // string so the calling UX is unchanged.
+    let key = keychain::get_openrouter_key()?.unwrap_or_default();
 
     if !enabled {
         return Err(NoteZError::InvalidInput("ai title generation is disabled".into()));
     }
     if key.is_empty() {
-        record_call(&db, &model, note_id.as_deref(), 0, 0, 0.0, 0, "error", Some("no api key"));
+        record_call(
+            &db,
+            CallRecord {
+                model: &model,
+                note_id: note_id.as_deref(),
+                prompt_tokens: 0,
+                completion_tokens: 0,
+                cost_usd: 0.0,
+                duration_ms: 0,
+                status: "error",
+                error: Some("no api key"),
+            },
+        );
         return Err(NoteZError::InvalidInput("no openrouter api key configured".into()));
     }
 
     // Cap input tokens cheaply by character count - longer notes get truncated
     // for the LLM only, the saved note keeps its full content.
-    let payload_text = if trimmed.chars().count() > 8000 {
-        trimmed.chars().take(8000).collect::<String>()
+    let payload_text = if trimmed.chars().count() > AI_TITLE_MAX_INPUT_CHARS {
+        trimmed.chars().take(AI_TITLE_MAX_INPUT_CHARS).collect::<String>()
     } else {
         trimmed.to_string()
     };
@@ -368,14 +416,16 @@ pub async fn generate_title(
             if title.is_empty() {
                 record_call(
                     &db,
-                    &model,
-                    note_id.as_deref(),
-                    prompt_tokens,
-                    completion_tokens,
-                    cost,
-                    elapsed_ms,
-                    "error",
-                    Some("empty title"),
+                    CallRecord {
+                        model: &model,
+                        note_id: note_id.as_deref(),
+                        prompt_tokens,
+                        completion_tokens,
+                        cost_usd: cost,
+                        duration_ms: elapsed_ms,
+                        status: "error",
+                        error: Some("empty title"),
+                    },
                 );
                 return Err(NoteZError::Other("model returned empty title".into()));
             }
@@ -387,14 +437,16 @@ pub async fn generate_title(
             }
             record_call(
                 &db,
-                &model,
-                note_id.as_deref(),
-                prompt_tokens,
-                completion_tokens,
-                cost,
-                elapsed_ms,
-                "ok",
-                None,
+                CallRecord {
+                    model: &model,
+                    note_id: note_id.as_deref(),
+                    prompt_tokens,
+                    completion_tokens,
+                    cost_usd: cost,
+                    duration_ms: elapsed_ms,
+                    status: "ok",
+                    error: None,
+                },
             );
             Ok(title)
         }
@@ -402,14 +454,16 @@ pub async fn generate_title(
             tracing::warn!("generate_title failed: {e}");
             record_call(
                 &db,
-                &model,
-                note_id.as_deref(),
-                0,
-                0,
-                0.0,
-                elapsed_ms,
-                "error",
-                Some(&e),
+                CallRecord {
+                    model: &model,
+                    note_id: note_id.as_deref(),
+                    prompt_tokens: 0,
+                    completion_tokens: 0,
+                    cost_usd: 0.0,
+                    duration_ms: elapsed_ms,
+                    status: "error",
+                    error: Some(&e),
+                },
             );
             Err(NoteZError::Other(e))
         }
@@ -427,7 +481,7 @@ async fn call_openrouter(
             ChatMessage { role: "system", content: TITLE_SYSTEM_PROMPT },
             ChatMessage { role: "user", content: text },
         ],
-        max_tokens: 80,
+        max_tokens: AI_TITLE_MAX_TOKENS,
         response_format: ResponseFormat {
             kind: "json_schema",
             json_schema: JsonSchemaSpec {
@@ -493,8 +547,8 @@ fn sanitize_title(raw: &str) -> String {
         s = line.to_string();
     }
     s = s.trim().to_string();
-    if s.chars().count() > 120 {
-        s = s.chars().take(120).collect();
+    if s.chars().count() > AI_TITLE_MAX_CHARS {
+        s = s.chars().take(AI_TITLE_MAX_CHARS).collect();
     }
     s
 }
@@ -513,8 +567,6 @@ fn update_note_title(db: &Db, note_id: &str, title: &str) -> Result<bool> {
 
 // ─── Activity ledger ───────────────────────────────────────────────────────
 
-const MAX_AI_PAGE: u32 = 200;
-
 #[tauri::command]
 pub fn list_ai_calls(
     db: State<Db>,
@@ -526,7 +578,7 @@ pub fn list_ai_calls(
     let limit_plus_one = (limit + 1) as i64;
 
     // LEFT JOIN to notes so deleted-then-purged calls still show with note_title=NULL.
-    let rows: Vec<AiCall> = if let Some(c) = cursor.as_ref() {
+    let (items, has_more) = if let Some(c) = cursor.as_ref() {
         let mut stmt = conn.prepare(
             "SELECT a.id, a.created_at, a.model, a.purpose, a.note_id,
                     n.title AS note_title,
@@ -538,12 +590,12 @@ pub fn list_ai_calls(
              ORDER BY a.created_at DESC, a.id DESC
              LIMIT ?3",
         )?;
-        let mapped = stmt.query_map(
+        collect_page(
+            &mut stmt,
             rusqlite::params![c.created_at, c.id, limit_plus_one],
+            limit,
             row_to_ai_call,
-        )?;
-        let collected: rusqlite::Result<Vec<_>> = mapped.collect();
-        collected?
+        )?
     } else {
         let mut stmt = conn.prepare(
             "SELECT a.id, a.created_at, a.model, a.purpose, a.note_id,
@@ -555,22 +607,14 @@ pub fn list_ai_calls(
              ORDER BY a.created_at DESC, a.id DESC
              LIMIT ?1",
         )?;
-        let mapped = stmt.query_map(rusqlite::params![limit_plus_one], row_to_ai_call)?;
-        let collected: rusqlite::Result<Vec<_>> = mapped.collect();
-        collected?
+        collect_page(&mut stmt, rusqlite::params![limit_plus_one], limit, row_to_ai_call)?
     };
 
-    let has_more = rows.len() > limit as usize;
-    let items: Vec<AiCall> = rows.into_iter().take(limit as usize).collect();
-    let next_cursor = if has_more {
-        items.last().map(|c| AiCallsCursor {
-            created_at: c.created_at.clone(),
-            id: c.id.clone(),
-        })
-    } else {
-        None
-    };
-    Ok(AiCallsPage { items, next_cursor })
+    let next = next_cursor(&items, has_more, |c| AiCallsCursor {
+        created_at: c.created_at.clone(),
+        id: c.id.clone(),
+    });
+    Ok(AiCallsPage { items, next_cursor: next })
 }
 
 fn row_to_ai_call(row: &rusqlite::Row) -> rusqlite::Result<AiCall> {
@@ -614,17 +658,18 @@ pub fn clear_ai_calls(db: State<Db>) -> Result<u64> {
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-fn record_call(
-    db: &Db,
-    model: &str,
-    note_id: Option<&str>,
+struct CallRecord<'a> {
+    model: &'a str,
+    note_id: Option<&'a str>,
     prompt_tokens: i64,
     completion_tokens: i64,
     cost_usd: f64,
     duration_ms: i64,
-    status: &str,
-    error: Option<&str>,
-) {
+    status: &'a str,
+    error: Option<&'a str>,
+}
+
+fn record_call(db: &Db, r: CallRecord<'_>) {
     let conn = match db.conn() {
         Ok(c) => c,
         Err(e) => {
@@ -643,17 +688,34 @@ fn record_call(
         rusqlite::params![
             id,
             now,
-            model,
-            note_id,
-            prompt_tokens,
-            completion_tokens,
-            cost_usd,
-            duration_ms,
-            status,
-            error
+            r.model,
+            r.note_id,
+            r.prompt_tokens,
+            r.completion_tokens,
+            r.cost_usd,
+            r.duration_ms,
+            r.status,
+            r.error
         ],
     ) {
         tracing::warn!("ai_calls insert failed: {e}");
+        return;
+    }
+
+    // Opportunistic retention. Power users can rack up tens of thousands of
+    // calls over time - we keep the most recent AI_CALLS_RETENTION rows and
+    // discard older ones. Cheap (one DELETE with a bounded subquery) and
+    // amortised across writes so we don't need a background sweep.
+    if let Err(e) = conn.execute(
+        "DELETE FROM ai_calls
+         WHERE id IN (
+             SELECT id FROM ai_calls
+             ORDER BY created_at DESC, id DESC
+             LIMIT -1 OFFSET ?1
+         )",
+        rusqlite::params![AI_CALLS_RETENTION],
+    ) {
+        tracing::warn!("ai_calls retention trim failed: {e}");
     }
 }
 

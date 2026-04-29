@@ -1,5 +1,12 @@
 import { batch, createMemo, createSignal } from "solid-js";
 import { createStore, produce } from "solid-js/store";
+import {
+  ITEMS_SLIDING_WINDOW_KEEP,
+  ITEMS_SLIDING_WINDOW_MAX,
+  NOTE_CACHE_MAX,
+  PAGE_SIZE,
+} from "../lib/constants";
+import { LRU } from "../lib/lru";
 import { api } from "../lib/tauri";
 import type {
   Note,
@@ -34,8 +41,6 @@ type NotesState = {
   trashLoaded: boolean;
 };
 
-const PAGE_SIZE = 100;
-
 const [state, setState] = createStore<NotesState>({
   pinned: [],
   items: [],
@@ -47,7 +52,11 @@ const [state, setState] = createStore<NotesState>({
   trashLoaded: false,
 });
 
-const cache = new Map<string, Note>();
+// Per-note Lexical-state cache. Bounded LRU - the user is realistically
+// editing one note at a time and bouncing through 5-10 in a session, so a
+// 50-entry cap is generous. Without the cap the cache grows unbounded for
+// users who navigate through their corpus over a long-running session.
+const cache = new LRU<string, Note>(NOTE_CACHE_MAX);
 
 export const notesState = state;
 
@@ -84,7 +93,14 @@ export async function hardRefreshNotes() {
   await refreshNotes();
 }
 
-/** Load the next page of unpinned items. No-op if there's nothing more. */
+/** Load the next page of unpinned items. No-op if there's nothing more.
+ *
+ * Sliding-window: once the loaded prefix exceeds `ITEMS_SLIDING_WINDOW_MAX`,
+ * we keep the trailing `ITEMS_SLIDING_WINDOW_KEEP` and discard the newest
+ * items above. The discarded section is recovered by re-loading from the
+ * top (refreshNotes) - which the user triggers by scrolling back up. Without
+ * this cap, a power user with 1M notes who scrolls forever would accumulate
+ * the entire summary list in memory (250 MB+). */
 export async function loadMoreNotes() {
   if (state.loadingMore || !state.nextCursor) return;
   setState("loadingMore", true);
@@ -92,7 +108,18 @@ export async function loadMoreNotes() {
     const page = await api.listNotes(state.nextCursor, PAGE_SIZE);
     setState(
       produce((s) => {
-        s.items = s.items.concat(page.items);
+        // Drop the top of the loaded prefix once we exceed the cap. The
+        // virtualizer's anchor is its scrollTop, which is unaffected by
+        // splicing content the user can't currently see (it sits below
+        // the bottom of the viewport, off-screen).
+        const newCount = s.items.length + page.items.length;
+        if (newCount > ITEMS_SLIDING_WINDOW_MAX) {
+          const dropFromTop = newCount - ITEMS_SLIDING_WINDOW_KEEP;
+          if (dropFromTop > 0 && dropFromTop < s.items.length) {
+            s.items.splice(0, dropFromTop);
+          }
+        }
+        s.items.push(...page.items);
         s.nextCursor = page.next_cursor;
       }),
     );
@@ -106,6 +133,25 @@ export async function loadNote(id: string): Promise<Note> {
   if (cached) return cached;
   const note = await api.getNote(id);
   cache.set(id, note);
+  return note;
+}
+
+/** Like `loadNote`, but bypasses the cache. Used after a backend mutation
+ *  whose effect doesn't flow through `updateNote` (e.g. snapshot restore
+ *  rewrites notes.{title,content_*} on the Rust side without going through
+ *  our update_note IPC, so the cache + sidebar summary are stale). */
+export async function reloadNote(id: string): Promise<Note> {
+  const note = await api.getNote(id);
+  cache.set(id, note);
+  setState(
+    produce((s) => {
+      const summary = summaryFromNote(note);
+      const inItems = s.items.findIndex((n) => n.id === id);
+      if (inItems >= 0) s.items[inItems] = summary;
+      const inPinned = s.pinned.findIndex((n) => n.id === id);
+      if (inPinned >= 0) s.pinned[inPinned] = summary;
+    }),
+  );
   return note;
 }
 
@@ -177,8 +223,7 @@ export async function togglePin(id: string): Promise<Note> {
 
 export async function softDeleteNote(id: string): Promise<void> {
   // Capture summary before mutating so we can prepend to trash if loaded.
-  const prev =
-    state.pinned.find((n) => n.id === id) ?? state.items.find((n) => n.id === id);
+  const prev = state.pinned.find((n) => n.id === id) ?? state.items.find((n) => n.id === id);
   await api.softDeleteNote(id);
   cache.delete(id);
   const deletedAt = new Date().toISOString();
@@ -275,7 +320,7 @@ function summaryFromNote(note: Note): NoteSummary {
 function shortPreview(text: string): string {
   const oneLine = text.replace(/\s+/g, " ").trim();
   if (oneLine.length <= 140) return oneLine;
-  return oneLine.slice(0, 140) + "…";
+  return `${oneLine.slice(0, 140)}…`;
 }
 
 const [selectedNoteId, setSelectedNoteIdRaw] = createSignal<string | null>(null);
@@ -303,10 +348,7 @@ export function selectFirstAvailable(): string | null {
 
 export async function ensureSelection(): Promise<string | null> {
   const id = selectedNoteId();
-  if (
-    id &&
-    (state.pinned.some((n) => n.id === id) || state.items.some((n) => n.id === id))
-  ) {
+  if (id && (state.pinned.some((n) => n.id === id) || state.items.some((n) => n.id === id))) {
     return id;
   }
   if (state.pinned.length === 0 && state.items.length === 0) {

@@ -1,3 +1,4 @@
+import { mergeRegister } from "@lexical/utils";
 import {
   $createTextNode,
   $getSelection,
@@ -12,7 +13,6 @@ import {
   type LexicalEditor,
   type TextNode,
 } from "lexical";
-import { mergeRegister } from "@lexical/utils";
 import { $createMentionNode } from "./mentionNode";
 
 export type MentionMatch = {
@@ -32,10 +32,7 @@ export type MentionAdapter = {
   confirmSelection: () => boolean;
 };
 
-export function registerMentionPlugin(
-  editor: LexicalEditor,
-  adapter: MentionAdapter,
-): () => void {
+export function registerMentionPlugin(editor: LexicalEditor, adapter: MentionAdapter): () => void {
   const closeIfOpen = () => {
     if (adapter.isOpen()) adapter.onClose();
   };
@@ -196,9 +193,10 @@ function getCaretRect(): DOMRect | null {
   if (rects.length > 0) return rects[0];
   const r = range.getBoundingClientRect();
   if (r.width === 0 && r.height === 0) {
-    const containerEl = range.startContainer.nodeType === Node.ELEMENT_NODE
-      ? (range.startContainer as HTMLElement)
-      : (range.startContainer.parentElement as HTMLElement | null);
+    const containerEl =
+      range.startContainer.nodeType === Node.ELEMENT_NODE
+        ? (range.startContainer as HTMLElement)
+        : (range.startContainer.parentElement as HTMLElement | null);
     return containerEl ? containerEl.getBoundingClientRect() : null;
   }
   return r;

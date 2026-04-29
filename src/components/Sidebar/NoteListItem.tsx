@@ -1,8 +1,9 @@
-import { Show, type Component } from "solid-js";
-import type { NoteSummary } from "../../lib/types";
+import { type Component, Show } from "solid-js";
 import { formatRelative, truncate } from "../../lib/format";
-import { sidebarPreviewLines } from "../../stores/settings";
+import type { NoteSummary } from "../../lib/types";
 import { nowTick } from "../../stores/clock";
+import { sidebarPreviewLines } from "../../stores/settings";
+import { PinIcon } from "../icons";
 
 type Props = {
   note: NoteSummary;
@@ -35,7 +36,7 @@ export const NoteListItem: Component<Props> = (props) => {
         <span class="nz-note-title">{title()}</span>
         <Show when={props.note.is_pinned}>
           <span class="nz-pin-badge" aria-label="Pinned">
-            <PinIcon />
+            <PinIcon width="11" height="11" fill="currentColor" />
           </span>
         </Show>
         <span class="nz-note-time">{formatRelative(props.note.updated_at, nowTick())}</span>
@@ -81,9 +82,3 @@ function showRowMenu(
   setTimeout(() => window.addEventListener("click", close), 0);
   document.body.appendChild(menu);
 }
-
-const PinIcon: Component = () => (
-  <svg width="11" height="11" viewBox="0 0 11 11" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-    <path d="M5.5 1L7 3.5V5.5L8.5 7H6.25L5.5 10L4.75 7H2.5L4 5.5V3.5L5.5 1Z" />
-  </svg>
-);

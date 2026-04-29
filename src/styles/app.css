@@ -71,8 +71,8 @@
   justify-content: center;
   border-radius: var(--nz-radius-sm);
   color: var(--nz-text-muted);
-  transition: background 140ms var(--nz-ease), color 140ms var(--nz-ease),
-    transform 80ms var(--nz-ease);
+  transition: background 140ms var(--nz-ease), color 140ms var(--nz-ease), transform 80ms
+    var(--nz-ease);
 }
 
 .nz-icon-btn:hover {
@@ -120,6 +120,14 @@
   background: #44b86a;
 }
 
+.nz-saving-indicator[data-state="error"] {
+  color: var(--nz-danger);
+}
+
+.nz-saving-indicator[data-state="error"]::before {
+  background: var(--nz-danger);
+}
+
 .nz-pill-btn {
   padding: 9px 18px;
   border-radius: 999px;
@@ -129,8 +137,8 @@
   font-weight: 500;
   font-size: 13px;
   letter-spacing: -0.005em;
-  transition: background 140ms var(--nz-ease), transform 100ms var(--nz-ease),
-    border-color 140ms var(--nz-ease);
+  transition: background 140ms var(--nz-ease), transform 100ms var(--nz-ease), border-color 140ms
+    var(--nz-ease);
 }
 
 .nz-pill-btn:hover {
@@ -148,8 +156,8 @@
   border-color: var(--nz-accent-hot);
   font-weight: 600;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-  transition: box-shadow 220ms var(--nz-ease), background 140ms var(--nz-ease),
-    transform 100ms var(--nz-ease);
+  transition: box-shadow 220ms var(--nz-ease), background 140ms var(--nz-ease), transform 100ms
+    var(--nz-ease);
 }
 
 .nz-pill-btn.primary:hover {

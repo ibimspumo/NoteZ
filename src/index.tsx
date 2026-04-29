@@ -12,5 +12,8 @@ import "./styles/about.css";
 import "./styles/settings.css";
 import "./styles/trash.css";
 import "./styles/dev-panel.css";
+import "./styles/toast.css";
+import "./styles/snapshots.css";
+import "./styles/print.css";
 
 render(() => <App />, document.getElementById("root") as HTMLElement);

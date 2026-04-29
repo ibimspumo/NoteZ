@@ -66,10 +66,7 @@ export function captureSelection(editor: LexicalEditor): SerializedSelection | n
   return result;
 }
 
-export function restoreSelection(
-  editor: LexicalEditor,
-  sel: SerializedSelection,
-): void {
+export function restoreSelection(editor: LexicalEditor, sel: SerializedSelection): void {
   editor.update(
     () => {
       const aNode = nodeFromPath(sel.anchor.path);

@@ -1,13 +1,18 @@
 import {
+  type Component,
   For,
   Show,
   createEffect,
   createMemo,
   createSignal,
   onCleanup,
-  type Component,
 } from "solid-js";
+import { AIActivityDialog } from "../components/AIActivityDialog";
+import { api } from "../lib/tauri";
+import type { AiModel, AiStats } from "../lib/types";
 import {
+  type ColorMode,
+  type SidebarPreviewLines,
   aiHasKey,
   aiModel,
   aiTitleEnabled,
@@ -26,17 +31,8 @@ import {
   setTrashRetentionDays,
   sidebarPreviewLines,
   trashRetentionDays,
-  type ColorMode,
-  type SidebarPreviewLines,
 } from "../stores/settings";
-import { api } from "../lib/tauri";
-import type { AiModel, AiStats } from "../lib/types";
-import { AIActivityDialog } from "./AIActivityDialog";
-
-type Props = {
-  open: boolean;
-  onClose: () => void;
-};
+import { closeSettings } from "../stores/ui";
 
 const RETENTION_OPTIONS: Array<{ value: number; label: string }> = [
   { value: 0, label: "Never" },
@@ -50,39 +46,43 @@ const RETENTION_OPTIONS: Array<{ value: number; label: string }> = [
 const DEFAULT_QUICK_CAPTURE = "super+alt+KeyN";
 const DEFAULT_COMMAND_BAR = "super+KeyK";
 
-export const SettingsDialog: Component<Props> = (props) => {
+export const SettingsView: Component = () => {
   createEffect(() => {
-    if (!props.open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") props.onClose();
+      if (e.key === "Escape") closeSettings();
     };
     window.addEventListener("keydown", onKey);
     onCleanup(() => window.removeEventListener("keydown", onKey));
   });
 
   return (
-    <Show when={props.open}>
-      <div class="nz-settings-backdrop" onClick={props.onClose}>
-        <div
-          class="nz-settings-dialog"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="nz-settings-title"
-          onClick={(e) => e.stopPropagation()}
+    <div class="nz-settings-view" role="region" aria-labelledby="nz-settings-title">
+      <header class="nz-settings-view-header" data-tauri-drag-region>
+        <button
+          type="button"
+          class="nz-settings-view-back"
+          aria-label="Close settings"
+          title="Close · esc"
+          onClick={closeSettings}
         >
-          <button
-            class="nz-settings-close"
-            aria-label="Close"
-            title="Close · esc"
-            onClick={props.onClose}
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="m3.5 3.5 7 7M10.5 3.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-            </svg>
-          </button>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path
+              d="M8.5 3 4.5 7l4 4"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <span>Back</span>
+        </button>
+        <h1 class="nz-settings-view-title" id="nz-settings-title">
+          Settings
+        </h1>
+      </header>
 
-          <h2 class="nz-settings-title" id="nz-settings-title">Settings</h2>
-
+      <div class="nz-settings-view-scroll">
+        <div class="nz-settings-view-inner">
           <SidebarDensitySection />
           <div class="nz-settings-divider" />
 
@@ -98,7 +98,7 @@ export const SettingsDialog: Component<Props> = (props) => {
           <ColorModeSection />
         </div>
       </div>
-    </Show>
+    </div>
   );
 };
 
@@ -194,7 +194,8 @@ const ShortcutsSection: Component = () => {
       <header class="nz-settings-section-header">
         <h3>Global shortcuts</h3>
         <p class="nz-settings-section-hint">
-          Click a shortcut to record a new combination. Must include at least one modifier (⌘, ⌥, ⇧ or ⌃).
+          Click a shortcut to record a new combination. Must include at least one modifier (⌘, ⌥, ⇧
+          or ⌃).
         </p>
       </header>
       <div class="nz-settings-shortcut-list">
@@ -251,7 +252,6 @@ const ShortcutRow: Component<ShortcutRowProps> = (props) => {
     }
     const accel = eventToAccelerator(e);
     if (!accel) {
-      // Modifier-only or bare key - show a hint while user keeps pressing.
       setPendingDisplay(buildHint(e));
       return;
     }
@@ -318,7 +318,7 @@ function buildHint(e: KeyboardEvent): string {
   if (e.altKey) parts.push("⌥");
   if (e.shiftKey) parts.push("⇧");
   if (e.ctrlKey) parts.push("⌃");
-  return parts.length > 0 ? parts.join("") + "…" : "Press keys…";
+  return parts.length > 0 ? `${parts.join("")}…` : "Press keys…";
 }
 
 const ColorModeSection: Component = () => {
@@ -349,7 +349,10 @@ const ColorModeSection: Component = () => {
           classList={{ active: colorMode() === "default" }}
           onClick={() => apply("default")}
         >
-          <span class="nz-settings-color-swatch nz-settings-color-swatch--default" aria-hidden="true" />
+          <span
+            class="nz-settings-color-swatch nz-settings-color-swatch--default"
+            aria-hidden="true"
+          />
           <span class="nz-settings-color-name">Standard</span>
           <span class="nz-settings-color-meta">Green accent</span>
         </button>
@@ -361,7 +364,10 @@ const ColorModeSection: Component = () => {
           classList={{ active: colorMode() === "mono" }}
           onClick={() => apply("mono")}
         >
-          <span class="nz-settings-color-swatch nz-settings-color-swatch--mono" aria-hidden="true" />
+          <span
+            class="nz-settings-color-swatch nz-settings-color-swatch--mono"
+            aria-hidden="true"
+          />
           <span class="nz-settings-color-name">Monochrome</span>
           <span class="nz-settings-color-meta">Greyscale only</span>
         </button>
@@ -422,8 +428,6 @@ const AISection: Component = () => {
     setError(null);
     try {
       await setOpenrouterApiKey("");
-      // If we just removed the key, also turn off the feature so
-      // captures don't keep trying with an empty key.
       if (aiTitleEnabled()) await setAiTitleEnabled(false);
     } catch (e) {
       setError(String(e));
@@ -435,8 +439,8 @@ const AISection: Component = () => {
       <header class="nz-settings-section-header">
         <h3>AI title generation</h3>
         <p class="nz-settings-section-hint">
-          When you save a Quick Note, NoteZ asks an LLM via OpenRouter to write a
-          short title in the note's language. Uses your own API key and credits.
+          When you save a Quick Note, NoteZ asks an LLM via OpenRouter to write a short title in the
+          note's language. Uses your own API key and credits.
         </p>
       </header>
 
@@ -474,11 +478,7 @@ const AISection: Component = () => {
           fallback={
             <div class="nz-ai-key-stored">
               <span class="nz-ai-key-mask">••••••••••••••••</span>
-              <button
-                class="nz-pill-btn danger"
-                type="button"
-                onClick={() => void onClearKey()}
-              >
+              <button class="nz-pill-btn danger" type="button" onClick={() => void onClearKey()}>
                 Clear
               </button>
             </div>
@@ -537,7 +537,7 @@ const AISection: Component = () => {
           <a
             href="https://openrouter.ai/keys"
             target="_blank"
-            rel="noopener"
+            rel="noreferrer noopener"
             class="nz-ai-link"
           >
             openrouter.ai/keys
@@ -560,25 +560,19 @@ const AISection: Component = () => {
       </div>
 
       <div class="nz-ai-activity-row">
-        <Show
-          when={stats()}
-          fallback={<span class="nz-ai-activity-summary">Loading…</span>}
-        >
+        <Show when={stats()} fallback={<span class="nz-ai-activity-summary">Loading…</span>}>
           {(s) => (
             <span class="nz-ai-activity-summary">
               {s().total_calls} call{s().total_calls === 1 ? "" : "s"} ·{" "}
               {formatUsdCompact(s().total_cost_usd)} spent
               <Show when={s().error_calls > 0}>
-                {" "}· <span class="nz-ai-activity-errors">{s().error_calls} failed</span>
+                {" "}
+                · <span class="nz-ai-activity-errors">{s().error_calls} failed</span>
               </Show>
             </span>
           )}
         </Show>
-        <button
-          type="button"
-          class="nz-pill-btn"
-          onClick={() => setActivityOpen(true)}
-        >
+        <button type="button" class="nz-pill-btn" onClick={() => setActivityOpen(true)}>
           View activity
         </button>
       </div>
@@ -657,10 +651,7 @@ const ModelPicker: Component<ModelPickerProps> = (props) => {
 
   return (
     <Show when={props.open}>
-      <div
-        class="nz-settings-backdrop nz-ai-picker-backdrop"
-        onClick={props.onClose}
-      >
+      <div class="nz-settings-backdrop nz-ai-picker-backdrop" onClick={props.onClose}>
         <div
           class="nz-ai-picker"
           role="dialog"
@@ -676,12 +667,7 @@ const ModelPicker: Component<ModelPickerProps> = (props) => {
               value={query()}
               onInput={(e) => setQuery(e.currentTarget.value)}
             />
-            <button
-              type="button"
-              class="nz-trash-close"
-              aria-label="Close"
-              onClick={props.onClose}
-            >
+            <button type="button" class="nz-trash-close" aria-label="Close" onClick={props.onClose}>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path
                   d="m3.5 3.5 7 7M10.5 3.5l-7 7"
@@ -697,16 +683,11 @@ const ModelPicker: Component<ModelPickerProps> = (props) => {
               {err()}
             </p>
           </Show>
-          <Show
-            when={!loading()}
-            fallback={<div class="nz-trash-loading">Loading models…</div>}
-          >
+          <Show when={!loading()} fallback={<div class="nz-trash-loading">Loading models…</div>}>
             <ul class="nz-ai-picker-list">
               <Show
                 when={filtered().length > 0}
-                fallback={
-                  <li class="nz-ai-picker-empty">No matching models.</li>
-                }
+                fallback={<li class="nz-ai-picker-empty">No matching models.</li>}
               >
                 <For each={filtered()}>
                   {(m) => (

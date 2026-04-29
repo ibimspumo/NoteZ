@@ -1,7 +1,11 @@
 mod commands;
+mod constants;
 mod db;
 mod error;
+mod events;
+mod keychain;
 mod models;
+mod pagination;
 mod setup;
 mod shortcuts;
 
@@ -9,12 +13,13 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
+use crate::constants::{
+    SETTING_COMMAND_BAR, SETTING_OPENROUTER_KEY_LEGACY, SETTING_OPENROUTER_KEY_PRESENT,
+    SETTING_QUICK_CAPTURE,
+};
 use crate::db::Db;
 use crate::error::{NoteZError, Result};
 use crate::shortcuts::{ShortcutSpec, ShortcutsState};
-
-const SETTING_QUICK_CAPTURE: &str = "shortcut_quick_capture";
-const SETTING_COMMAND_BAR: &str = "shortcut_command_bar";
 
 struct AppPaths {
     db: PathBuf,
@@ -33,6 +38,55 @@ fn resolve_app_paths(app: &AppHandle) -> std::io::Result<AppPaths> {
         db: dir.join("notez.db"),
         assets,
     })
+}
+
+/// Migrate a legacy plain-text OpenRouter API key out of the `settings` table
+/// and into the OS keychain. No-op if there's nothing to migrate. Logged but
+/// non-fatal on failure - the key stays where it is and we retry next launch.
+fn migrate_openrouter_key_to_keychain(db: &Db) {
+    let conn = match db.conn() {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!("openrouter key migration: db unavailable: {e}");
+            return;
+        }
+    };
+    let legacy: Option<String> = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = ?1",
+            rusqlite::params![SETTING_OPENROUTER_KEY_LEGACY],
+            |r| r.get(0),
+        )
+        .ok();
+    let Some(value) = legacy else { return };
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        // Empty row is meaningless - drop it.
+        let _ = conn.execute(
+            "DELETE FROM settings WHERE key = ?1",
+            rusqlite::params![SETTING_OPENROUTER_KEY_LEGACY],
+        );
+        return;
+    }
+    if let Err(e) = keychain::set_openrouter_key(trimmed) {
+        tracing::warn!("openrouter key migration: keychain write failed: {e}");
+        return;
+    }
+    // Keychain write succeeded - replace the row with the "present" marker
+    // so the renderer sees has_key=true on cold start without rereading the
+    // legacy column.
+    let now = crate::db::now_iso();
+    let _ = conn.execute(
+        "DELETE FROM settings WHERE key = ?1",
+        rusqlite::params![SETTING_OPENROUTER_KEY_LEGACY],
+    );
+    let _ = conn.execute(
+        "INSERT INTO settings (key, value, updated_at)
+         VALUES (?1, ?2, ?3)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+        rusqlite::params![SETTING_OPENROUTER_KEY_PRESENT, "1", now],
+    );
+    tracing::info!("openrouter API key migrated from settings table to OS keychain");
 }
 
 fn read_shortcut_setting(db: &Db, key: &str, default: ShortcutSpec) -> ShortcutSpec {
@@ -98,6 +152,7 @@ fn update_shortcut(
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
         rusqlite::params![key, canonical, now],
     )?;
+    crate::events::emit_settings_changed(&app, key);
     Ok(canonical)
 }
 
@@ -175,7 +230,7 @@ pub fn run() {
                 .build(),
         )
         .setup(|app| {
-            let paths = resolve_app_paths(&app.handle())?;
+            let paths = resolve_app_paths(app.handle())?;
             tracing::info!("opening database: {:?}", paths.db);
             tracing::info!("assets dir: {:?}", paths.assets);
             let db = Db::open(&paths.db, &paths.assets)
@@ -193,10 +248,17 @@ pub fn run() {
                 shortcuts::default_command_bar(),
             );
 
+            // One-time migration: pre-keychain builds stored the OpenRouter
+            // key as a plain row in `settings`. If we find one there, move it
+            // into the OS keychain and erase the column. Best-effort: if the
+            // keychain write fails (user denied access, headless CI), the
+            // legacy row stays put and the next launch will retry.
+            migrate_openrouter_key_to_keychain(&db);
+
             app.manage(db);
             app.manage(ShortcutsState::new(qc_spec, cb_spec));
 
-            crate::setup::install_window_chrome(&app.handle());
+            crate::setup::install_window_chrome(app.handle());
 
             // Register global shortcuts. If the user-configured one fails (e.g. another
             // app holds it), the warning is logged and in-app fallbacks still work.
@@ -241,6 +303,7 @@ pub fn run() {
             get_shortcuts,
             // assets
             commands::assets::save_asset,
+            commands::assets::save_asset_from_path,
             commands::assets::get_asset,
             commands::assets::get_assets_dir,
             commands::assets::list_assets,
@@ -265,6 +328,8 @@ pub fn run() {
             commands::dev::dev_count_generated_notes,
             #[cfg(debug_assertions)]
             commands::dev::dev_delete_generated_notes,
+            #[cfg(debug_assertions)]
+            commands::dev::dev_seed_demo_notes,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

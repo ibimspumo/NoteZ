@@ -1,9 +1,13 @@
 import { onCleanup, onMount } from "solid-js";
-import { matchHotkey, type Hotkey } from "../lib/keymap";
+import { type Hotkey, matchHotkey } from "../lib/keymap";
 
 export type ShortcutBinding = {
   hotkey: Hotkey;
-  /** Return `true` to indicate the shortcut handled the event (and prevent default). */
+  /** Return `false` to bail out of the binding (caller will not preventDefault).
+   *  Any other return value (including `undefined` and `void`) is treated as
+   *  "handled" - the event is consumed. The `void` arm lets you write
+   *  `handler: () => doThing()` without a wrapping block, which keeps the
+   *  binding table compact. */
   handler: (e: KeyboardEvent) => boolean | void;
 };
 

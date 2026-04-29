@@ -1,7 +1,12 @@
 // User-configurable app settings. Persisted in the SQLite `settings` table
 // via Rust commands; mirrored here as Solid signals so the UI stays reactive.
 
+import { listen } from "@tauri-apps/api/event";
 import { createSignal } from "solid-js";
+import {
+  DEFAULT_SIDEBAR_PREVIEW_LINES as DEFAULT_SIDEBAR_PREVIEW_LINES_C,
+  DEFAULT_TRASH_RETENTION_DAYS,
+} from "../lib/constants";
 import { api } from "../lib/tauri";
 
 export type ColorMode = "default" | "mono";
@@ -11,13 +16,13 @@ const KEY_TRASH_RETENTION = "trash_retention_days";
 const KEY_COLOR_MODE = "color_mode";
 const KEY_SIDEBAR_PREVIEW_LINES = "sidebar_preview_lines";
 
-const DEFAULT_TRASH_RETENTION = 30; // days; 0 = never auto-delete
+const DEFAULT_TRASH_RETENTION = DEFAULT_TRASH_RETENTION_DAYS;
 const DEFAULT_COLOR_MODE: ColorMode = "default";
-const DEFAULT_SIDEBAR_PREVIEW_LINES: SidebarPreviewLines = 2;
+const DEFAULT_SIDEBAR_PREVIEW_LINES: SidebarPreviewLines =
+  DEFAULT_SIDEBAR_PREVIEW_LINES_C as SidebarPreviewLines;
 
-const [trashRetentionDays, setTrashRetentionDaysSig] = createSignal<number>(
-  DEFAULT_TRASH_RETENTION,
-);
+const [trashRetentionDays, setTrashRetentionDaysSig] =
+  createSignal<number>(DEFAULT_TRASH_RETENTION);
 const [colorMode, setColorModeSig] = createSignal<ColorMode>(DEFAULT_COLOR_MODE);
 const [sidebarPreviewLines, setSidebarPreviewLinesSig] = createSignal<SidebarPreviewLines>(
   DEFAULT_SIDEBAR_PREVIEW_LINES,
@@ -52,9 +57,34 @@ let inFlight: Promise<void> | null = null;
 export function loadSettings(): Promise<void> {
   if (inFlight) return inFlight;
   inFlight = (async () => {
-    await loadSettingsImpl();
+    try {
+      await loadSettingsImpl();
+    } finally {
+      // Reset so a follow-up reload (e.g. from the cross-window bridge) can
+      // re-fetch instead of returning the cached resolved promise forever.
+      inFlight = null;
+    }
   })();
   return inFlight;
+}
+
+/**
+ * Wire up the cross-window settings bridge. The backend emits
+ * `notez://settings/changed` whenever any setting (or shortcut) is written;
+ * each window that mounted this listener re-loads its in-memory store so
+ * its UI catches up with the change.
+ *
+ * Without this, switching the color mode in the main window would leave the
+ * Quick-Capture window's body class out of sync until a full restart.
+ *
+ * Safe to mount in both windows. Returns the unlisten function so callers
+ * who care can clean up; for the App-root mount we just rely on the
+ * window's lifecycle to clean up at unload.
+ */
+export async function registerSettingsBridge(): Promise<() => void> {
+  return await listen("notez://settings/changed", () => {
+    void loadSettings();
+  });
 }
 
 async function loadSettingsImpl() {
@@ -67,9 +97,9 @@ async function loadSettingsImpl() {
 
   const retentionRaw = map.get(KEY_TRASH_RETENTION);
   const retention = retentionRaw == null ? DEFAULT_TRASH_RETENTION : Number(retentionRaw);
-  setTrashRetentionDaysSig(Number.isFinite(retention) && retention >= 0
-    ? retention
-    : DEFAULT_TRASH_RETENTION);
+  setTrashRetentionDaysSig(
+    Number.isFinite(retention) && retention >= 0 ? retention : DEFAULT_TRASH_RETENTION,
+  );
 
   const modeRaw = map.get(KEY_COLOR_MODE);
   const mode: ColorMode = modeRaw === "mono" ? "mono" : "default";
@@ -151,7 +181,10 @@ export async function setCommandBarShortcut(accelerator: string) {
 // Convert canonical accelerator ("super+alt+KeyN") to a Mac-style display ("⌘⌥N").
 export function formatAccelerator(s: string): string {
   if (!s) return "";
-  const parts = s.split("+").map((p) => p.trim()).filter(Boolean);
+  const parts = s
+    .split("+")
+    .map((p) => p.trim())
+    .filter(Boolean);
   const out: string[] = [];
   for (const p of parts) {
     const lower = p.toLowerCase();
@@ -175,29 +208,47 @@ function displayKey(token: string): string {
   if (t.startsWith("key") && t.length === 4) return t.slice(3).toUpperCase();
   if (t.startsWith("digit") && t.length === 6) return t.slice(5);
   switch (t) {
-    case "space": return "Space";
+    case "space":
+      return "Space";
     case "enter":
-    case "return": return "↵";
-    case "tab": return "⇥";
-    case "backspace": return "⌫";
+    case "return":
+      return "↵";
+    case "tab":
+      return "⇥";
+    case "backspace":
+      return "⌫";
     case "delete":
-    case "del": return "⌦";
+    case "del":
+      return "⌦";
     case "escape":
-    case "esc": return "⎋";
-    case "minus": return "−";
-    case "equal": return "=";
-    case "comma": return ",";
+    case "esc":
+      return "⎋";
+    case "minus":
+      return "−";
+    case "equal":
+      return "=";
+    case "comma":
+      return ",";
     case "period":
-    case "dot": return ".";
-    case "slash": return "/";
-    case "backslash": return "\\";
-    case "semicolon": return ";";
-    case "quote": return "'";
+    case "dot":
+      return ".";
+    case "slash":
+      return "/";
+    case "backslash":
+      return "\\";
+    case "semicolon":
+      return ";";
+    case "quote":
+      return "'";
     case "backquote":
-    case "grave": return "`";
-    case "bracketleft": return "[";
-    case "bracketright": return "]";
-    default: return token.toUpperCase();
+    case "grave":
+      return "`";
+    case "bracketleft":
+      return "[";
+    case "bracketright":
+      return "]";
+    default:
+      return token.toUpperCase();
   }
 }
 

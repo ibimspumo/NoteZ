@@ -1,13 +1,6 @@
-import {
-  For,
-  Show,
-  createEffect,
-  createSignal,
-  onCleanup,
-  type Component,
-} from "solid-js";
-import { api } from "../lib/tauri";
+import { type Component, For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import { formatRelative } from "../lib/format";
+import { api } from "../lib/tauri";
 import type { AiCall, AiCallsCursor, AiStats } from "../lib/types";
 
 type Props = {
@@ -28,10 +21,7 @@ export const AIActivityDialog: Component<Props> = (props) => {
     setLoading(true);
     setError(null);
     try {
-      const [page, s] = await Promise.all([
-        api.listAiCalls(null, 50),
-        api.getAiStats(),
-      ]);
+      const [page, s] = await Promise.all([api.listAiCalls(null, 50), api.getAiStats()]);
       setItems(page.items);
       setCursor(page.next_cursor);
       setStats(s);
@@ -103,11 +93,7 @@ export const AIActivityDialog: Component<Props> = (props) => {
                 AI activity
               </h2>
               <Show when={stats()}>
-                {(s) => (
-                  <span class="nz-trash-count">
-                    {s().total_calls}
-                  </span>
-                )}
+                {(s) => <span class="nz-trash-count">{s().total_calls}</span>}
               </Show>
             </div>
             <button
@@ -130,8 +116,8 @@ export const AIActivityDialog: Component<Props> = (props) => {
           <Show when={stats()}>
             {(s) => (
               <p class="nz-trash-blurb">
-                Total spent: <strong>{formatUsd(s().total_cost_usd)}</strong>
-                {" "}across {s().total_calls} call{s().total_calls === 1 ? "" : "s"}
+                Total spent: <strong>{formatUsd(s().total_cost_usd)}</strong> across{" "}
+                {s().total_calls} call{s().total_calls === 1 ? "" : "s"}
                 <Show when={s().error_calls > 0}>
                   <span> · {s().error_calls} failed</span>
                 </Show>
@@ -148,10 +134,7 @@ export const AIActivityDialog: Component<Props> = (props) => {
             <Show
               when={!isEmpty()}
               fallback={
-                <Show
-                  when={loaded()}
-                  fallback={<div class="nz-trash-loading">Loading…</div>}
-                >
+                <Show when={loaded()} fallback={<div class="nz-trash-loading">Loading…</div>}>
                   <div class="nz-trash-empty">
                     <p>No AI calls yet.</p>
                   </div>
@@ -159,9 +142,7 @@ export const AIActivityDialog: Component<Props> = (props) => {
               }
             >
               <ul class="nz-ai-list">
-                <For each={items()}>
-                  {(call) => <AiCallRow call={call} />}
-                </For>
+                <For each={items()}>{(call) => <AiCallRow call={call} />}</For>
               </ul>
               <Show when={cursor()}>
                 <button
@@ -177,10 +158,7 @@ export const AIActivityDialog: Component<Props> = (props) => {
 
           <Show when={items().length > 0}>
             <footer class="nz-trash-footer">
-              <button
-                class="nz-pill-btn danger"
-                onClick={() => void handleClear()}
-              >
+              <button class="nz-pill-btn danger" onClick={() => void handleClear()}>
                 {confirmClear() ? "Click again to confirm" : "Clear history"}
               </button>
             </footer>
@@ -200,20 +178,24 @@ const AiCallRow: Component<{ call: AiCall }> = (p) => {
           <span class="nz-ai-row-title">
             {p.call.note_title?.trim() || (p.call.note_id ? "Untitled note" : "—")}
           </span>
-          <span class="nz-ai-row-cost">
-            {isError() ? "failed" : formatUsd(p.call.cost_usd)}
-          </span>
+          <span class="nz-ai-row-cost">{isError() ? "failed" : formatUsd(p.call.cost_usd)}</span>
         </div>
         <div class="nz-ai-row-meta">
           <span title={p.call.created_at}>{formatRelative(p.call.created_at)}</span>
-          <span class="nz-trash-dot" aria-hidden="true">·</span>
+          <span class="nz-trash-dot" aria-hidden="true">
+            ·
+          </span>
           <span class="nz-ai-row-model">{p.call.model}</span>
           <Show when={!isError()}>
-            <span class="nz-trash-dot" aria-hidden="true">·</span>
+            <span class="nz-trash-dot" aria-hidden="true">
+              ·
+            </span>
             <span>
               {p.call.prompt_tokens}→{p.call.completion_tokens} tok
             </span>
-            <span class="nz-trash-dot" aria-hidden="true">·</span>
+            <span class="nz-trash-dot" aria-hidden="true">
+              ·
+            </span>
             <span>{p.call.duration_ms}ms</span>
           </Show>
         </div>

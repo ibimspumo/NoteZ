@@ -13,12 +13,30 @@ const BRIGHT = "var(--nz-brand-bright, #1AD592)";
 const DEEP = "var(--nz-brand-deep, #08885A)";
 
 const PATTERN: Array<[number, number, string]> = [
-  [0, 0, BRIGHT], [1, 0, BRIGHT], [2, 0, BRIGHT], [3, 0, BRIGHT], [4, 0, BRIGHT],
-  [0, 1, DEEP],   [1, 1, DEEP],   [2, 1, DEEP],   [3, 1, BRIGHT], [4, 1, BRIGHT],
-  [2, 2, BRIGHT], [3, 2, BRIGHT],
-  [1, 3, BRIGHT], [2, 3, BRIGHT],
-  [0, 4, BRIGHT], [1, 4, BRIGHT], [2, 4, DEEP],   [3, 4, DEEP],   [4, 4, DEEP],
-  [0, 5, BRIGHT], [1, 5, BRIGHT], [2, 5, BRIGHT], [3, 5, BRIGHT], [4, 5, BRIGHT],
+  [0, 0, BRIGHT],
+  [1, 0, BRIGHT],
+  [2, 0, BRIGHT],
+  [3, 0, BRIGHT],
+  [4, 0, BRIGHT],
+  [0, 1, DEEP],
+  [1, 1, DEEP],
+  [2, 1, DEEP],
+  [3, 1, BRIGHT],
+  [4, 1, BRIGHT],
+  [2, 2, BRIGHT],
+  [3, 2, BRIGHT],
+  [1, 3, BRIGHT],
+  [2, 3, BRIGHT],
+  [0, 4, BRIGHT],
+  [1, 4, BRIGHT],
+  [2, 4, DEEP],
+  [3, 4, DEEP],
+  [4, 4, DEEP],
+  [0, 5, BRIGHT],
+  [1, 5, BRIGHT],
+  [2, 5, BRIGHT],
+  [3, 5, BRIGHT],
+  [4, 5, BRIGHT],
 ];
 
 export const BrandMark: Component<Props> = (props) => {

@@ -153,6 +153,21 @@
   gap: 8px;
 }
 
+.nz-dev-divider {
+  height: 1px;
+  background: var(--nz-divider);
+  margin: 4px 0 2px;
+}
+
+.nz-dev-section-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nz-text-muted);
+  margin-bottom: -2px;
+}
+
 .nz-dev-btn {
   font: inherit;
   font-size: 12.5px;
@@ -163,8 +178,8 @@
   background: var(--nz-bg-hover);
   color: var(--nz-text-strong);
   cursor: pointer;
-  transition: background 120ms var(--nz-ease), color 120ms var(--nz-ease),
-    transform 80ms var(--nz-ease);
+  transition: background 120ms var(--nz-ease), color 120ms var(--nz-ease), transform 80ms
+    var(--nz-ease);
 }
 
 .nz-dev-btn:hover:not(:disabled) {
@@ -178,7 +193,7 @@
 
 .nz-dev-btn.primary {
   background: var(--nz-accent-hot);
-  color: #fff;
+  color: var(--nz-on-accent);
   border-color: transparent;
 }
 

@@ -53,12 +53,15 @@ export function formatTime(iso: string): string {
 }
 
 export function deriveTitle(text: string): string {
-  const firstLine = text.split("\n").map((l) => l.trim()).find((l) => l.length > 0);
+  const firstLine = text
+    .split("\n")
+    .map((l) => l.trim())
+    .find((l) => l.length > 0);
   if (!firstLine) return "";
   return firstLine.slice(0, 120);
 }
 
 export function truncate(text: string, max: number): string {
   if (text.length <= max) return text;
-  return text.slice(0, max - 1) + "…";
+  return `${text.slice(0, max - 1)}…`;
 }

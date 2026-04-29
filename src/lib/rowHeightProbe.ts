@@ -171,7 +171,8 @@ function runProbe(): ProbedHeights {
   let previewContentWidth = widthPx;
   if (previewEl) {
     const cs = getComputedStyle(previewEl);
-    previewFont = `${cs.fontStyle} ${cs.fontVariant} ${cs.fontWeight} ${cs.fontSize} / ${cs.lineHeight} ${cs.fontFamily}`.trim();
+    previewFont =
+      `${cs.fontStyle} ${cs.fontVariant} ${cs.fontWeight} ${cs.fontSize} / ${cs.lineHeight} ${cs.fontFamily}`.trim();
     // Actual content width inside the preview span (its parent has padding
     // from .nz-note-item; we want the width text gets to flow into).
     const meta = previewEl.parentElement!;

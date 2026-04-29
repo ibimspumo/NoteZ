@@ -1,3 +1,4 @@
+use crate::constants::PREVIEW_MAX_CHARS;
 use crate::db::Db;
 use crate::error::Result;
 use crate::models::NoteSummary;
@@ -18,7 +19,7 @@ pub fn list_backlinks(db: State<Db>, note_id: String) -> Result<Vec<NoteSummary>
         Ok(NoteSummary {
             id: row.get("id")?,
             title: row.get("title")?,
-            preview: crate::db::make_preview(&content_text, 140),
+            preview: crate::db::make_preview(&content_text, PREVIEW_MAX_CHARS),
             is_pinned: row.get::<_, i64>("is_pinned")? != 0,
             pinned_at: row.get("pinned_at")?,
             updated_at: row.get("updated_at")?,

@@ -1,12 +1,14 @@
 import {
+  type Component,
   For,
   Show,
   createEffect,
   createMemo,
   createSignal,
   onCleanup,
-  type Component,
 } from "solid-js";
+import { formatRelative, truncate } from "../lib/format";
+import type { TrashSummary } from "../lib/types";
 import {
   emptyTrash,
   loadMoreTrash,
@@ -15,8 +17,6 @@ import {
   purgeNote,
   restoreNote,
 } from "../stores/notes";
-import { formatRelative, truncate } from "../lib/format";
-import type { TrashSummary } from "../lib/types";
 
 type Props = {
   open: boolean;
@@ -113,15 +113,10 @@ export const TrashDialog: Component<Props> = (props) => {
               }
             >
               <ul class="nz-trash-list">
-                <For each={items()}>
-                  {(item) => <TrashRow item={item} />}
-                </For>
+                <For each={items()}>{(item) => <TrashRow item={item} />}</For>
               </ul>
               <Show when={notesState.trashCursor}>
-                <button
-                  class="nz-trash-loadmore"
-                  onClick={() => void loadMoreTrash()}
-                >
+                <button class="nz-trash-loadmore" onClick={() => void loadMoreTrash()}>
                   Load more
                 </button>
               </Show>
@@ -130,10 +125,7 @@ export const TrashDialog: Component<Props> = (props) => {
 
           <Show when={items().length > 0}>
             <footer class="nz-trash-footer">
-              <button
-                class="nz-pill-btn danger"
-                onClick={() => void handleEmpty()}
-              >
+              <button class="nz-pill-btn danger" onClick={() => void handleEmpty()}>
                 {confirmEmpty() ? "Click again to confirm" : "Empty Trash"}
               </button>
             </footer>
@@ -168,17 +160,15 @@ const TrashRow: Component<{ item: TrashSummary }> = (p) => {
         <div class="nz-trash-item-meta">
           <span>Deleted {formatRelative(p.item.deleted_at)}</span>
           <Show when={remaining()}>
-            <span class="nz-trash-dot" aria-hidden="true">·</span>
+            <span class="nz-trash-dot" aria-hidden="true">
+              ·
+            </span>
             <span class="nz-trash-countdown">{remaining()}</span>
           </Show>
         </div>
       </div>
       <div class="nz-trash-item-actions">
-        <button
-          class="nz-pill-btn"
-          title="Restore"
-          onClick={() => void restoreNote(p.item.id)}
-        >
+        <button class="nz-pill-btn" title="Restore" onClick={() => void restoreNote(p.item.id)}>
           Restore
         </button>
         <button
@@ -208,11 +198,6 @@ const TrashIcon: Component = () => (
       stroke-linecap="round"
       stroke-linejoin="round"
     />
-    <path
-      d="M7 7v5M9 7v5"
-      stroke="currentColor"
-      stroke-width="1.3"
-      stroke-linecap="round"
-    />
+    <path d="M7 7v5M9 7v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
   </svg>
 );

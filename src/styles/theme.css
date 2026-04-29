@@ -1,23 +1,59 @@
 :root {
   --nz-accent: #00dc82;
   --nz-accent-hot: #00c374;
+  --nz-on-accent: #fff;
   --nz-accent-soft: rgba(0, 220, 130, 0.16);
   --nz-accent-glow: rgba(0, 220, 130, 0.32);
   --nz-danger: #d54a3a;
 
   /* Brand mark dots — match the app icon. Two shades for depth. */
-  --nz-brand-bright: #1AD592;
-  --nz-brand-deep: #08885A;
+  --nz-brand-bright: #1ad592;
+  --nz-brand-deep: #08885a;
   --nz-brand-glow: rgba(26, 213, 146, 0.28);
 
   --nz-radius-sm: 6px;
   --nz-radius-md: 8px;
   --nz-radius-lg: 12px;
   --nz-radius-xl: 16px;
+  --nz-radius-pill: 999px;
   --nz-ease: cubic-bezier(0.32, 0.72, 0, 1);
 
-  --nz-font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
-    "Helvetica Neue", Helvetica, Arial, sans-serif;
+  /* Animation duration scale. Keep the count small so motion stays
+     coherent across the app - use --nz-dur-fast for instant feedback,
+     --nz-dur for hovers/state-toggles, --nz-dur-slow for layout shifts. */
+  --nz-dur-instant: 80ms;
+  --nz-dur-fast: 100ms;
+  --nz-dur: 140ms;
+  --nz-dur-medium: 220ms;
+  --nz-dur-slow: 320ms;
+
+  /* Type scale. Anchored on 13px body text with a ~1.2 ratio for steps. */
+  --nz-text-xxs: 10px;
+  --nz-text-xs: 11px;
+  --nz-text-sm: 11.5px;
+  --nz-text-md: 12.5px;
+  --nz-text-base: 13px;
+  --nz-text-lg: 13.5px;
+  --nz-text-xl: 16px;
+  --nz-text-2xl: 17px;
+  --nz-text-3xl: 21px;
+  --nz-text-4xl: 26px;
+  --nz-text-title: 28px;
+
+  /* 4 px spacing scale. Use these for padding/margin consistency. */
+  --nz-space-1: 2px;
+  --nz-space-2: 4px;
+  --nz-space-3: 6px;
+  --nz-space-4: 8px;
+  --nz-space-5: 10px;
+  --nz-space-6: 12px;
+  --nz-space-7: 14px;
+  --nz-space-8: 16px;
+  --nz-space-10: 20px;
+  --nz-space-12: 24px;
+
+  --nz-font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue",
+    Helvetica, Arial, sans-serif;
   --nz-font-mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
 }
 
@@ -62,7 +98,8 @@
 :root.nz-mono {
   --nz-accent: #f4f4f5;
   --nz-accent-hot: #fafafa;
-  --nz-accent-soft: rgba(255, 255, 255, 0.10);
+  --nz-on-accent: #0a0a0c;
+  --nz-accent-soft: rgba(255, 255, 255, 0.1);
   --nz-accent-glow: rgba(255, 255, 255, 0.16);
   --nz-danger: #c46a5e;
 
@@ -76,7 +113,7 @@
   --nz-bg-elev: rgba(28, 28, 30, 0.94);
   --nz-bg-overlay: rgba(22, 22, 24, 0.94);
   --nz-bg-hover: rgba(255, 255, 255, 0.05);
-  --nz-bg-active: rgba(255, 255, 255, 0.10);
+  --nz-bg-active: rgba(255, 255, 255, 0.1);
   --nz-bg-active-strong: rgba(255, 255, 255, 0.16);
   --nz-bg-row: rgba(255, 255, 255, 0.03);
   --nz-divider: rgba(255, 255, 255, 0.06);
@@ -84,15 +121,15 @@
   --nz-text: #ededee;
   --nz-text-strong: #fafafa;
   --nz-text-muted: rgba(237, 237, 238, 0.62);
-  --nz-text-faint: rgba(237, 237, 238, 0.40);
+  --nz-text-faint: rgba(237, 237, 238, 0.4);
   --nz-text-whisper: rgba(237, 237, 238, 0.22);
-  --nz-selection: rgba(255, 255, 255, 0.20);
+  --nz-selection: rgba(255, 255, 255, 0.2);
   --nz-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
   --nz-shadow: 0 14px 44px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.36);
   --nz-shadow-lg: 0 28px 80px rgba(0, 0, 0, 0.78), 0 8px 22px rgba(0, 0, 0, 0.5);
   --nz-scrollbar: rgba(255, 255, 255, 0.12);
   --nz-scrollbar-hover: rgba(255, 255, 255, 0.28);
-  --nz-mark: rgba(255, 255, 255, 0.20);
+  --nz-mark: rgba(255, 255, 255, 0.2);
   --nz-mention-text: #ededee;
   --nz-mention-bg: rgba(255, 255, 255, 0.08);
   --nz-mention-border: rgba(255, 255, 255, 0.22);

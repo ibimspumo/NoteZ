@@ -1,8 +1,8 @@
-import { Show, createSignal, onCleanup, onMount, type Component } from "solid-js";
 import { emit } from "@tauri-apps/api/event";
-import { api } from "../lib/tauri";
-import { deriveTitle } from "../lib/format";
+import { type Component, Show, createSignal, onCleanup, onMount } from "solid-js";
 import zIcon from "../assets/Z.svg";
+import { deriveTitle } from "../lib/format";
+import { api } from "../lib/tauri";
 
 type Status = "idle" | "saving" | "generating";
 
@@ -124,10 +124,7 @@ export const CaptureView: Component = () => {
             <Show
               when={status() === "saving"}
               fallback={
-                <Show
-                  when={!error()}
-                  fallback={<span class="nz-capture-error">{error()}</span>}
-                >
+                <Show when={!error()} fallback={<span class="nz-capture-error">{error()}</span>}>
                   <span class="nz-capture-hint">
                     <kbd>⌘</kbd>
                     <kbd>↵</kbd>

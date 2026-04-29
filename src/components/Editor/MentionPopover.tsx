@@ -1,11 +1,4 @@
-import {
-  createEffect,
-  createSignal,
-  For,
-  onCleanup,
-  Show,
-  type Component,
-} from "solid-js";
+import { type Component, For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import { Portal } from "solid-js/web";
 import { api } from "../../lib/tauri";
 import type { SearchHit } from "../../lib/types";
@@ -27,14 +20,17 @@ export const MentionPopover: Component<Props> = (props) => {
   createEffect(() => {
     const q = props.match.query;
     let cancelled = false;
-    api.quickLookup(q, 8).then((hits) => {
-      if (cancelled) return;
-      const filtered = hits.filter((h) => h.id !== props.currentNoteId);
-      setResults(filtered);
-      setActiveIdx(0);
-    }).catch(() => {
-      if (!cancelled) setResults([]);
-    });
+    api
+      .quickLookup(q, 8)
+      .then((hits) => {
+        if (cancelled) return;
+        const filtered = hits.filter((h) => h.id !== props.currentNoteId);
+        setResults(filtered);
+        setActiveIdx(0);
+      })
+      .catch(() => {
+        if (!cancelled) setResults([]);
+      });
     onCleanup(() => {
       cancelled = true;
     });
@@ -95,10 +91,7 @@ export const MentionPopover: Component<Props> = (props) => {
                     {hit.title || <em class="nz-untitled">Untitled</em>}
                   </span>
                   <Show when={hit.snippet}>
-                    <span
-                      class="nz-mention-snippet"
-                      innerHTML={highlight(hit.snippet)}
-                    />
+                    <span class="nz-mention-snippet" innerHTML={highlight(hit.snippet)} />
                   </Show>
                 </li>
               )}
@@ -111,14 +104,9 @@ export const MentionPopover: Component<Props> = (props) => {
 };
 
 function highlight(snippet: string): string {
-  return escapeHtml(snippet)
-    .replaceAll("&lt;&lt;", "<mark>")
-    .replaceAll("&gt;&gt;", "</mark>");
+  return escapeHtml(snippet).replaceAll("&lt;&lt;", "<mark>").replaceAll("&gt;&gt;", "</mark>");
 }
 
 function escapeHtml(text: string): string {
-  return text
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
+  return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }

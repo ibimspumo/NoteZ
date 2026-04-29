@@ -1,5 +1,5 @@
-import { invoke, convertFileSrc } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { type UnlistenFn, listen } from "@tauri-apps/api/event";
 import type {
   AiCallsCursor,
   AiCallsPage,
@@ -25,8 +25,7 @@ export const api = {
   // notes
   createNote: () => invoke<Note>("create_note"),
   getNote: (id: string) => invoke<Note>("get_note", { id }),
-  updateNote: (input: UpdateNoteInput) =>
-    invoke<Note>("update_note", { input }),
+  updateNote: (input: UpdateNoteInput) => invoke<Note>("update_note", { input }),
   listNotes: (cursor?: NotesCursor | null, limit?: number) =>
     invoke<NotesPage>("list_notes", { cursor: cursor ?? null, limit }),
   listTrash: (cursor?: TrashCursor | null, limit?: number) =>
@@ -45,44 +44,37 @@ export const api = {
     invoke<SearchHit[]>("quick_lookup", { query, limit }),
 
   // snapshots
-  createSnapshot: (
-    noteId: string,
-    isManual?: boolean,
-    manualLabel?: string,
-  ) =>
+  createSnapshot: (noteId: string, isManual?: boolean, manualLabel?: string) =>
     invoke<Snapshot>("create_snapshot", { noteId, isManual, manualLabel }),
-  listSnapshots: (
-    noteId: string,
-    cursor?: SnapshotsCursor | null,
-    limit?: number,
-  ) =>
+  listSnapshots: (noteId: string, cursor?: SnapshotsCursor | null, limit?: number) =>
     invoke<SnapshotsPage>("list_snapshots", {
       noteId,
       cursor: cursor ?? null,
       limit,
     }),
-  restoreSnapshot: (snapshotId: string) =>
-    invoke<void>("restore_snapshot", { snapshotId }),
+  restoreSnapshot: (snapshotId: string) => invoke<void>("restore_snapshot", { snapshotId }),
 
   // mentions
-  listBacklinks: (noteId: string) =>
-    invoke<NoteSummary[]>("list_backlinks", { noteId }),
+  listBacklinks: (noteId: string) => invoke<NoteSummary[]>("list_backlinks", { noteId }),
 
   // settings
   getSetting: (key: string) => invoke<string | null>("get_setting", { key }),
-  setSetting: (key: string, value: string) =>
-    invoke<void>("set_setting", { key, value }),
+  setSetting: (key: string, value: string) => invoke<void>("set_setting", { key, value }),
   listSettings: () => invoke<Array<[string, string]>>("list_settings"),
 
   // shortcuts (live-mutable global hotkeys)
-  getShortcuts: () =>
-    invoke<{ quick_capture: string; command_bar: string }>("get_shortcuts"),
+  getShortcuts: () => invoke<{ quick_capture: string; command_bar: string }>("get_shortcuts"),
   updateShortcut: (name: "quick_capture" | "command_bar", accelerator: string) =>
     invoke<string>("update_shortcut", { name, accelerator }),
 
   // assets
-  saveAsset: (bytes: number[], mime: string) =>
-    invoke<AssetRef>("save_asset", { bytes, mime }),
+  saveAsset: (bytes: number[], mime: string) => invoke<AssetRef>("save_asset", { bytes, mime }),
+  /** Faster alternative for the drag-from-Finder flow: instead of streaming
+   *  millions of bytes through the JSON IPC, we hand the backend a path and
+   *  it reads the file off-thread. Used by the Tauri 2 `dropPaths` listener
+   *  in the editor. */
+  saveAssetFromPath: (path: string, mime: string) =>
+    invoke<AssetRef>("save_asset_from_path", { path, mime }),
   getAsset: (id: string) => invoke<AssetRef | null>("get_asset", { id }),
   getAssetsDir: () => invoke<string>("get_assets_dir"),
   listAssets: () => invoke<Asset[]>("list_assets"),
@@ -97,8 +89,7 @@ export const api = {
   setAiEnabled: (enabled: boolean) => invoke<void>("set_ai_enabled", { enabled }),
   setAiModel: (model: string) => invoke<void>("set_ai_model", { model }),
   setOpenrouterKey: (key: string) => invoke<void>("set_openrouter_key", { key }),
-  listAiModels: (forceRefresh?: boolean) =>
-    invoke<AiModel[]>("list_ai_models", { forceRefresh }),
+  listAiModels: (forceRefresh?: boolean) => invoke<AiModel[]>("list_ai_models", { forceRefresh }),
   generateTitle: (text: string, noteId?: string | null) =>
     invoke<string>("generate_title", { text, noteId: noteId ?? null }),
   listAiCalls: (cursor?: AiCallsCursor | null, limit?: number) =>
@@ -115,6 +106,7 @@ export const api = {
   }) => invoke<number>("dev_generate_notes", { options }),
   devCountGeneratedNotes: () => invoke<number>("dev_count_generated_notes"),
   devDeleteGeneratedNotes: () => invoke<number>("dev_delete_generated_notes"),
+  devSeedDemoNotes: () => invoke<number>("dev_seed_demo_notes"),
 };
 
 /** Convert an absolute on-disk asset path to a webview-loadable URL. */
@@ -146,8 +138,6 @@ export function onDevProgress(
   handler: (p: DevProgress) => void,
 ): Promise<UnlistenFn> {
   const event =
-    kind === "generate"
-      ? "notez://dev/generate-progress"
-      : "notez://dev/delete-progress";
+    kind === "generate" ? "notez://dev/generate-progress" : "notez://dev/delete-progress";
   return listen<DevProgress>(event, (e) => handler(e.payload));
 }

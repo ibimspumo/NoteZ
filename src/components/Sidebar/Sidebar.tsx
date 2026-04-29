@@ -1,34 +1,27 @@
-import {
-  createMemo,
-  createSignal,
-  For,
-  onCleanup,
-  onMount,
-  Show,
-  type Component,
-} from "solid-js";
-import {
-  loadMoreNotes,
-  notesState,
-  selectedId,
-  setSelectedId,
-} from "../../stores/notes";
-import { openCommandBar, sidebarCollapsed } from "../../stores/ui";
-import { sidebarPreviewLines } from "../../stores/settings";
-import { nowTick } from "../../stores/clock";
-import { APP_VERSION } from "../../lib/version";
-import { MeasuredVirtualList } from "../MeasuredVirtualList";
-import { AboutDialog } from "../AboutDialog";
-import { SettingsDialog } from "../SettingsDialog";
-import { TrashDialog } from "../TrashDialog";
-import { NoteListItem } from "./NoteListItem";
-import { bucketFor, type Bucket } from "../../lib/buckets";
+import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
+import { type Bucket, bucketFor } from "../../lib/buckets";
 import {
   bindRowHeightProbeContainer,
   rowHeightForPreview,
   subscribeRowHeightProbe,
 } from "../../lib/rowHeightProbe";
 import type { NoteSummary } from "../../lib/types";
+import { APP_VERSION } from "../../lib/version";
+import { nowTick } from "../../stores/clock";
+import { loadMoreNotes, notesState, selectedId, setSelectedId } from "../../stores/notes";
+import { sidebarPreviewLines } from "../../stores/settings";
+import {
+  closeSettings,
+  openCommandBar,
+  openSettings,
+  settingsOpen,
+  sidebarCollapsed,
+} from "../../stores/ui";
+import { AboutDialog } from "../AboutDialog";
+import { MeasuredVirtualList } from "../MeasuredVirtualList";
+import { TrashDialog } from "../TrashDialog";
+import { NewNoteIcon, SearchIcon, SettingsGearIcon, TrashIcon } from "../icons";
+import { NoteListItem } from "./NoteListItem";
 
 type Props = {
   onCreate: () => void;
@@ -36,16 +29,13 @@ type Props = {
   onDelete: (id: string) => void;
 };
 
-type ListRow =
-  | { kind: "header"; label: Bucket }
-  | { kind: "note"; note: NoteSummary };
+type ListRow = { kind: "header"; label: Bucket } | { kind: "note"; note: NoteSummary };
 
 const HEADER_ROW_HEIGHT = 32;
 
 export const Sidebar: Component<Props> = (props) => {
   const [aboutOpen, setAboutOpen] = createSignal(false);
   const [trashOpen, setTrashOpen] = createSignal(false);
-  const [settingsOpen, setSettingsOpen] = createSignal(false);
   const [probeRevision, setProbeRevision] = createSignal(0);
 
   onMount(() => {
@@ -81,20 +71,20 @@ export const Sidebar: Component<Props> = (props) => {
   // Bumped when something outside row data invalidates heights (density
   // setting, font load, sidebar resize). MeasuredVirtualList re-estimates
   // every row when this changes.
-  const estimateVersion = createMemo(
-    () => sidebarPreviewLines() * 1_000_003 + probeRevision(),
-  );
+  const estimateVersion = createMemo(() => sidebarPreviewLines() * 1_000_003 + probeRevision());
 
   const handleSearchTrigger = (e?: Event) => {
     if (e) e.preventDefault();
     openCommandBar();
   };
 
+  const selectNote = (id: string) => {
+    closeSettings();
+    setSelectedId(id);
+  };
+
   return (
-    <aside
-      class="nz-sidebar"
-      classList={{ collapsed: sidebarCollapsed() }}
-    >
+    <aside class="nz-sidebar" classList={{ collapsed: sidebarCollapsed() }}>
       <div class="nz-sidebar-titlebar" data-tauri-drag-region />
       <div class="nz-sidebar-header" data-tauri-drag-region>
         <button
@@ -114,7 +104,7 @@ export const Sidebar: Component<Props> = (props) => {
           onClick={handleSearchTrigger}
           aria-label="Search notes · ⌘K"
         >
-          <SearchIcon />
+          <SearchIcon width="13" height="13" />
           <span class="nz-search-trigger-label">Search notes</span>
           <kbd class="nz-search-trigger-kbd">⌘K</kbd>
         </button>
@@ -130,7 +120,7 @@ export const Sidebar: Component<Props> = (props) => {
                   <NoteListItem
                     note={n}
                     selected={n.id === selectedId()}
-                    onSelect={() => setSelectedId(n.id)}
+                    onSelect={() => selectNote(n.id)}
                     onTogglePin={() => props.onTogglePin(n.id)}
                     onDelete={() => props.onDelete(n.id)}
                   />
@@ -144,11 +134,7 @@ export const Sidebar: Component<Props> = (props) => {
           <Show
             when={rows().length > 0}
             fallback={
-              <Show
-                when={
-                  notesState.pinned.length === 0 && notesState.initialLoaded
-                }
-              >
+              <Show when={notesState.pinned.length === 0 && notesState.initialLoaded}>
                 <div class="nz-empty-state">
                   <p>No notes yet.</p>
                   <button class="nz-pill-btn" onClick={props.onCreate}>
@@ -187,7 +173,7 @@ export const Sidebar: Component<Props> = (props) => {
                       <NoteListItem
                         note={r.note}
                         selected={r.note.id === selectedId()}
-                        onSelect={() => setSelectedId(r.note.id)}
+                        onSelect={() => selectNote(r.note.id)}
                         onTogglePin={() => props.onTogglePin(r.note.id)}
                         onDelete={() => props.onDelete(r.note.id)}
                       />
@@ -200,12 +186,8 @@ export const Sidebar: Component<Props> = (props) => {
         </div>
       </div>
 
-      <button
-        class="nz-trash-row"
-        onClick={() => setTrashOpen(true)}
-        aria-label="Open Trash"
-      >
-        <TrashIcon />
+      <button class="nz-trash-row" onClick={() => setTrashOpen(true)} aria-label="Open Trash">
+        <TrashIcon width="14" height="14" />
         <span class="nz-trash-row-label">Trash</span>
         <Show when={notesState.trashLoaded && notesState.trash.length > 0}>
           <span class="nz-trash-row-count">{notesState.trash.length}</span>
@@ -215,11 +197,13 @@ export const Sidebar: Component<Props> = (props) => {
       <div class="nz-sidebar-footer">
         <button
           class="nz-icon-btn nz-settings-button"
+          classList={{ active: settingsOpen() }}
           aria-label="Open settings"
+          aria-pressed={settingsOpen()}
           title="Settings"
-          onClick={() => setSettingsOpen(true)}
+          onClick={openSettings}
         >
-          <SettingsGearIcon />
+          <SettingsGearIcon width="14" height="14" />
         </button>
         <button
           class="nz-version-button"
@@ -232,57 +216,7 @@ export const Sidebar: Component<Props> = (props) => {
       </div>
 
       <AboutDialog open={aboutOpen()} onClose={() => setAboutOpen(false)} />
-      <SettingsDialog open={settingsOpen()} onClose={() => setSettingsOpen(false)} />
       <TrashDialog open={trashOpen()} onClose={() => setTrashOpen(false)} />
     </aside>
   );
 };
-
-const SearchIcon: Component = () => (
-  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.4" />
-    <path d="M11 11L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
-  </svg>
-);
-
-const TrashIcon: Component = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path
-      d="M2.5 4.5h11M6 4.5V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5M4 4.5l.6 8.5A1.5 1.5 0 0 0 6.1 14.5h3.8a1.5 1.5 0 0 0 1.5-1.5l.6-8.5"
-      stroke="currentColor"
-      stroke-width="1.3"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    />
-    <path
-      d="M7 7v5M9 7v5"
-      stroke="currentColor"
-      stroke-width="1.3"
-      stroke-linecap="round"
-    />
-  </svg>
-);
-
-const SettingsGearIcon: Component = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path
-      d="M19.43 12.98c.04-.32.07-.65.07-.98s-.03-.66-.07-.98l2.11-1.65a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.61-.22l-2.49 1a7.03 7.03 0 0 0-1.69-.98l-.38-2.65A.5.5 0 0 0 14 2h-4a.5.5 0 0 0-.49.42l-.38 2.65c-.61.25-1.17.58-1.69.98l-2.49-1a.5.5 0 0 0-.61.22l-2 3.46a.5.5 0 0 0 .12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65a.5.5 0 0 0-.12.64l2 3.46a.5.5 0 0 0 .61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65A.5.5 0 0 0 10 22h4a.5.5 0 0 0 .49-.42l.38-2.65c.61-.25 1.17-.58 1.69-.98l2.49 1a.5.5 0 0 0 .61-.22l2-3.46a.5.5 0 0 0-.12-.64l-2.11-1.65Z"
-      stroke="currentColor"
-      stroke-width="1.6"
-      stroke-linejoin="round"
-    />
-    <circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="1.6" />
-  </svg>
-);
-
-const NewNoteIcon: Component = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path
-      d="M3 3.5C3 2.67 3.67 2 4.5 2H9L13 6V12.5C13 13.33 12.33 14 11.5 14H4.5C3.67 14 3 13.33 3 12.5V3.5Z"
-      stroke="currentColor"
-      stroke-width="1.3"
-    />
-    <path d="M9 2V6H13" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
-    <path d="M8 8.5V11.5M6.5 10H9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
-  </svg>
-);
