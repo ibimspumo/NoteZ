@@ -158,44 +158,29 @@ export const Sidebar: Component<Props> = (props) => {
               }}
               hasMore={!!notesState.nextCursor}
               onLoadMore={loadMoreNotes}
-              renderRow={(i) => {
-                // Read rows()[i] reactively, not once. Solid's <Show> without
-                // `keyed` invokes its children closure exactly once per
-                // truthy/falsy transition, so a captured `const r = row()`
-                // freezes on the first row value. After updateNote()'s
-                // splice+unshift replaces the proxy at this index, the
-                // captured `r.note` points at an orphaned proxy that is no
-                // longer tracked - so the row's updated_at stays stale.
-                const row = createMemo(() => rows()[i]);
-                const note = createMemo(() => {
-                  const r = row();
-                  return r && r.kind === "note" ? r.note : null;
-                });
-                const headerLabel = createMemo(() => {
-                  const r = row();
-                  return r && r.kind === "header" ? r.label : null;
-                });
-                return (
-                  <Show when={row()}>
-                    <Show
-                      when={note()}
-                      fallback={
+              renderRow={(i) => (
+                <Show when={rows()[i]}>
+                  {(row) => {
+                    const r = row();
+                    if (r.kind === "header") {
+                      return (
                         <div class="nz-bucket-header">
-                          <span>{headerLabel()}</span>
+                          <span>{r.label}</span>
                         </div>
-                      }
-                    >
+                      );
+                    }
+                    return (
                       <NoteListItem
-                        note={note() as NoteSummary}
-                        selected={(note() as NoteSummary).id === selectedId()}
-                        onSelect={() => selectNote((note() as NoteSummary).id)}
-                        onTogglePin={() => props.onTogglePin((note() as NoteSummary).id)}
-                        onDelete={() => props.onDelete((note() as NoteSummary).id)}
+                        note={r.note}
+                        selected={r.note.id === selectedId()}
+                        onSelect={() => selectNote(r.note.id)}
+                        onTogglePin={() => props.onTogglePin(r.note.id)}
+                        onDelete={() => props.onDelete(r.note.id)}
                       />
-                    </Show>
-                  </Show>
-                );
-              }}
+                    );
+                  }}
+                </Show>
+              )}
             />
           </Show>
         </div>

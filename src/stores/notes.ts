@@ -181,16 +181,30 @@ export async function updateNote(input: UpdateNoteInput): Promise<Note> {
     produce((s) => {
       const list = note.is_pinned ? s.pinned : s.items;
       const idx = list.findIndex((n) => n.id === note.id);
-      const summary = summaryFromNote(note);
-      if (idx >= 0) {
-        list[idx] = summary;
-        // Keep recently-edited unpinned notes near the top of the loaded prefix.
-        // (Ordering across the pagination boundary is a server concern; this
-        // only fixes the visible window.)
-        if (!note.is_pinned) {
-          list.splice(idx, 1);
-          list.unshift(summary);
-        }
+      if (idx < 0) return;
+      // Mutate the proxy at idx in place. Replacing it with `list[idx] =
+      // summary` would orphan the existing proxy, and any consumer that
+      // captured the old reference (e.g. a sidebar row's <Show> children
+      // closure that read row.note once) would keep showing the old
+      // updated_at because the orphaned proxy is no longer tracked. By
+      // writing properties on the existing proxy we keep its identity and
+      // every reactive read of its updated_at sees the new value.
+      const item = list[idx];
+      const newPreview = shortPreview(note.content_text);
+      if (item.title !== note.title) item.title = note.title;
+      if (item.preview !== newPreview) item.preview = newPreview;
+      if (item.is_pinned !== note.is_pinned) item.is_pinned = note.is_pinned;
+      if (item.pinned_at !== note.pinned_at) item.pinned_at = note.pinned_at;
+      if (item.updated_at !== note.updated_at) item.updated_at = note.updated_at;
+      // Keep recently-edited unpinned notes near the top of the loaded prefix.
+      // Skip when already at idx 0 - the splice/unshift would be a no-op
+      // visually but Solid's array reconciliation may still rebuild the
+      // proxy at index 0, breaking captured references. (Ordering across
+      // the pagination boundary is a server concern; this only fixes the
+      // visible window.)
+      if (!note.is_pinned && idx > 0) {
+        list.splice(idx, 1);
+        list.unshift(item);
       }
     }),
   );
