@@ -9,6 +9,7 @@ import type { NoteSummary } from "../../lib/types";
 import { APP_VERSION } from "../../lib/version";
 import { nowTick } from "../../stores/clock";
 import { loadMoreNotes, notesState, selectedId, setSelectedId } from "../../stores/notes";
+import { openNoteIds } from "../../stores/panes";
 import { sidebarPreviewLines } from "../../stores/settings";
 import {
   closeSettings,
@@ -120,6 +121,7 @@ export const Sidebar: Component<Props> = (props) => {
                   <NoteListItem
                     note={n}
                     selected={n.id === selectedId()}
+                    openElsewhere={openNoteIds().has(n.id) && n.id !== selectedId()}
                     onSelect={() => selectNote(n.id)}
                     onTogglePin={() => props.onTogglePin(n.id)}
                     onDelete={() => props.onDelete(n.id)}
@@ -159,9 +161,16 @@ export const Sidebar: Component<Props> = (props) => {
               hasMore={!!notesState.nextCursor}
               onLoadMore={loadMoreNotes}
               renderRow={(i) => (
-                <Show when={rows()[i]}>
-                  {(row) => {
-                    const r = row();
+                <Show when={rows()[i]} keyed>
+                  {(r) => {
+                    // `keyed` is required. Without it Solid's <Show> uses
+                    // `equals: (a, b) => !a === !b` and only re-emits when
+                    // truthiness flips, so this function would run once at
+                    // mount and freeze on the first ListRow it ever saw -
+                    // which made the sidebar's bucket header look stuck
+                    // after a save reordered the items underneath. With
+                    // `keyed` the function re-runs on every identity
+                    // change of rows()[i].
                     if (r.kind === "header") {
                       return (
                         <div class="nz-bucket-header">
@@ -173,6 +182,9 @@ export const Sidebar: Component<Props> = (props) => {
                       <NoteListItem
                         note={r.note}
                         selected={r.note.id === selectedId()}
+                        openElsewhere={
+                          openNoteIds().has(r.note.id) && r.note.id !== selectedId()
+                        }
                         onSelect={() => selectNote(r.note.id)}
                         onTogglePin={() => props.onTogglePin(r.note.id)}
                         onDelete={() => props.onDelete(r.note.id)}
@@ -198,10 +210,10 @@ export const Sidebar: Component<Props> = (props) => {
         <button
           class="nz-icon-btn nz-settings-button"
           classList={{ active: settingsOpen() }}
-          aria-label="Open settings"
+          aria-label={settingsOpen() ? "Close settings" : "Open settings"}
           aria-pressed={settingsOpen()}
           title="Settings"
-          onClick={openSettings}
+          onClick={() => (settingsOpen() ? closeSettings() : openSettings())}
         >
           <SettingsGearIcon width="14" height="14" />
         </button>

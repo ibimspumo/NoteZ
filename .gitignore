@@ -18,6 +18,7 @@ dist-ssr
 # Tauri / Rust
 src-tauri/target/
 src-tauri/gen/
+tools/**/target/
 
 # Logs
 npm-debug.log*

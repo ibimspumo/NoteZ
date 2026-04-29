@@ -1,0 +1,391 @@
+/* Pane host: replaces the direct EditorPane child of nz-main. Owns the
+   remaining vertical space below the header. */
+.nz-pane-host {
+  flex: 1 1 auto;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.nz-pane-host > * {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Split container. Sizes for individual children come from inline `flex`
+   on `.nz-split-cell` written by the PaneTree renderer. */
+.nz-split {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.nz-split.row {
+  flex-direction: row;
+}
+.nz-split.column {
+  flex-direction: column;
+}
+.nz-split-cell {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  /* `flex` set inline by PaneTree.tsx using node.sizes[i] */
+}
+.nz-split-cell > * {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Individual pane (leaf). Position relative so the drop overlay can
+   absolute-position over it. */
+.nz-pane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  background: var(--nz-bg-main);
+  overflow: hidden;
+  transition: box-shadow 140ms var(--nz-ease);
+  container: nz-pane / inline-size;
+}
+
+/* Active-pane affordance. Only visible when there's more than one pane -
+   in single-pane mode the inset shadow would just look like a stray border. */
+.nz-pane:has(+ .nz-pane-splitter),
+.nz-pane-splitter ~ .nz-pane {
+  /* placeholder selector intentionally left blank */
+}
+.nz-pane.active .nz-pane-header {
+  background: var(--nz-bg-row);
+  color: var(--nz-text);
+}
+
+/* Per-pane header. Hidden when there's only one pane (controlled at the
+   tree level, not here). */
+.nz-pane-header {
+  flex: 0 0 28px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 0 12px;
+  border-bottom: 1px solid var(--nz-divider);
+  font-size: var(--nz-text-sm);
+  color: var(--nz-text-muted);
+  user-select: none;
+  background: transparent;
+}
+.nz-pane-header-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.nz-pane-header-pin {
+  display: inline-flex;
+  align-items: center;
+  color: var(--nz-text-muted);
+}
+.nz-pane-header-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--nz-radius-sm);
+  font-size: 16px;
+  line-height: 1;
+  color: var(--nz-text-faint);
+  transition: background 100ms var(--nz-ease), color 100ms var(--nz-ease);
+}
+.nz-pane-header-close:hover {
+  background: var(--nz-bg-hover);
+  color: var(--nz-text-strong);
+}
+
+/* Resizer handle. The visible line is 4px (::before, the layout size of
+   the splitter element itself) but the pointer hit area is widened via an
+   absolutely-positioned ::after that extends beyond the splitter into the
+   neighbouring panes. Without this, a 4px-tall column splitter (the
+   horizontal divider in a top/bottom split) was effectively impossible to
+   grab on a vertical drag - the row case got away with it because a 4px
+   *wide* full-height strip is still easy to land on. */
+.nz-pane-splitter {
+  flex: 0 0 4px;
+  position: relative;
+  z-index: 2;
+  background: transparent;
+}
+.nz-pane-splitter.row {
+  cursor: col-resize;
+}
+.nz-pane-splitter.column {
+  cursor: row-resize;
+}
+.nz-pane-splitter::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--nz-divider);
+  transition: background 120ms var(--nz-ease);
+  pointer-events: none;
+}
+/* Invisible expanded hit zone. Pointer events on the pseudo route to the
+   originating element, so a 12px-wide grab target overlays the 4px line
+   without affecting layout. The cells around it have `overflow: hidden`
+   but live as siblings of the splitter inside `.nz-split`, so the ::after
+   sits cleanly above them in the splitter's stacking context. */
+.nz-pane-splitter::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+}
+.nz-pane-splitter.row::after {
+  inset: 0 -4px;
+}
+.nz-pane-splitter.column::after {
+  inset: -4px 0;
+}
+.nz-pane-splitter:hover::before,
+body.nz-resizing .nz-pane-splitter::before {
+  background: var(--nz-accent);
+}
+body.nz-resizing {
+  cursor: inherit;
+  user-select: none;
+}
+body.nz-resizing * {
+  user-select: none !important;
+}
+/* Tauri's `data-tauri-drag-region` swallows pointer events to drive native
+   window-drag. While resizing a pane splitter, the cursor sweeps through
+   the global header (a drag region) on a vertical drag, which interrupts
+   our pointer capture. Disable drag-region pointer behaviour for the
+   duration of the resize. */
+body.nz-resizing [data-tauri-drag-region] {
+  pointer-events: none;
+}
+
+/* Drop overlay. Mounted only while a sidebar drag is active (the parent
+   gates on `dragNoteId()`), so DOM cost is zero outside of drag. */
+.nz-pane-drop {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  pointer-events: auto;
+}
+.nz-pane-drop-highlight {
+  position: absolute;
+  inset: 6px;
+  border: 1.5px solid var(--nz-accent);
+  border-radius: var(--nz-radius-md);
+  background: var(--nz-accent-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  transition: inset 80ms var(--nz-ease);
+}
+.nz-pane-drop-highlight[data-zone="left"] {
+  right: 50%;
+}
+.nz-pane-drop-highlight[data-zone="right"] {
+  left: 50%;
+}
+.nz-pane-drop-highlight[data-zone="top"] {
+  bottom: 50%;
+}
+.nz-pane-drop-highlight[data-zone="bottom"] {
+  top: 50%;
+}
+.nz-pane-drop-label {
+  background: var(--nz-bg-overlay);
+  border: 1px solid var(--nz-divider-strong);
+  border-radius: var(--nz-radius-sm);
+  padding: 4px 10px;
+  font-size: var(--nz-text-md);
+  color: var(--nz-text);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--nz-shadow-sm);
+  pointer-events: none;
+}
+
+/* Empty-pane picker (search + recents inline) */
+.nz-empty-pane {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.nz-empty-pane-shell {
+  width: 100%;
+  max-width: 360px;
+  background: var(--nz-bg-elev);
+  border: 1px solid var(--nz-divider);
+  border-radius: var(--nz-radius-md);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: var(--nz-shadow);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.nz-empty-pane-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--nz-divider);
+  border-radius: var(--nz-radius-sm);
+  background: var(--nz-bg-row);
+  color: var(--nz-text-muted);
+}
+.nz-empty-pane-input {
+  flex: 1 1 auto;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: var(--nz-text-base);
+  color: var(--nz-text);
+  font-family: inherit;
+}
+.nz-empty-pane-section-label {
+  font-size: var(--nz-text-xxs);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--nz-text-faint);
+  padding: 8px 8px 2px;
+}
+.nz-empty-pane-results {
+  display: flex;
+  flex-direction: column;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.nz-empty-pane-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--nz-radius-sm);
+  font-size: var(--nz-text-md);
+  color: var(--nz-text);
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.nz-empty-pane-row.active {
+  background: var(--nz-bg-hover);
+}
+.nz-empty-pane-row-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nz-empty-pane-row-time {
+  flex: 0 0 auto;
+  font-size: var(--nz-text-xs);
+  color: var(--nz-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.nz-empty-pane-empty {
+  padding: 12px 10px;
+  font-size: var(--nz-text-md);
+  color: var(--nz-text-faint);
+  text-align: center;
+}
+.nz-empty-pane-create {
+  margin-top: 4px;
+  padding: 7px 10px;
+  border-radius: var(--nz-radius-sm);
+  background: var(--nz-bg-row);
+  border: 1px solid var(--nz-divider);
+  color: var(--nz-text);
+  font-size: var(--nz-text-md);
+  font-family: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: background 100ms var(--nz-ease), border-color 100ms var(--nz-ease);
+}
+.nz-empty-pane-create:hover {
+  background: var(--nz-bg-hover);
+  border-color: var(--nz-divider-strong);
+}
+
+/* WebKit/Tauri's WKWebView blocks native HTML5 drag-and-drop on elements
+   that inherit `user-select: none` from the body unless the element opts
+   in via `-webkit-user-drag`. Without this, dragstart fires but the OS
+   never enters drag mode, so dragenter/dragover/drop never reach the
+   pane drop targets. */
+.nz-note-item {
+  -webkit-user-drag: element;
+}
+
+/* Source-row placeholder while a drag is in progress. The row's height
+   is preserved so the surrounding list doesn't reflow, and the visible
+   content fades to a thin dashed outline that reads as "this row is
+   being moved". When the drop completes (or is cancelled), `dragend`
+   clears the flag and the row pops back. */
+.nz-note-item.drag-source {
+  opacity: 0.35;
+}
+.nz-note-item.drag-source > * {
+  visibility: hidden;
+}
+
+/* Drag-image ghost. The element is briefly painted at the source row's
+   on-screen position so WebKit's snapshot mechanism actually captures it
+   (offscreen-positioned ghosts get skipped by WKWebView's painter, which
+   was the bug behind "drag image is invisible"). Inline styles in
+   `NoteListItem.tsx` set position/top/left/width/height to mirror the
+   source. We just add a soft elevated chrome here so the snapshot reads
+   as a "lifted card" rather than a flat row. */
+.nz-drag-ghost {
+  background: var(--nz-bg-elev);
+  border: 1px solid var(--nz-divider-strong);
+  border-radius: var(--nz-radius-md);
+  box-shadow: var(--nz-shadow);
+  list-style: none;
+  margin: 0;
+  /* selected/active backgrounds from .nz-note-item shouldn't bleed into
+     the ghost - drop them so it always looks neutral. */
+  --nz-bg-active: transparent;
+  --nz-bg-active-strong: transparent;
+}
+.nz-drag-ghost::before {
+  display: none !important;
+}
+
+/* Sidebar: subtle "open in another pane" indicator on note rows. The thin
+   accent stripe on the left edge stays out of the way of the row's normal
+   selection styling but tells the user "this is on screen elsewhere". */
+.nz-note-item.open-elsewhere::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 50%;
+  background: var(--nz-accent);
+  opacity: 0.5;
+  border-radius: 2px;
+  pointer-events: none;
+}
+.nz-note-item {
+  position: relative;
+}

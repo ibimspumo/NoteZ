@@ -6,7 +6,13 @@ export type Hotkey = {
 };
 
 export function matchHotkey(e: KeyboardEvent, hotkey: Hotkey): boolean {
-  if (e.key.toLowerCase() !== hotkey.key.toLowerCase()) return false;
+  // On macOS, holding Option turns letter keys into alternate glyphs
+  // (e.g. ⌥+D → "∂", ⌥+⇧+D → "Í"), so `e.key` no longer matches the binding.
+  // Fall back to `e.code` ("KeyD") which is layout- and modifier-independent.
+  const wantKey = hotkey.key.toLowerCase();
+  const gotKey = e.key.toLowerCase();
+  const codeKey = e.code.startsWith("Key") ? e.code.slice(3).toLowerCase() : "";
+  if (gotKey !== wantKey && codeKey !== wantKey) return false;
   const wantMod = hotkey.mods.includes("mod");
   const wantShift = hotkey.mods.includes("shift");
   const wantAlt = hotkey.mods.includes("alt");

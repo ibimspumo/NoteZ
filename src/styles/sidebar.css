@@ -201,6 +201,39 @@
   background: var(--nz-bg-active-strong);
 }
 
+/* "Just moved" - a brief highlight when a save lifts the row to a new
+ * position (e.g. a Yesterday note rolling into Today after an edit). The
+ * animation is small and quick so it reads as confirmation rather than
+ * decoration. Uses the row's own background so .selected stays correct
+ * after the animation finishes. */
+.nz-note-item.just-moved {
+  animation: nz-note-just-moved 600ms var(--nz-ease);
+}
+
+@keyframes nz-note-just-moved {
+  0% {
+    background: var(--nz-accent-soft);
+    transform: translateX(-6px);
+    box-shadow: 0 0 0 1px var(--nz-accent-glow);
+  }
+  60% {
+    background: var(--nz-accent-soft);
+    transform: translateX(0);
+    box-shadow: 0 0 0 1px transparent;
+  }
+  100% {
+    background: transparent;
+    transform: translateX(0);
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nz-note-item.just-moved {
+    animation: none;
+  }
+}
+
 /* Selected row indicator: stacked dots echoing the brand mark. */
 .nz-note-item.selected::before {
   content: "";

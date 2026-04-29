@@ -11,25 +11,25 @@ import { AIActivityDialog } from "../components/AIActivityDialog";
 import { api } from "../lib/tauri";
 import type { AiModel, AiStats } from "../lib/types";
 import {
-  type ColorMode,
   type SidebarPreviewLines,
   aiHasKey,
   aiModel,
   aiTitleEnabled,
-  colorMode,
   commandBarShortcut,
   eventToAccelerator,
   formatAccelerator,
+  listAvailableThemes,
   quickCaptureShortcut,
+  setActiveTheme,
   setAiModelChoice,
   setAiTitleEnabled,
-  setColorMode,
   setCommandBarShortcut,
   setOpenrouterApiKey,
   setQuickCaptureShortcut,
   setSidebarPreviewLines,
   setTrashRetentionDays,
   sidebarPreviewLines,
+  themeId,
   trashRetentionDays,
 } from "../stores/settings";
 import { closeSettings } from "../stores/ui";
@@ -95,7 +95,7 @@ export const SettingsView: Component = () => {
           <AISection />
           <div class="nz-settings-divider" />
 
-          <ColorModeSection />
+          <ThemeSection />
         </div>
       </div>
     </div>
@@ -321,12 +321,12 @@ function buildHint(e: KeyboardEvent): string {
   return parts.length > 0 ? `${parts.join("")}…` : "Press keys…";
 }
 
-const ColorModeSection: Component = () => {
+const ThemeSection: Component = () => {
   const [error, setError] = createSignal<string | null>(null);
-  const apply = async (mode: ColorMode) => {
+  const apply = async (id: string) => {
     setError(null);
     try {
-      await setColorMode(mode);
+      await setActiveTheme(id);
     } catch (e) {
       setError(String(e));
     }
@@ -335,42 +335,36 @@ const ColorModeSection: Component = () => {
   return (
     <section class="nz-settings-section">
       <header class="nz-settings-section-header">
-        <h3>Color mode</h3>
+        <h3>Theme</h3>
         <p class="nz-settings-section-hint">
-          Monochrome removes the green accent for an all-greyscale dark UI.
+          Choose the look of NoteZ. Custom themes are coming next.
         </p>
       </header>
-      <div class="nz-settings-color-row" role="radiogroup" aria-label="Color mode">
-        <button
-          type="button"
-          role="radio"
-          aria-checked={colorMode() === "default"}
-          class="nz-settings-color-card"
-          classList={{ active: colorMode() === "default" }}
-          onClick={() => apply("default")}
-        >
-          <span
-            class="nz-settings-color-swatch nz-settings-color-swatch--default"
-            aria-hidden="true"
-          />
-          <span class="nz-settings-color-name">Standard</span>
-          <span class="nz-settings-color-meta">Green accent</span>
-        </button>
-        <button
-          type="button"
-          role="radio"
-          aria-checked={colorMode() === "mono"}
-          class="nz-settings-color-card"
-          classList={{ active: colorMode() === "mono" }}
-          onClick={() => apply("mono")}
-        >
-          <span
-            class="nz-settings-color-swatch nz-settings-color-swatch--mono"
-            aria-hidden="true"
-          />
-          <span class="nz-settings-color-name">Monochrome</span>
-          <span class="nz-settings-color-meta">Greyscale only</span>
-        </button>
+      <div class="nz-settings-color-row" role="radiogroup" aria-label="Theme">
+        <For each={listAvailableThemes()}>
+          {(theme) => (
+            <button
+              type="button"
+              role="radio"
+              aria-checked={themeId() === theme.id}
+              class="nz-settings-color-card"
+              classList={{ active: themeId() === theme.id }}
+              onClick={() => apply(theme.id)}
+            >
+              <span
+                class="nz-settings-color-swatch"
+                aria-hidden="true"
+                style={{
+                  background: `linear-gradient(120deg, ${theme.tokens["nz-bg-elev"]} 0% 60%, ${theme.tokens["nz-accent"]} 60% 100%)`,
+                }}
+              />
+              <span class="nz-settings-color-name">{theme.name}</span>
+              <span class="nz-settings-color-meta">
+                {theme.description ?? (theme.mode === "light" ? "Light" : "Dark")}
+              </span>
+            </button>
+          )}
+        </For>
       </div>
       <Show when={error()}>
         <p class="nz-settings-error">{error()}</p>

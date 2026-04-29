@@ -1,0 +1,70 @@
+{
+  "id": "light",
+  "name": "Light",
+  "author": "NoteZ",
+  "description": "Bright surfaces with the same green accent. Daylight friendly.",
+  "schema": 1,
+  "mode": "light",
+  "tokens": {
+    "nz-accent": "#00b86d",
+    "nz-accent-hot": "#008a52",
+    "nz-on-accent": "#fff",
+    "nz-accent-soft": "rgba(0, 184, 109, 0.14)",
+    "nz-accent-glow": "rgba(0, 184, 109, 0.28)",
+
+    "nz-brand-bright": "#1ad592",
+    "nz-brand-deep": "#08885a",
+    "nz-brand-glow": "rgba(8, 136, 90, 0.22)",
+
+    "nz-danger": "#c63a2a",
+
+    "nz-body-bg": "#f5f3ee",
+    "nz-bg-app": "rgba(252, 251, 249, 0.55)",
+    "nz-bg-sidebar": "rgba(250, 248, 244, 0.78)",
+    "nz-bg-main": "rgba(255, 254, 252, 0.82)",
+    "nz-bg-elev": "rgba(255, 255, 255, 0.96)",
+    "nz-bg-overlay": "rgba(255, 254, 252, 0.96)",
+    "nz-bg-hover": "rgba(20, 20, 22, 0.06)",
+    "nz-bg-active": "rgba(0, 184, 109, 0.26)",
+    "nz-bg-active-strong": "rgba(0, 184, 109, 0.36)",
+    "nz-bg-row": "rgba(255, 255, 255, 0.62)",
+
+    "nz-divider": "rgba(20, 20, 22, 0.08)",
+    "nz-divider-strong": "rgba(20, 20, 22, 0.14)",
+
+    "nz-text": "#18181b",
+    "nz-text-strong": "#0a0a0c",
+    "nz-text-muted": "rgba(24, 24, 27, 0.62)",
+    "nz-text-faint": "rgba(24, 24, 27, 0.38)",
+    "nz-text-whisper": "rgba(24, 24, 27, 0.22)",
+
+    "nz-selection": "rgba(0, 184, 109, 0.32)",
+
+    "nz-shadow-sm": "0 1px 2px rgba(0, 0, 0, 0.05), 0 1px 1px rgba(0, 0, 0, 0.04)",
+    "nz-shadow": "0 12px 36px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.05)",
+    "nz-shadow-lg": "0 28px 80px rgba(0, 0, 0, 0.22), 0 6px 18px rgba(0, 0, 0, 0.08)",
+
+    "nz-scrollbar": "rgba(20, 20, 22, 0.14)",
+    "nz-scrollbar-hover": "rgba(20, 20, 22, 0.28)",
+
+    "nz-mark": "#b6f5d4",
+
+    "nz-mention-text": "#006b3f",
+    "nz-mention-bg": "rgba(0, 184, 109, 0.12)",
+    "nz-mention-border": "rgba(0, 184, 109, 0.32)",
+    "nz-mention-bg-hover": "rgba(0, 184, 109, 0.22)",
+
+    "nz-focus-ring": "rgba(0, 184, 109, 0.55)",
+
+    "nz-checkbox-fill": "#ffffff",
+
+    "nz-diff-add-bg": "rgba(45, 164, 78, 0.1)",
+    "nz-diff-add-border": "#2da44e",
+    "nz-diff-remove-bg": "rgba(213, 74, 58, 0.1)",
+    "nz-diff-remove-border": "#c63a2a",
+    "nz-diff-add-bg-strong": "rgba(45, 164, 78, 0.3)",
+    "nz-diff-add-fg-strong": "#0a3a18",
+    "nz-diff-remove-bg-strong": "rgba(213, 74, 58, 0.28)",
+    "nz-diff-remove-fg-strong": "#6b1d14"
+  }
+}

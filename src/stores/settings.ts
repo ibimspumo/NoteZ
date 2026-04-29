@@ -3,27 +3,35 @@
 
 import { listen } from "@tauri-apps/api/event";
 import { createSignal } from "solid-js";
+import { applyTheme } from "../lib/applyTheme";
 import {
   DEFAULT_SIDEBAR_PREVIEW_LINES as DEFAULT_SIDEBAR_PREVIEW_LINES_C,
   DEFAULT_TRASH_RETENTION_DAYS,
 } from "../lib/constants";
 import { api } from "../lib/tauri";
+import {
+  BUILTIN_THEMES,
+  BUILTIN_THEME_IDS,
+  DEFAULT_THEME_ID,
+  getBuiltin,
+} from "../themes";
 
-export type ColorMode = "default" | "mono";
 export type SidebarPreviewLines = 0 | 1 | 2;
 
 const KEY_TRASH_RETENTION = "trash_retention_days";
-const KEY_COLOR_MODE = "color_mode";
+const KEY_THEME_ID = "theme_id";
+/** Legacy key from before the theme system. We migrate `mono` -> theme_id `mono`,
+ * everything else -> theme_id `default`. Read-only - never written from new code. */
+const KEY_COLOR_MODE_LEGACY = "color_mode";
 const KEY_SIDEBAR_PREVIEW_LINES = "sidebar_preview_lines";
 
 const DEFAULT_TRASH_RETENTION = DEFAULT_TRASH_RETENTION_DAYS;
-const DEFAULT_COLOR_MODE: ColorMode = "default";
 const DEFAULT_SIDEBAR_PREVIEW_LINES: SidebarPreviewLines =
   DEFAULT_SIDEBAR_PREVIEW_LINES_C as SidebarPreviewLines;
 
 const [trashRetentionDays, setTrashRetentionDaysSig] =
   createSignal<number>(DEFAULT_TRASH_RETENTION);
-const [colorMode, setColorModeSig] = createSignal<ColorMode>(DEFAULT_COLOR_MODE);
+const [themeId, setThemeIdSig] = createSignal<string>(DEFAULT_THEME_ID);
 const [sidebarPreviewLines, setSidebarPreviewLinesSig] = createSignal<SidebarPreviewLines>(
   DEFAULT_SIDEBAR_PREVIEW_LINES,
 );
@@ -36,7 +44,7 @@ const [loaded, setLoaded] = createSignal(false);
 
 export {
   trashRetentionDays,
-  colorMode,
+  themeId,
   sidebarPreviewLines,
   quickCaptureShortcut,
   commandBarShortcut,
@@ -46,10 +54,16 @@ export {
   loaded as settingsLoaded,
 };
 
-function applyColorModeClass(mode: ColorMode) {
-  const root = document.documentElement;
-  if (mode === "mono") root.classList.add("nz-mono");
-  else root.classList.remove("nz-mono");
+/** All themes available to the picker. Phase 1: built-ins only. Phase 2 will
+ * merge user-imported themes loaded from disk. */
+export function listAvailableThemes() {
+  return BUILTIN_THEMES;
+}
+
+function applyThemeById(id: string) {
+  // Built-ins only in Phase 1. Unknown id falls back to default.
+  const theme = getBuiltin(id) ?? getBuiltin(DEFAULT_THEME_ID);
+  if (theme) applyTheme(theme);
 }
 
 let inFlight: Promise<void> | null = null;
@@ -101,10 +115,21 @@ async function loadSettingsImpl() {
     Number.isFinite(retention) && retention >= 0 ? retention : DEFAULT_TRASH_RETENTION,
   );
 
-  const modeRaw = map.get(KEY_COLOR_MODE);
-  const mode: ColorMode = modeRaw === "mono" ? "mono" : "default";
-  setColorModeSig(mode);
-  applyColorModeClass(mode);
+  // Theme: prefer the new key, fall back to the legacy color_mode for users
+  // who upgraded across the rename. Mono is the only legacy non-default value.
+  const themeIdRaw = map.get(KEY_THEME_ID);
+  const legacyMode = map.get(KEY_COLOR_MODE_LEGACY);
+  let resolvedThemeId = DEFAULT_THEME_ID;
+  if (themeIdRaw && BUILTIN_THEME_IDS.has(themeIdRaw)) {
+    resolvedThemeId = themeIdRaw;
+  } else if (themeIdRaw) {
+    // Custom theme id - Phase 2 will resolve from disk; for now fall back.
+    resolvedThemeId = DEFAULT_THEME_ID;
+  } else if (legacyMode === "mono") {
+    resolvedThemeId = "mono";
+  }
+  setThemeIdSig(resolvedThemeId);
+  applyThemeById(resolvedThemeId);
 
   const linesRaw = map.get(KEY_SIDEBAR_PREVIEW_LINES);
   const lines = parseSidebarPreviewLines(linesRaw);
@@ -148,10 +173,10 @@ export async function setTrashRetentionDays(days: number) {
   setTrashRetentionDaysSig(clean);
 }
 
-export async function setColorMode(mode: ColorMode) {
-  await api.setSetting(KEY_COLOR_MODE, mode);
-  setColorModeSig(mode);
-  applyColorModeClass(mode);
+export async function setActiveTheme(id: string) {
+  await api.setSetting(KEY_THEME_ID, id);
+  setThemeIdSig(id);
+  applyThemeById(id);
 }
 
 export async function setSidebarPreviewLines(lines: SidebarPreviewLines) {

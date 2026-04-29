@@ -99,7 +99,12 @@ pub const DB_BUSY_TIMEOUT_SECS: u64 = 5;
 // rejected at the IPC boundary as defense-in-depth.
 
 pub const SETTING_TRASH_RETENTION: &str = "trash_retention_days";
-pub const SETTING_COLOR_MODE: &str = "color_mode";
+/// Active theme id. Built-in: "default", "light", "mono". Custom themes
+/// (Phase 2) will use UUIDs that resolve against on-disk `.nzt` files.
+pub const SETTING_THEME_ID: &str = "theme_id";
+/// Legacy: pre-theme-system "color_mode" with values "default" | "mono".
+/// Read at startup as a migration fallback when `theme_id` is absent.
+pub const SETTING_COLOR_MODE_LEGACY: &str = "color_mode";
 pub const SETTING_SIDEBAR_PREVIEW_LINES: &str = "sidebar_preview_lines";
 pub const SETTING_QUICK_CAPTURE: &str = "shortcut_quick_capture";
 pub const SETTING_COMMAND_BAR: &str = "shortcut_command_bar";
@@ -112,12 +117,16 @@ pub const SETTING_OPENROUTER_KEY_LEGACY: &str = "openrouter_api_key";
 /// otherwise. Lets the UI render the "Stored / Clear" state without an
 /// IPC roundtrip per render.
 pub const SETTING_OPENROUTER_KEY_PRESENT: &str = "openrouter_api_key_present";
+/// Serialized pane-tree layout + active-pane id, so the app reopens with the
+/// same split topology and last-focused note.
+pub const SETTING_PANES_LAYOUT: &str = "panes:layout";
 
 /// All known top-level setting keys. The allowlist in `set_setting` accepts
 /// either an exact match here or a recognized dynamic prefix (`cursor:`).
 pub const KNOWN_SETTING_KEYS: &[&str] = &[
     SETTING_TRASH_RETENTION,
-    SETTING_COLOR_MODE,
+    SETTING_THEME_ID,
+    SETTING_COLOR_MODE_LEGACY,
     SETTING_SIDEBAR_PREVIEW_LINES,
     SETTING_QUICK_CAPTURE,
     SETTING_COMMAND_BAR,
@@ -125,6 +134,7 @@ pub const KNOWN_SETTING_KEYS: &[&str] = &[
     SETTING_AI_MODEL,
     SETTING_OPENROUTER_KEY_LEGACY,
     SETTING_OPENROUTER_KEY_PRESENT,
+    SETTING_PANES_LAYOUT,
 ];
 
 /// Dynamic keys that match a prefix. The remainder is opaque (a UUID for

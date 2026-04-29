@@ -132,9 +132,16 @@ export function $isMentionNode(node: LexicalNode | null | undefined): node is Me
   return node instanceof MentionNode;
 }
 
+export type MentionClickOpts = {
+  /** True when the user held the platform mod key (⌘ on mac, Ctrl elsewhere)
+   *  - request to open the note in a new right-split pane instead of the
+   *  active pane, mirroring ⌘D. */
+  split: boolean;
+};
+
 export function attachMentionClickHandler(
   rootEl: HTMLElement,
-  onClick: (noteId: string) => void,
+  onClick: (noteId: string, opts: MentionClickOpts) => void,
 ): () => void {
   const handler = (e: MouseEvent) => {
     const target = e.target as HTMLElement | null;
@@ -145,7 +152,7 @@ export function attachMentionClickHandler(
     if (!noteId) return;
     e.preventDefault();
     e.stopPropagation();
-    onClick(noteId);
+    onClick(noteId, { split: e.metaKey || e.ctrlKey });
   };
   rootEl.addEventListener("click", handler);
   return () => rootEl.removeEventListener("click", handler);

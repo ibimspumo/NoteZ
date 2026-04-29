@@ -183,19 +183,13 @@
 }
 
 .nz-diff-stat-add {
-  color: #2da44e;
+  color: var(--nz-diff-add-border);
   font-weight: 600;
 }
 
 .nz-diff-stat-remove {
-  color: var(--nz-danger);
+  color: var(--nz-diff-remove-border);
   font-weight: 600;
-}
-
-@media (prefers-color-scheme: dark) {
-  .nz-diff-stat-add {
-    color: #3fb950;
-  }
 }
 
 .nz-diff-mode {
@@ -245,103 +239,42 @@
 
 /* ─── Line-level highlights ────────────────────────────────────────────── */
 
-/* Light mode: GitHub's classic palette - greens for additions, reds for
- * removals, both with a desaturated tint that stays readable on a
- * monochrome printer too. */
+/* Diff colors are *semantic* (green = added, red = removed) so they stay
+ * colored even in monochrome themes. Each theme provides its own
+ * `--nz-diff-*` palette; the mono theme keeps the same green/red as the
+ * default-dark theme rather than washing them out. */
 .nz-diff-row-add {
-  background: rgba(45, 164, 78, 0.1);
-  border-left-color: #2da44e;
+  background: var(--nz-diff-add-bg);
+  border-left-color: var(--nz-diff-add-border);
 }
 
 .nz-diff-row-remove {
-  background: rgba(213, 74, 58, 0.1);
-  border-left-color: var(--nz-danger);
+  background: var(--nz-diff-remove-bg);
+  border-left-color: var(--nz-diff-remove-border);
 }
 
 .nz-diff-row-context {
   color: var(--nz-text-muted);
 }
 
-@media (prefers-color-scheme: dark) {
-  .nz-diff-row-add {
-    background: rgba(63, 185, 80, 0.14);
-    border-left-color: #3fb950;
-  }
-  .nz-diff-row-remove {
-    background: rgba(248, 81, 73, 0.14);
-    border-left-color: #f85149;
-  }
-}
-
-/* Mono mode keeps the diff colored. The whole-app mono palette strips green
- * because the accent is *decorative*; here it's *semantic* (red=removed,
- * green=added) and washing it out would actively harm readability. The mono
- * override therefore only applies to chrome (sidebar, badges, etc.), never
- * to the diff payload. We re-state the dark-mode palette explicitly here so
- * it wins over any cascading mono override on parent variables. */
-:root.nz-mono .nz-diff-row-add {
-  background: rgba(63, 185, 80, 0.16);
-  border-left-color: #3fb950;
-}
-
-:root.nz-mono .nz-diff-row-remove {
-  background: rgba(248, 81, 73, 0.16);
-  border-left-color: #f85149;
-}
-
-/* The diff stat counts in the meta header should also stay color-coded. */
-:root.nz-mono .nz-diff-stat-add {
-  color: #3fb950;
-}
-
-:root.nz-mono .nz-diff-stat-remove {
-  color: #f85149;
-}
-
 /* ─── Word-level highlights inside changed lines ───────────────────────── */
 
 .nz-diff-word-add {
-  background: rgba(45, 164, 78, 0.3);
-  color: #0a3a18;
+  background: var(--nz-diff-add-bg-strong);
+  color: var(--nz-diff-add-fg-strong);
   border-radius: 2px;
   padding: 0 1px;
   margin: 0 -1px;
 }
 
 .nz-diff-word-remove {
-  background: rgba(213, 74, 58, 0.28);
-  color: #6b1d14;
+  background: var(--nz-diff-remove-bg-strong);
+  color: var(--nz-diff-remove-fg-strong);
   border-radius: 2px;
   padding: 0 1px;
   margin: 0 -1px;
   text-decoration: line-through;
-  text-decoration-color: rgba(107, 29, 20, 0.4);
-}
-
-@media (prefers-color-scheme: dark) {
-  .nz-diff-word-add {
-    background: rgba(63, 185, 80, 0.32);
-    color: #aff5b4;
-  }
-  .nz-diff-word-remove {
-    background: rgba(248, 81, 73, 0.28);
-    color: #ffd7d3;
-    text-decoration-color: rgba(255, 215, 211, 0.5);
-  }
-}
-
-/* Word-level highlights in mono mode: keep the green/red semantics, same
- * reasoning as the line-level rule above. */
-:root.nz-mono .nz-diff-word-add {
-  background: rgba(63, 185, 80, 0.32);
-  color: #aff5b4;
-}
-
-:root.nz-mono .nz-diff-word-remove {
-  background: rgba(248, 81, 73, 0.28);
-  color: #ffd7d3;
-  text-decoration: line-through;
-  text-decoration-color: rgba(255, 215, 211, 0.5);
+  text-decoration-color: currentColor;
 }
 
 .nz-diff-empty {

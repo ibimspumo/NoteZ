@@ -11,7 +11,11 @@ import {
   loadEditorStateFromJSON,
 } from "./lexical/createEditor";
 import { collectAssetIds } from "./lexical/imageNode";
-import { attachMentionClickHandler, collectMentionTargets } from "./lexical/mentionNode";
+import {
+  type MentionClickOpts,
+  attachMentionClickHandler,
+  collectMentionTargets,
+} from "./lexical/mentionNode";
 import { type MentionMatch, insertMention, registerMentionPlugin } from "./lexical/mentionPlugin";
 import {
   type SerializedSelection,
@@ -38,7 +42,7 @@ type EditorProps = {
   noteId: string;
   initialJson: string;
   onChange: (change: EditorChange) => void;
-  onOpenNote: (noteId: string) => void;
+  onOpenNote: (noteId: string, opts?: MentionClickOpts) => void;
   onReady?: (editor: LexicalEditor | null) => void;
 };
 
@@ -79,8 +83,8 @@ export const Editor: Component<EditorProps> = (props) => {
     editorRef = handles.editor;
     props.onReady?.(handles.editor);
 
-    const cleanupClick = attachMentionClickHandler(containerRef, (id) => {
-      props.onOpenNote(id);
+    const cleanupClick = attachMentionClickHandler(containerRef, (id, opts) => {
+      props.onOpenNote(id, opts);
     });
 
     const cleanupMentions = registerMentionPlugin(handles.editor, {

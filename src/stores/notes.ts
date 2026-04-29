@@ -1,5 +1,6 @@
 import { batch, createMemo, createSignal } from "solid-js";
 import { createStore, produce } from "solid-js/store";
+import { bucketFor } from "../lib/buckets";
 import {
   ITEMS_SLIDING_WINDOW_KEEP,
   ITEMS_SLIDING_WINDOW_MAX,
@@ -16,6 +17,7 @@ import type {
   TrashSummary,
   UpdateNoteInput,
 } from "../lib/types";
+import { activePaneNoteId, openNoteInActivePane, openNoteInPane, paneForNote } from "./panes";
 
 /**
  * Notes store. Two key invariants:
@@ -59,6 +61,32 @@ const [state, setState] = createStore<NotesState>({
 const cache = new LRU<string, Note>(NOTE_CACHE_MAX);
 
 export const notesState = state;
+
+// Brief "just moved" flag used by the sidebar to play a small highlight
+// animation on a row whose bucket or position changed during a save. Set
+// from updateNote and auto-cleared after the animation duration. Single-id
+// state - if a second note moves while the first is still highlighted, the
+// flag jumps to the new id and the previous row's animation aborts; that's
+// fine because the user only sees one save per keystroke burst per note.
+const [recentlyMovedId, setRecentlyMovedId] = createSignal<string | null>(null);
+let recentlyMovedTimer: number | null = null;
+const MOVED_FLASH_MS = 600;
+
+export const recentlyMovedNoteId = recentlyMovedId;
+
+function flashMoved(id: string) {
+  if (recentlyMovedTimer != null) clearTimeout(recentlyMovedTimer);
+  // Re-set in two ticks so the animation restarts cleanly when the same
+  // note moves again before its previous flash finished.
+  setRecentlyMovedId(null);
+  queueMicrotask(() => {
+    setRecentlyMovedId(id);
+    recentlyMovedTimer = window.setTimeout(() => {
+      setRecentlyMovedId(null);
+      recentlyMovedTimer = null;
+    }, MOVED_FLASH_MS);
+  });
+}
 
 /** First-page load. Replaces both pinned + items. */
 export async function refreshNotes() {
@@ -123,7 +151,7 @@ export async function loadMoreNotes() {
         s.nextCursor = page.next_cursor;
       }),
     );
-  } finally {
+    } finally {
     setState("loadingMore", false);
   }
 }
@@ -177,6 +205,7 @@ export async function createNote(): Promise<Note> {
 export async function updateNote(input: UpdateNoteInput): Promise<Note> {
   const note = await api.updateNote(input);
   cache.set(note.id, note);
+  let movedOrRebucketed = false;
   setState(
     produce((s) => {
       const list = note.is_pinned ? s.pinned : s.items;
@@ -191,6 +220,13 @@ export async function updateNote(input: UpdateNoteInput): Promise<Note> {
       // every reactive read of its updated_at sees the new value.
       const item = list[idx];
       const newPreview = shortPreview(note.content_text);
+      // Compare buckets BEFORE we overwrite updated_at so we still flash
+      // the row when the only change is a bucket transition (e.g. the
+      // single Yesterday note rolling into Today at idx 0, where the
+      // splice/unshift below is skipped).
+      const bucketChanged =
+        !note.is_pinned &&
+        bucketFor(item.updated_at, new Date()) !== bucketFor(note.updated_at, new Date());
       if (item.title !== note.title) item.title = note.title;
       if (item.preview !== newPreview) item.preview = newPreview;
       if (item.is_pinned !== note.is_pinned) item.is_pinned = note.is_pinned;
@@ -205,9 +241,13 @@ export async function updateNote(input: UpdateNoteInput): Promise<Note> {
       if (!note.is_pinned && idx > 0) {
         list.splice(idx, 1);
         list.unshift(item);
+        movedOrRebucketed = true;
+      } else if (bucketChanged) {
+        movedOrRebucketed = true;
       }
     }),
   );
+  if (movedOrRebucketed) flashMoved(note.id);
   return note;
 }
 
@@ -240,6 +280,10 @@ export async function softDeleteNote(id: string): Promise<void> {
   const prev = state.pinned.find((n) => n.id === id) ?? state.items.find((n) => n.id === id);
   await api.softDeleteNote(id);
   cache.delete(id);
+  // Clear any pane showing this note so its editor doesn't keep saving into
+  // a trashed row. Same-note guard means at most one pane references the id.
+  const showingPane = paneForNote(id);
+  if (showingPane) openNoteInPane(showingPane, null);
   const deletedAt = new Date().toISOString();
   setState(
     produce((s) => {
@@ -337,15 +381,18 @@ function shortPreview(text: string): string {
   return `${oneLine.slice(0, 140)}…`;
 }
 
-const [selectedNoteId, setSelectedNoteIdRaw] = createSignal<string | null>(null);
-
-export const selectedId = selectedNoteId;
+/** "Selected note" is now derived from the active pane in the panes store -
+ *  there's no longer a separate top-level signal. Existing consumers keep
+ *  using `selectedId()` / `setSelectedId(id)` and these route through the
+ *  active pane. Setting null clears the active pane (used after deleting the
+ *  last note). */
+export const selectedId = activePaneNoteId;
 export function setSelectedId(id: string | null) {
-  setSelectedNoteIdRaw(id);
+  openNoteInActivePane(id);
 }
 
 export const selectedNoteSummary = createMemo(() => {
-  const id = selectedNoteId();
+  const id = activePaneNoteId();
   if (!id) return undefined;
   return state.pinned.find((n) => n.id === id) ?? state.items.find((n) => n.id === id);
 });
@@ -353,22 +400,22 @@ export const selectedNoteSummary = createMemo(() => {
 export function selectFirstAvailable(): string | null {
   const first = state.pinned[0] ?? state.items[0];
   if (first) {
-    setSelectedNoteIdRaw(first.id);
+    openNoteInActivePane(first.id);
     return first.id;
   }
-  setSelectedNoteIdRaw(null);
+  openNoteInActivePane(null);
   return null;
 }
 
 export async function ensureSelection(): Promise<string | null> {
-  const id = selectedNoteId();
+  const id = activePaneNoteId();
   if (id && (state.pinned.some((n) => n.id === id) || state.items.some((n) => n.id === id))) {
     return id;
   }
   if (state.pinned.length === 0 && state.items.length === 0) {
     const note = await createNote();
     batch(() => {
-      setSelectedNoteIdRaw(note.id);
+      openNoteInActivePane(note.id);
     });
     return note.id;
   }

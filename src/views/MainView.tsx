@@ -1,33 +1,43 @@
-import type { LexicalEditor } from "lexical";
-import { type Component, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
+import { type Component, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { CommandBar } from "../components/CommandBar/CommandBar";
 import { DevPanel } from "../components/DevPanel";
-import { Editor, type EditorChange } from "../components/Editor/Editor";
 import { EditorToolbar } from "../components/Editor/Toolbar";
+import { PaneTree } from "../components/Pane/PaneTree";
 import { Sidebar } from "../components/Sidebar/Sidebar";
 import { SnapshotsDialog } from "../components/SnapshotsDialog";
 import { HistoryIcon, SidebarIcon } from "../components/icons";
-import { formatAbsoluteDate, formatRelative } from "../lib/format";
-import { onEvent } from "../lib/tauri";
-import { api } from "../lib/tauri";
-import type { Note } from "../lib/types";
-import { nowTick } from "../stores/clock";
+import { matchHotkey } from "../lib/keymap";
+import { api, onEvent } from "../lib/tauri";
 import {
   createNote,
   ensureSelection,
   getCachedNote,
   loadMoreNotes,
-  loadNote,
   notesState,
   patchCachedNote,
   refreshNotes,
-  reloadNote,
   selectedId,
   setSelectedId,
   softDeleteNote,
   togglePin,
   updateNote,
 } from "../stores/notes";
+import {
+  activeApi,
+  activeEditor,
+  activePaneId,
+  closePane,
+  panes,
+  panesState,
+  setActivePaneId,
+  splitPane,
+  totalPaneCount,
+} from "../stores/panes";
+import {
+  loadLayout,
+  restoreLayoutFromSettings,
+  scheduleLayoutPersist,
+} from "../stores/panesPersist";
 import { loadSettings, trashRetentionDays } from "../stores/settings";
 import {
   closeCommandBar,
@@ -39,50 +49,47 @@ import {
   toggleSidebar,
 } from "../stores/ui";
 import { SettingsView } from "./SettingsView";
-import { useSavePipeline } from "./useSavePipeline";
 import { useShortcuts } from "./useShortcuts";
 
 export const MainView: Component = () => {
-  const [activeNote, setActiveNote] = createSignal<Note | null>(null);
-  const [editorKey, setEditorKey] = createSignal(0);
-  const [editorInstance, setEditorInstance] = createSignal<LexicalEditor | null>(null);
-  const [devPanelOpen, setDevPanelOpen] = createSignal(false);
   const [snapshotsOpen, setSnapshotsOpen] = createSignal(false);
+  const [devPanelOpen, setDevPanelOpen] = createSignal(false);
 
-  const save = useSavePipeline({
-    onSaved: (updated) => {
-      const current = activeNote();
-      if (current && current.id === updated.id) setActiveNote(updated);
-    },
-  });
+  const savingState = createMemo(() => activeApi()?.savingState() ?? "idle");
+  const layoutRoot = createMemo(() => panesState.root);
 
-  const handleChange = (change: EditorChange) => {
-    const id = selectedId();
-    if (!id) return;
-    save.markDirty(id, change.snapshot);
+  const flushIfPending = async () => {
+    const a = activeApi();
+    if (a?.hasPendingSave()) await a.flushSave();
   };
 
-  const handleOpenNote = async (id: string) => {
-    if (save.hasPending()) await save.flush();
+  const handleOpenNote = async (id: string, opts?: { split: boolean }) => {
+    await flushIfPending();
     closeSettings();
+    if (opts?.split) {
+      // ⌘/Ctrl+click on a mention: open the linked note in a new right-split
+      // pane, mirroring ⌘D. splitPane's same-note guard focuses an existing
+      // pane if the note is already open elsewhere.
+      splitPane(activePaneId(), "right", id);
+      return;
+    }
     setSelectedId(id);
   };
 
   const handleCreateNote = async () => {
-    await save.flush();
+    await activeApi()?.flushSave();
     closeSettings();
     const note = await createNote();
-    save.resetBaseline(note.id, note.content_json);
+    activeApi()?.resetBaseline(note.id, note.content_json);
     setSelectedId(note.id);
   };
 
   const handleCreateWithTitle = async (title: string) => {
-    await save.flush();
+    await activeApi()?.flushSave();
     closeSettings();
     const note = await createNote();
-    save.resetBaseline(note.id, note.content_json);
+    activeApi()?.resetBaseline(note.id, note.content_json);
     setSelectedId(note.id);
-    // Inject title via a fresh editor state - easiest is to call updateNote with title-only state.
     const initialJson = {
       root: {
         children: [
@@ -124,31 +131,18 @@ export const MainView: Component = () => {
       asset_ids: [],
     });
     patchCachedNote(updated);
-    setActiveNote(updated);
-    save.resetBaseline(note.id, json);
-    setEditorKey((k) => k + 1);
+    activeApi()?.applyExternalUpdate(updated);
   };
 
-  /** After a snapshot restores onto a note, reload that note from the DB and
-   *  remount the editor with the post-restore content. Cache + sidebar
-   *  summary are patched too so the user doesn't see stale title/preview. */
   const handleSnapshotRestored = async (noteId: string) => {
-    // Cancel any in-flight save for the previous (now-stale) editor state.
-    // The restore replaced what was on disk; we don't want a debounced save
-    // of the pre-restore state to land afterwards and clobber it.
-    await save.flush();
-    const note = await reloadNote(noteId);
-    if (selectedId() === noteId) {
-      setActiveNote(note);
-      save.resetBaseline(note.id, note.content_json);
-      setEditorKey((k) => k + 1);
-    }
+    const a = activeApi();
+    if (a) await a.reloadFromBackend(noteId);
   };
 
   const handleTogglePin = async (id: string) => {
     await togglePin(id);
     const cached = getCachedNote(id);
-    if (cached && activeNote()?.id === id) setActiveNote(cached);
+    if (cached) activeApi()?.syncActiveNote(cached);
   };
 
   /** Move the sidebar selection by `step` rows. Wraps the combined
@@ -159,84 +153,68 @@ export const MainView: Component = () => {
     const cur = selectedId();
     const idx = cur ? all.findIndex((n) => n.id === cur) : -1;
     let next = idx + step;
-    // Clamp instead of wrap - wrapping at the bottom would teleport the user
-    // back to the pinned section, which is disorienting.
     if (next < 0) next = 0;
     if (next > all.length - 1) next = all.length - 1;
     void handleOpenNote(all[next].id);
   };
 
   const handleDelete = async (id: string) => {
-    if (save.hasPending()) await save.flush();
+    await flushIfPending();
     await softDeleteNote(id);
     if (selectedId() === id) {
       const next = notesState.pinned[0]?.id ?? notesState.items[0]?.id ?? null;
       if (next) {
         setSelectedId(next);
+      } else if (notesState.nextCursor) {
+        await loadMoreNotes();
+        setSelectedId(notesState.items[0]?.id ?? null);
       } else {
-        // No notes left in the loaded prefix - try to fetch the next page
-        // before giving up, in case there are more behind the cursor.
-        if (notesState.nextCursor) {
-          await loadMoreNotes();
-          setSelectedId(notesState.items[0]?.id ?? null);
-        } else {
-          setSelectedId(null);
-        }
+        setSelectedId(null);
       }
     }
   };
 
+  const splitActivePane = (side: "right" | "bottom") => {
+    splitPane(activePaneId(), side, null);
+  };
+
+  const closeActivePane = () => {
+    if (totalPaneCount() <= 1) return;
+    closePane(activePaneId());
+  };
+
+  const focusPaneByIndex = (n: number) => {
+    const list = panes();
+    const target = list[n - 1];
+    if (target) setActivePaneId(target.id);
+  };
+
   onMount(async () => {
-    // Load user settings first so the trash purge uses the configured retention.
-    await loadSettings().catch((e) => {
-      console.warn("loadSettings failed:", e);
-    });
-    // Trash auto-expiry: 0 means "never auto-delete".
+    await loadSettings().catch((e) => console.warn("loadSettings failed:", e));
     const days = trashRetentionDays();
     if (days > 0) {
-      api.purgeOldTrash(days).catch((e) => {
-        console.warn("purge_old_trash failed:", e);
-      });
+      api.purgeOldTrash(days).catch((e) => console.warn("purge_old_trash failed:", e));
     }
     await refreshNotes();
+    // Restore the saved layout BEFORE ensureSelection so the layout drives the
+    // initial selection, not the other way around. References to deleted
+    // notes get nulled out by `restoreLayoutFromSettings`.
+    const saved = await loadLayout();
+    if (saved) restoreLayoutFromSettings(saved);
     await ensureSelection();
-  });
-
-  // Load note when selection changes.
-  createEffect(async () => {
-    const id = selectedId();
-    if (!id) {
-      setActiveNote(null);
-      setEditorInstance(null);
-      return;
-    }
-    // Wait for any save targeting the previous note to land before we hand the
-    // baseline over to the new one - otherwise the in-flight save could update
-    // the new note's baseline if its IPC resolves after this effect.
-    if (save.hasPending()) await save.flush();
-    const note = await loadNote(id);
-    setActiveNote(note);
-    save.resetBaseline(note.id, note.content_json);
-    setEditorKey((k) => k + 1);
+    // Subsequent layout mutations debounce-persist to the settings table.
+    scheduleLayoutPersist();
   });
 
   useShortcuts([
-    {
-      hotkey: { key: "k", mods: ["mod"] },
-      handler: () => {
-        openCommandBar();
-      },
-    },
+    { hotkey: { key: "k", mods: ["mod"] }, handler: () => openCommandBar() },
     {
       hotkey: { key: "n", mods: ["mod"] },
       handler: () => {
         void handleCreateNote();
       },
     },
-    {
-      hotkey: { key: "\\", mods: ["mod"] },
-      handler: () => toggleSidebar(),
-    },
+    { hotkey: { key: "\\", mods: ["mod"] }, handler: () => toggleSidebar() },
     {
       hotkey: { key: "p", mods: ["mod", "shift"] },
       handler: () => {
@@ -258,17 +236,12 @@ export const MainView: Component = () => {
         if (id) void handleDelete(id);
       },
     },
-    // ⌘⇧H: open snapshot history for the active note. Mirrors macOS Notes /
-    // browser conventions (Cmd-Y is taken by Lexical for redo).
     {
       hotkey: { key: "h", mods: ["mod", "shift"] },
       handler: () => {
         if (selectedId()) setSnapshotsOpen(true);
       },
     },
-    // Cmd-Up/Down: navigate the sidebar list without leaving the editor.
-    // Skipped if the user is mid-mention (`@…` popover catches up/down first
-    // because Lexical's KEY_ARROW commands run before window keydown).
     {
       hotkey: { key: "ArrowDown", mods: ["mod", "alt"] },
       handler: () => navigateSelection(1),
@@ -277,10 +250,28 @@ export const MainView: Component = () => {
       hotkey: { key: "ArrowUp", mods: ["mod", "alt"] },
       handler: () => navigateSelection(-1),
     },
-    // Dev-only: open the stress-test panel. The handler returns false in
-    // release so the keypress falls through to whatever else might use it.
+    // Splits: ⌘D right, ⌘⇧D down. New pane comes up empty - the picker is
+    // autofocused so the user keeps typing without an extra click.
+    {
+      hotkey: { key: "d", mods: ["mod"] },
+      handler: () => splitActivePane("right"),
+    },
     {
       hotkey: { key: "d", mods: ["mod", "shift"] },
+      handler: () => splitActivePane("bottom"),
+    },
+    // ⌘W: close active pane. Returns false (falls through) when there's only
+    // one pane left, so Tauri's window-close binding can still take it.
+    {
+      hotkey: { key: "w", mods: ["mod"] },
+      handler: () => {
+        if (totalPaneCount() <= 1) return false;
+        closeActivePane();
+      },
+    },
+    // Dev-only: stress-test panel.
+    {
+      hotkey: { key: "d", mods: ["mod", "shift", "alt"] },
       handler: () => {
         if (!import.meta.env.DEV) return false;
         setDevPanelOpen((v) => !v);
@@ -288,12 +279,27 @@ export const MainView: Component = () => {
     },
   ]);
 
+  // ⌘1..⌘9 focus pane N. One listener handles the whole range - cheaper than
+  // nine entries in `useShortcuts`.
+  onMount(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (totalPaneCount() <= 1) return;
+      for (let n = 1; n <= 9; n++) {
+        if (matchHotkey(e, { key: String(n), mods: ["mod"] })) {
+          e.preventDefault();
+          focusPaneByIndex(n);
+          return;
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    onCleanup(() => window.removeEventListener("keydown", onKey));
+  });
+
   onMount(async () => {
     const unlistenCmd = await onEvent("notez://global/command-bar", () => {
       openCommandBar();
     });
-    // Fired by the Quick Capture window after it persists a new note -
-    // refresh the sidebar so the entry shows up live.
     const unlistenChanged = await onEvent("notez://notes/changed", () => {
       void refreshNotes();
     });
@@ -319,17 +325,17 @@ export const MainView: Component = () => {
               <SidebarIcon />
             </button>
             <div class="nz-main-header-toolbar" data-tauri-drag-region>
-              <Show when={editorInstance()}>{(ed) => <EditorToolbar editor={ed()} />}</Show>
+              <Show when={activeEditor()}>{(ed) => <EditorToolbar editor={ed()} />}</Show>
             </div>
             <div
               class="nz-saving-indicator"
               data-tauri-drag-region
-              data-state={save.savingState()}
-              title={save.savingState() === "error" ? "Last save failed" : undefined}
+              data-state={savingState()}
+              title={savingState() === "error" ? "Last save failed" : undefined}
             >
-              <Show when={save.savingState() === "saving"}>Saving…</Show>
-              <Show when={save.savingState() === "saved"}>Saved</Show>
-              <Show when={save.savingState() === "error"}>Save failed</Show>
+              <Show when={savingState() === "saving"}>Saving…</Show>
+              <Show when={savingState() === "saved"}>Saved</Show>
+              <Show when={savingState() === "error"}>Save failed</Show>
             </div>
             <Show when={selectedId()}>
               <button
@@ -343,46 +349,13 @@ export const MainView: Component = () => {
               </button>
             </Show>
           </header>
-          <Show
-            when={activeNote()}
-            fallback={
-              <div class="nz-empty-editor">
-                <button class="nz-pill-btn primary" onClick={handleCreateNote}>
-                  Create your first note
-                </button>
-              </div>
-            }
-          >
-            {(note) => (
-              <div class="nz-editor-wrap">
-                <div class="nz-meta-bar">
-                  <span class="nz-meta-primary">{formatAbsoluteDate(note().created_at)}</span>
-                  <span class="nz-meta-dot" aria-hidden="true">
-                    ·
-                  </span>
-                  <span class="nz-meta-secondary">
-                    Last edited {formatRelative(note().updated_at, nowTick())}
-                  </span>
-                  <Show when={note().is_pinned}>
-                    <span class="nz-meta-dot" aria-hidden="true">
-                      ·
-                    </span>
-                    <span class="nz-meta-pin">Pinned</span>
-                  </Show>
-                </div>
-                {/* Re-mount editor on note change via key. */}
-                <div data-editor-key={editorKey()}>
-                  <Editor
-                    noteId={note().id}
-                    initialJson={note().content_json}
-                    onChange={handleChange}
-                    onOpenNote={handleOpenNote}
-                    onReady={setEditorInstance}
-                  />
-                </div>
-              </div>
-            )}
-          </Show>
+          <div class="nz-pane-host">
+            <PaneTree
+              node={layoutRoot()}
+              onOpenNote={handleOpenNote}
+              onCreate={handleCreateNote}
+            />
+          </div>
         </Show>
       </main>
       <CommandBar

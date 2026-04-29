@@ -10,8 +10,9 @@ mod setup;
 mod shortcuts;
 
 use std::path::PathBuf;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+use tauri_plugin_window_state::{AppHandleExt as _, StateFlags};
 
 use crate::constants::{
     SETTING_COMMAND_BAR, SETTING_OPENROUTER_KEY_LEGACY, SETTING_OPENROUTER_KEY_PRESENT,
@@ -259,6 +260,23 @@ pub fn run() {
             app.manage(ShortcutsState::new(qc_spec, cb_spec));
 
             crate::setup::install_window_chrome(app.handle());
+
+            // Flush the saved window-state to disk the moment the main window
+            // is closed. The plugin only writes on `RunEvent::Exit`, but on
+            // macOS the app doesn't exit while a hidden Quick Capture window
+            // is still around - so without this hook, a session that touched
+            // Quick Capture would never persist the main window's final size
+            // or position, and the next launch would restore stale geometry.
+            if let Some(main) = app.get_webview_window("main") {
+                let app_handle = app.handle().clone();
+                main.on_window_event(move |event| {
+                    if matches!(event, WindowEvent::CloseRequested { .. }) {
+                        if let Err(e) = app_handle.save_window_state(StateFlags::all()) {
+                            tracing::warn!("save_window_state on main close failed: {e}");
+                        }
+                    }
+                });
+            }
 
             // Register global shortcuts. If the user-configured one fails (e.g. another
             // app holds it), the warning is logged and in-app fallbacks still work.

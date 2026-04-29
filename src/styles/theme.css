@@ -1,16 +1,12 @@
+/* Non-themable base tokens. Spacing, type-scale, radii, animation
+ * durations, and font stacks are deliberately NOT in the theme contract -
+ * exposing them would let custom themes break component layout assumptions.
+ *
+ * Themable tokens (colors, shadows, etc.) are injected at runtime by
+ * `src/lib/applyTheme.ts` into a `<style id="nz-theme">` element. See
+ * `src/themes/contract.ts` for the full list. */
+
 :root {
-  --nz-accent: #00dc82;
-  --nz-accent-hot: #00c374;
-  --nz-on-accent: #fff;
-  --nz-accent-soft: rgba(0, 220, 130, 0.16);
-  --nz-accent-glow: rgba(0, 220, 130, 0.32);
-  --nz-danger: #d54a3a;
-
-  /* Brand mark dots — match the app icon. Two shades for depth. */
-  --nz-brand-bright: #1ad592;
-  --nz-brand-deep: #08885a;
-  --nz-brand-glow: rgba(26, 213, 146, 0.28);
-
   --nz-radius-sm: 6px;
   --nz-radius-md: 8px;
   --nz-radius-lg: 12px;
@@ -57,123 +53,9 @@
   --nz-font-mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --nz-bg-app: rgba(252, 251, 249, 0.0);
-    --nz-bg-sidebar: transparent;
-    --nz-bg-main: rgba(255, 254, 252, 0.55);
-    --nz-bg-elev: rgba(255, 255, 255, 0.88);
-    --nz-bg-overlay: rgba(255, 254, 252, 0.92);
-    --nz-bg-hover: rgba(20, 20, 22, 0.045);
-    --nz-bg-active: rgba(0, 220, 130, 0.14);
-    --nz-bg-active-strong: rgba(0, 220, 130, 0.22);
-    --nz-bg-row: rgba(255, 255, 255, 0.42);
-    --nz-divider: rgba(20, 20, 22, 0.07);
-    --nz-divider-strong: rgba(20, 20, 22, 0.13);
-    --nz-text: #18181b;
-    --nz-text-strong: #0a0a0c;
-    --nz-text-muted: rgba(24, 24, 27, 0.62);
-    --nz-text-faint: rgba(24, 24, 27, 0.38);
-    --nz-text-whisper: rgba(24, 24, 27, 0.22);
-    --nz-selection: rgba(0, 220, 130, 0.32);
-    --nz-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05), 0 1px 1px rgba(0, 0, 0, 0.04);
-    --nz-shadow: 0 12px 36px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.05);
-    --nz-shadow-lg: 0 28px 80px rgba(0, 0, 0, 0.22), 0 6px 18px rgba(0, 0, 0, 0.08);
-    --nz-scrollbar: rgba(20, 20, 22, 0.12);
-    --nz-scrollbar-hover: rgba(20, 20, 22, 0.24);
-    --nz-mark: #b6f5d4;
-    --nz-mention-text: #006b3f;
-    --nz-mention-bg: rgba(0, 220, 130, 0.12);
-    --nz-mention-border: rgba(0, 220, 130, 0.32);
-    --nz-mention-bg-hover: rgba(0, 220, 130, 0.2);
-    --nz-focus-ring: rgba(0, 220, 130, 0.55);
-    --nz-checkbox-fill: #08231a;
-  }
-}
-
-/* Monochrome mode — all greyscale, no green accent.
- * Forces dark colors regardless of the OS color scheme so users get the
- * "everything dark, nothing colorful" look they asked for. The class is
- * toggled on <html> by stores/settings.ts. */
-:root.nz-mono {
-  --nz-accent: #f4f4f5;
-  --nz-accent-hot: #fafafa;
-  --nz-on-accent: #0a0a0c;
-  --nz-accent-soft: rgba(255, 255, 255, 0.1);
-  --nz-accent-glow: rgba(255, 255, 255, 0.16);
-  --nz-danger: #c46a5e;
-
-  --nz-brand-bright: #d4d4d8;
-  --nz-brand-deep: #71717a;
-  --nz-brand-glow: rgba(255, 255, 255, 0.16);
-
-  --nz-bg-app: rgba(14, 14, 16, 0.0);
-  --nz-bg-sidebar: transparent;
-  --nz-bg-main: rgba(14, 14, 16, 0.55);
-  --nz-bg-elev: rgba(28, 28, 30, 0.94);
-  --nz-bg-overlay: rgba(22, 22, 24, 0.94);
-  --nz-bg-hover: rgba(255, 255, 255, 0.05);
-  --nz-bg-active: rgba(255, 255, 255, 0.1);
-  --nz-bg-active-strong: rgba(255, 255, 255, 0.16);
-  --nz-bg-row: rgba(255, 255, 255, 0.03);
-  --nz-divider: rgba(255, 255, 255, 0.06);
-  --nz-divider-strong: rgba(255, 255, 255, 0.12);
-  --nz-text: #ededee;
-  --nz-text-strong: #fafafa;
-  --nz-text-muted: rgba(237, 237, 238, 0.62);
-  --nz-text-faint: rgba(237, 237, 238, 0.4);
-  --nz-text-whisper: rgba(237, 237, 238, 0.22);
-  --nz-selection: rgba(255, 255, 255, 0.2);
-  --nz-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --nz-shadow: 0 14px 44px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.36);
-  --nz-shadow-lg: 0 28px 80px rgba(0, 0, 0, 0.78), 0 8px 22px rgba(0, 0, 0, 0.5);
-  --nz-scrollbar: rgba(255, 255, 255, 0.12);
-  --nz-scrollbar-hover: rgba(255, 255, 255, 0.28);
-  --nz-mark: rgba(255, 255, 255, 0.2);
-  --nz-mention-text: #ededee;
-  --nz-mention-bg: rgba(255, 255, 255, 0.08);
-  --nz-mention-border: rgba(255, 255, 255, 0.22);
-  --nz-mention-bg-hover: rgba(255, 255, 255, 0.14);
-  --nz-focus-ring: rgba(255, 255, 255, 0.42);
-  --nz-checkbox-fill: #1a1a1c;
-}
-
-/* Stronger background base for monochrome — apply to body so the overall app
- * skews darker than default dark mode. */
-:root.nz-mono body {
-  background-color: #0a0a0c;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --nz-bg-app: rgba(28, 28, 30, 0.0);
-    --nz-bg-sidebar: transparent;
-    --nz-bg-main: rgba(28, 28, 30, 0.5);
-    --nz-bg-elev: rgba(38, 38, 42, 0.94);
-    --nz-bg-overlay: rgba(34, 34, 38, 0.92);
-    --nz-bg-hover: rgba(255, 255, 255, 0.06);
-    --nz-bg-active: rgba(0, 220, 130, 0.18);
-    --nz-bg-active-strong: rgba(0, 220, 130, 0.26);
-    --nz-bg-row: rgba(255, 255, 255, 0.04);
-    --nz-divider: rgba(255, 255, 255, 0.07);
-    --nz-divider-strong: rgba(255, 255, 255, 0.14);
-    --nz-text: #f4f4f5;
-    --nz-text-strong: #fafafa;
-    --nz-text-muted: rgba(244, 244, 245, 0.62);
-    --nz-text-faint: rgba(244, 244, 245, 0.4);
-    --nz-text-whisper: rgba(244, 244, 245, 0.22);
-    --nz-selection: rgba(0, 220, 130, 0.34);
-    --nz-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --nz-shadow: 0 14px 44px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.3);
-    --nz-shadow-lg: 0 28px 80px rgba(0, 0, 0, 0.7), 0 8px 22px rgba(0, 0, 0, 0.45);
-    --nz-scrollbar: rgba(255, 255, 255, 0.14);
-    --nz-scrollbar-hover: rgba(255, 255, 255, 0.32);
-    --nz-mark: rgba(0, 220, 130, 0.32);
-    --nz-mention-text: #5fefac;
-    --nz-mention-bg: rgba(0, 220, 130, 0.16);
-    --nz-mention-border: rgba(0, 220, 130, 0.42);
-    --nz-mention-bg-hover: rgba(0, 220, 130, 0.26);
-    --nz-focus-ring: rgba(0, 220, 130, 0.6);
-    --nz-checkbox-fill: #062e1d;
-  }
+/* Body background is themable (the mono theme uses an opaque dark base
+ * because it doesn't want OS vibrancy bleeding through). The default and
+ * light themes set this to `transparent` so vibrancy works as before. */
+body {
+  background-color: var(--nz-body-bg, transparent);
 }

@@ -256,6 +256,12 @@ the `v` prefix), otherwise `tauri-action` fails the build.
 
 ## Don'ts
 
+- **Never start the dev server on your own.** Do not run `pnpm dev`,
+  `pnpm tauri dev`, or `preview_start` to "verify" a change unless the
+  user explicitly asks for it. The user runs the dev server themselves;
+  rely on `pnpm typecheck` and `cargo check` for verification, and
+  describe what to look for if a manual check is needed. This overrides
+  the generic preview/verification workflow for this repo.
 - **No `@lexical/react`.** Solid + React don't mix; vanilla-only.
 - **No `tauri-plugin-sql`.** We own the schema in Rust (richer than the plugin allows
   for FTS5 + ranking).

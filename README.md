@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.7.3-1f883d?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-0.8.0-1f883d?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/platform-macOS-1f883d?style=flat-square" alt="macOS" />
   <img src="https://img.shields.io/badge/storage-local%20only-1f883d?style=flat-square" alt="local-only" />
   <img src="https://img.shields.io/badge/telemetry-none-1f883d?style=flat-square" alt="no telemetry" />
@@ -58,6 +58,11 @@ the way.
 
 **Pin what matters.** Keep your most-used notes at the top of the sidebar.
 
+**Work side-by-side.** Drag a note from the sidebar onto an editor edge to
+split the view, or hit `Cmd+D` to open a fresh pane. Tile up to eight panes,
+resize the dividers, focus any pane with `Cmd+1..9`, and your layout
+restores itself the next time you launch.
+
 **Never lose a thought.** A global hotkey (`Cmd+Shift+N`) opens a tiny capture
 window from anywhere on your Mac. Type, press `Cmd+Enter`, and it's saved.
 
@@ -76,6 +81,10 @@ disappear. Plenty of time to change your mind.
 | `Cmd+N` | New note |
 | `Cmd+Shift+N` | Quick Capture (works system-wide) |
 | `Cmd+\` | Toggle sidebar |
+| `Cmd+D` | Split pane right |
+| `Cmd+Shift+D` | Split pane down |
+| `Cmd+W` | Close active pane |
+| `Cmd+1..9` | Focus pane by index |
 | `Cmd+Shift+P` | Pin or unpin current note |
 | `Cmd+Backspace` | Move note to Trash |
 | `@` | Open note-link suggestions |
@@ -121,13 +130,16 @@ you ever want to look inside.
 ## Roadmap
 
 **Now.** Editor, search, pinning, snapshots, mentions, quick capture, trash,
-images.
+images, split panes.
 
-**Next.** Split panes. Slash menu. Code blocks with syntax highlighting.
-Backlinks panel. Hashtag tags. Daily notes. Templates.
+**Next.** Slash menu. Code blocks with syntax highlighting. Backlinks panel.
+Hashtag tags. Daily notes. Templates. Note sharing via `notez://` deep links
+(no server, recipient also runs NoteZ).
 
 **Later.** Windows and Linux builds. Tables, callouts, LaTeX. End-to-end
-encrypted sync. Local semantic search. iOS companion.
+encrypted sync. Local semantic search. iOS companion. Optional cloud
+shortlinks for sharing with non-NoteZ users (E2E-encrypted, plan in
+[docs/sharing-plan.md](docs/sharing-plan.md)).
 
 ## Built with
 

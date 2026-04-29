@@ -8,7 +8,7 @@
 }
 
 .nz-meta-bar {
-  padding: 28px max(88px, calc((100% - 720px) / 2)) 0;
+  padding: 28px max(44px, calc((100% - 720px) / 2)) 0;
   font-size: 11px;
   color: var(--nz-text-whisper);
   letter-spacing: 0.02em;
@@ -108,7 +108,7 @@
 .nz-editor-content {
   outline: none;
   caret-color: var(--nz-accent-hot);
-  padding: 18px max(88px, calc((100% - 720px) / 2)) 56px;
+  padding: 18px max(44px, calc((100% - 720px) / 2)) 56px;
   font-family: var(--nz-font-ui);
   font-size: 16px;
   line-height: 1.65;
@@ -137,8 +137,8 @@
 .nz-editor-placeholder {
   position: absolute;
   top: 18px;
-  left: max(88px, calc((100% - 720px) / 2));
-  right: max(88px, calc((100% - 720px) / 2));
+  left: max(44px, calc((100% - 720px) / 2));
+  right: max(44px, calc((100% - 720px) / 2));
   font-size: 28px;
   font-weight: 700;
   letter-spacing: -0.024em;
@@ -147,6 +147,38 @@
   pointer-events: none;
   user-select: none;
   z-index: 1;
+}
+
+/* Container-query-driven side padding: tiled panes get less horizontal
+   inset as they shrink so the text doesn't disappear into a sliver. */
+@container nz-pane (max-width: 350px) {
+  .nz-meta-bar {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+  .nz-editor-content {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+  .nz-editor-placeholder {
+    left: 24px;
+    right: 24px;
+  }
+}
+
+@container nz-pane (max-width: 220px) {
+  .nz-meta-bar {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .nz-editor-content {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .nz-editor-placeholder {
+    left: 16px;
+    right: 16px;
+  }
 }
 
 .nz-paragraph {

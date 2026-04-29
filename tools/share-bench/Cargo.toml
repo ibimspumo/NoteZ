@@ -1,0 +1,17 @@
+[package]
+name = "share-bench"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+flate2 = "1"
+zstd = "0.13"
+brotli = "7"
+base64 = "0.22"
+z85 = "3"
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
+
+[profile.release]
+opt-level = 3
+lto = true
