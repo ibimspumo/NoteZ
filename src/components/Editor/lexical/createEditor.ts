@@ -263,7 +263,7 @@ function readParagraphIndent(el: HTMLElement): number {
     if (Number.isFinite(n) && n > 0) return n;
   }
   const padding = el.style.paddingInlineStart || el.style.paddingLeft;
-  if (padding && padding.endsWith("px")) {
+  if (padding?.endsWith("px")) {
     const px = Number.parseFloat(padding);
     if (Number.isFinite(px) && px > 0) return Math.round(px / 40);
   }

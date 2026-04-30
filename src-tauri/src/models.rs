@@ -161,9 +161,10 @@ pub struct Folder {
 ///  - `Inbox`   - only notes with `folder_id IS NULL`
 ///  - `Folder { id, include_descendants }` - notes in this folder and
 ///    optionally its descendant folders
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum FolderFilter {
+    #[default]
     All,
     Inbox,
     Folder {
@@ -171,12 +172,6 @@ pub enum FolderFilter {
         #[serde(default = "default_true")]
         include_descendants: bool,
     },
-}
-
-impl Default for FolderFilter {
-    fn default() -> Self {
-        FolderFilter::All
-    }
 }
 
 fn default_true() -> bool {
@@ -198,21 +193,16 @@ fn default_true() -> bool {
 ///    its descendant folders get soft-deleted (visible in Trash). All those
 ///    folders themselves are then removed. Treats the whole subtree as a
 ///    unit so the user doesn't end up with empty subfolders.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum DeleteFolderMode {
+    #[default]
     ReparentToParent,
     ReparentTo {
         #[serde(default)]
         folder_id: Option<String>,
     },
     TrashNotes,
-}
-
-impl Default for DeleteFolderMode {
-    fn default() -> Self {
-        Self::ReparentToParent
-    }
 }
 
 /// Returned by `save_asset` - what the editor needs to render the image.
