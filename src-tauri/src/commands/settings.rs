@@ -1,4 +1,6 @@
-use crate::constants::{KNOWN_SETTING_KEYS, KNOWN_SETTING_PREFIXES};
+use crate::constants::{
+    KNOWN_SETTING_KEYS, KNOWN_SETTING_PREFIXES, MAX_SETTING_KEY_BYTES, MAX_SETTING_VALUE_BYTES,
+};
 use crate::db::{now_iso, Db};
 use crate::error::{NoteZError, Result};
 use tauri::{AppHandle, State};
@@ -34,9 +36,21 @@ pub fn set_setting(
     key: String,
     value: String,
 ) -> Result<()> {
+    if key.len() > MAX_SETTING_KEY_BYTES {
+        return Err(NoteZError::InvalidInput(format!(
+            "setting key too long ({} bytes, max {MAX_SETTING_KEY_BYTES})",
+            key.len()
+        )));
+    }
     if !is_allowed_key(&key) {
         return Err(NoteZError::InvalidInput(format!(
             "setting key not allowed: {key}"
+        )));
+    }
+    if value.len() > MAX_SETTING_VALUE_BYTES {
+        return Err(NoteZError::InvalidInput(format!(
+            "setting value too large ({} bytes, max {MAX_SETTING_VALUE_BYTES})",
+            value.len()
         )));
     }
     let conn = db.conn()?;

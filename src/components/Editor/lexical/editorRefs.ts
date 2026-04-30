@@ -22,7 +22,14 @@
  * tracker GC'd when the editor goes away.
  */
 
-import { $getNodeByKey, type LexicalEditor, type NodeKey } from "lexical";
+import {
+  $getNodeByKey,
+  $getRoot,
+  $isElementNode,
+  type LexicalEditor,
+  type LexicalNode,
+  type NodeKey,
+} from "lexical";
 import { ImageNode } from "./imageNode";
 import { MentionNode } from "./mentionNode";
 
@@ -39,6 +46,9 @@ const trackers = new WeakMap<LexicalEditor, Tracker>();
  *
  * Call this once per editor instance, right after `createEditor` and the
  * initial `setRootElement`.
+ *
+ * Public-API only: we walk the tree from the root via `$getRoot()` +
+ * recursive descent, not the private `editorState._nodeMap`.
  */
 export function registerEditorRefs(editor: LexicalEditor): () => void {
   const t: Tracker = {
@@ -47,17 +57,22 @@ export function registerEditorRefs(editor: LexicalEditor): () => void {
   };
   trackers.set(editor, t);
 
-  // Seed: walk the current state once. We accept this O(n) cost only at
-  // editor creation - subsequent updates are incremental.
+  // Seed: walk the current state once. Mutation listeners only fire for
+  // nodes mutated AFTER registration, so existing nodes (e.g. when an
+  // editor state is loaded from JSON before this runs) need an explicit
+  // initial pass. O(n) but only at editor creation.
   editor.getEditorState().read(() => {
-    for (const key of editor.getEditorState()._nodeMap.keys()) {
-      const node = $getNodeByKey(key);
+    const visit = (node: LexicalNode) => {
       if (node instanceof MentionNode) {
-        t.mentions.set(key, node.getNoteId());
+        t.mentions.set(node.getKey(), node.getNoteId());
       } else if (node instanceof ImageNode) {
-        t.assets.set(key, node.getAssetId());
+        t.assets.set(node.getKey(), node.getAssetId());
       }
-    }
+      if ($isElementNode(node)) {
+        for (const child of node.getChildren()) visit(child);
+      }
+    };
+    visit($getRoot());
   });
 
   const offMention = editor.registerMutationListener(MentionNode, (mutated) => {

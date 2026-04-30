@@ -29,6 +29,13 @@ export type SavePipeline = {
   hasPending: () => boolean;
   /** Replace the "last saved" baseline - call after switching notes so the diff check is accurate. */
   resetBaseline: (noteId: string, json: string) => void;
+  /**
+   * Cancel any pending save without flushing. Used when the underlying note
+   * is going away (soft-delete, purge) and a pending save would write to a
+   * row that no longer exists, surfacing as a NotFound error toast. The
+   * editor's update listener will quiesce on the same lifecycle event.
+   */
+  cancelPending: (noteId?: string) => void;
 };
 
 /**
@@ -211,6 +218,18 @@ export function useSavePipeline(opts: {
     debouncedSave.cancel();
   };
 
+  const cancelPending: SavePipeline["cancelPending"] = (noteId) => {
+    // If a noteId filter is supplied, only cancel when the pipeline is
+    // currently aimed at that note. Without the filter we cancel
+    // unconditionally. We cannot abort an `inFlight` save - tauri::invoke
+    // has no abort handle - but cleared `pending*` and the cancelled
+    // debouncer keep new saves from queuing up after.
+    if (noteId !== undefined && pendingNoteId !== noteId) return;
+    pendingNoteId = null;
+    pendingSnapshot = null;
+    debouncedSave.cancel();
+  };
+
   // Flush pending changes when the window loses focus - protects against
   // "I closed the lid before the debounce fired" data loss.
   onMount(() => {
@@ -230,5 +249,6 @@ export function useSavePipeline(opts: {
     flush,
     hasPending: () => pendingNoteId !== null || inFlight !== null,
     resetBaseline,
+    cancelPending,
   };
 }

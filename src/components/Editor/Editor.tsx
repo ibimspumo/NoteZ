@@ -29,8 +29,11 @@ import {
   restoreSelection,
 } from "./lexical/selectionPath";
 
-// Settings-table key namespace for per-note cursor persistence.
-const cursorKey = (noteId: string) => `cursor:${noteId}`;
+// Per-note cursor persistence used to live in the kitchen-sink `settings`
+// table under `cursor:<uuid>` keys. As of migration v7 it moved to a
+// dedicated `cursors` table accessed via api.getCursor / api.setCursor -
+// which keeps `list_settings` O(1) regardless of how many notes the user
+// has touched. The migration backfilled the existing keys.
 const PERSIST_DEBOUNCE_MS = 800;
 
 export type EditorChange = {
@@ -69,7 +72,7 @@ export const Editor: Component<EditorProps> = (props) => {
     const id = lastNoteId;
     const sel = liveSelection;
     if (!id || !sel) return;
-    void api.setSetting(cursorKey(id), JSON.stringify(sel)).catch((e) => {
+    void api.setCursor(id, JSON.stringify(sel)).catch((e) => {
       console.warn("failed to persist cursor", e);
     });
   };
@@ -204,7 +207,7 @@ export const Editor: Component<EditorProps> = (props) => {
       const outgoingId = lastNoteId;
       const outgoingSel = liveSelection;
       void api
-        .setSetting(cursorKey(outgoingId), JSON.stringify(outgoingSel))
+        .setCursor(outgoingId, JSON.stringify(outgoingSel))
         .catch((e) => console.warn("failed to persist cursor", e));
     }
     lastNoteId = id;
@@ -240,7 +243,7 @@ export const Editor: Component<EditorProps> = (props) => {
     // guarded by the `lastNoteId !== id` check.
     if (!cachedSel) {
       void api
-        .getSetting(cursorKey(id))
+        .getCursor(id)
         .then((raw) => {
           if (lastNoteId !== id || !raw || !editorRef) return;
           // The user might have moved the caret already since the load (e.g.

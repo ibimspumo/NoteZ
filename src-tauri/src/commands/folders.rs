@@ -15,22 +15,14 @@ const MAX_FOLDER_DEPTH: i64 = 64;
 #[tauri::command]
 pub fn list_folders(db: State<Db>) -> Result<Vec<Folder>> {
     let conn = db.conn()?;
-    // Note counts come from a LEFT JOIN aggregation against active notes.
-    // For 1M notes this still runs in milliseconds: idx_notes_folder_active_updated
-    // is a partial index on (folder_id, ...) WHERE deleted_at IS NULL, so the
-    // GROUP BY scans only the index. Folder count is bounded by user behaviour
-    // (hundreds at most), so the join's outer side is small.
+    // `folders.note_count` is maintained denormalised by triggers (migration
+    // v6) so this listing is O(folders), independent of the note corpus
+    // size. Before v6 this query did a LEFT JOIN aggregate over millions of
+    // active notes on every cold app boot.
     let mut stmt = conn.prepare(
-        "SELECT f.id, f.parent_id, f.name, f.sort_order, f.created_at, f.updated_at,
-                COALESCE(c.cnt, 0) AS cnt
-         FROM folders f
-         LEFT JOIN (
-             SELECT folder_id, COUNT(*) AS cnt
-             FROM notes
-             WHERE deleted_at IS NULL AND folder_id IS NOT NULL
-             GROUP BY folder_id
-         ) c ON c.folder_id = f.id
-         ORDER BY COALESCE(f.parent_id, ''), f.sort_order, f.name COLLATE NOCASE",
+        "SELECT id, parent_id, name, sort_order, created_at, updated_at, note_count
+         FROM folders
+         ORDER BY COALESCE(parent_id, ''), sort_order, name COLLATE NOCASE",
     )?;
     let rows = stmt.query_map([], |row| {
         Ok(Folder {
@@ -40,7 +32,7 @@ pub fn list_folders(db: State<Db>) -> Result<Vec<Folder>> {
             sort_order: row.get("sort_order")?,
             created_at: row.get("created_at")?,
             updated_at: row.get("updated_at")?,
-            note_count: row.get::<_, i64>("cnt")?.max(0) as u32,
+            note_count: row.get::<_, i64>("note_count")?.max(0) as u32,
         })
     })?;
     let mut out = Vec::new();
@@ -278,10 +270,8 @@ pub fn move_folder(
 
 fn fetch_folder(conn: &Connection, id: &str) -> Result<Folder> {
     conn.query_row(
-        "SELECT f.id, f.parent_id, f.name, f.sort_order, f.created_at, f.updated_at,
-                (SELECT COUNT(*) FROM notes
-                  WHERE folder_id = f.id AND deleted_at IS NULL) AS cnt
-         FROM folders f WHERE f.id = ?1",
+        "SELECT id, parent_id, name, sort_order, created_at, updated_at, note_count
+         FROM folders WHERE id = ?1",
         rusqlite::params![id],
         |row| {
             Ok(Folder {
@@ -291,7 +281,7 @@ fn fetch_folder(conn: &Connection, id: &str) -> Result<Folder> {
                 sort_order: row.get("sort_order")?,
                 created_at: row.get("created_at")?,
                 updated_at: row.get("updated_at")?,
-                note_count: row.get::<_, i64>("cnt")?.max(0) as u32,
+                note_count: row.get::<_, i64>("note_count")?.max(0) as u32,
             })
         },
     )
@@ -360,7 +350,34 @@ fn sanitize_name(name: &str) -> Result<String> {
             MAX_FOLDER_NAME_LEN
         )));
     }
+    // Reject control characters (incl. newlines/tabs) and bidi-override
+    // codepoints. A folder named "First\nSecond" would break single-line
+    // sidebar rendering; a Unicode RTL/bidi override could visually swap
+    // adjacent UI labels (the same class of attack rustc warns about with
+    // `text_direction_codepoint_in_comment`). Stripping just whitespace
+    // would silently mangle the user's intent, so we reject loudly.
+    for c in trimmed.chars() {
+        if is_disallowed_name_char(c) {
+            return Err(NoteZError::InvalidInput(format!(
+                "folder name contains disallowed character (U+{:04X})",
+                c as u32
+            )));
+        }
+    }
     Ok(trimmed.to_string())
+}
+
+fn is_disallowed_name_char(c: char) -> bool {
+    if c.is_control() {
+        return true;
+    }
+    // Unicode bidirectional control characters - hidden codepoints that
+    // visually re-order following text. These are a known phishing / UI
+    // confusion vector and have no business in a folder name.
+    matches!(
+        c as u32,
+        0x200E | 0x200F | 0x202A..=0x202E | 0x2066..=0x2069
+    )
 }
 
 /// Resolve a folder filter to the SQL fragment + bind params needed to scope

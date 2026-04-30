@@ -1,6 +1,6 @@
 [package]
 name = "notez"
-version = "0.8.4"
+version = "0.8.5"
 description = "NoteZ - fast, local, beautiful notes for Mac."
 authors = ["NoteZ Contributors"]
 edition = "2021"
@@ -46,6 +46,13 @@ blurhash = "0.2"
 sha2 = "0.10"
 hex = "0.4"
 aho-corasick = "1"
+
+# Unicode word segmentation for FTS query tokenisation. The naive
+# `c.is_alphanumeric()` split treats CJK runs as a single giant token
+# (no whitespace breaks them up), so a Japanese / Chinese / Korean
+# search effectively can't decompose into prefix-matchable tokens.
+# `unicode-segmentation` gives us the proper UAX#29 word-boundaries.
+unicode-segmentation = "1"
 
 # OpenRouter AI title generation. rustls-tls keeps us off OpenSSL on macOS so
 # the bundle stays self-contained.

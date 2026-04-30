@@ -108,6 +108,26 @@ export type Asset = {
   created_at: string;
 };
 
+export type AssetsCursor = {
+  created_at: string;
+  id: string;
+};
+
+export type AssetsPage = {
+  items: Asset[];
+  next_cursor: AssetsCursor | null;
+};
+
+export type BacklinksCursor = {
+  updated_at: string;
+  id: string;
+};
+
+export type BacklinksPage = {
+  items: NoteSummary[];
+  next_cursor: BacklinksCursor | null;
+};
+
 export type AssetRef = {
   id: string;
   mime: string;

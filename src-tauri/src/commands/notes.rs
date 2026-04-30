@@ -1,4 +1,7 @@
-use crate::constants::{DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_PINNED, PREVIEW_MAX_CHARS};
+use crate::constants::{
+    DEFAULT_PAGE_SIZE, MAX_ASSET_REFS_PER_NOTE, MAX_MENTION_TARGETS_PER_NOTE,
+    MAX_NOTE_JSON_BYTES, MAX_NOTE_TEXT_BYTES, MAX_PAGE_SIZE, MAX_PINNED, PREVIEW_MAX_CHARS,
+};
 use crate::db::{make_preview, note_row_to_summary, now_iso, wal_checkpoint, Db};
 use crate::error::{NoteZError, Result};
 use crate::models::{
@@ -55,6 +58,33 @@ pub fn get_note(db: State<Db>, id: String) -> Result<Note> {
 
 #[tauri::command]
 pub fn update_note(db: State<Db>, input: UpdateNoteInput) -> Result<Note> {
+    // Defense-in-depth: reject pathological inputs at the IPC boundary so a
+    // buggy/compromised renderer can't blow up SQLite or the FTS index.
+    if input.content_text.len() > MAX_NOTE_TEXT_BYTES {
+        return Err(NoteZError::InvalidInput(format!(
+            "note content_text too large ({} bytes, max {MAX_NOTE_TEXT_BYTES})",
+            input.content_text.len()
+        )));
+    }
+    if input.content_json.len() > MAX_NOTE_JSON_BYTES {
+        return Err(NoteZError::InvalidInput(format!(
+            "note content_json too large ({} bytes, max {MAX_NOTE_JSON_BYTES})",
+            input.content_json.len()
+        )));
+    }
+    if input.mention_target_ids.len() > MAX_MENTION_TARGETS_PER_NOTE {
+        return Err(NoteZError::InvalidInput(format!(
+            "too many mention targets ({}, max {MAX_MENTION_TARGETS_PER_NOTE})",
+            input.mention_target_ids.len()
+        )));
+    }
+    if input.asset_ids.len() > MAX_ASSET_REFS_PER_NOTE {
+        return Err(NoteZError::InvalidInput(format!(
+            "too many asset references ({}, max {MAX_ASSET_REFS_PER_NOTE})",
+            input.asset_ids.len()
+        )));
+    }
+
     let mut conn = db.conn()?;
     let tx = conn.transaction()?;
 
@@ -85,6 +115,25 @@ pub fn update_note(db: State<Db>, input: UpdateNoteInput) -> Result<Note> {
                 "INSERT OR IGNORE INTO mentions (source_note_id, target_note_id, created_at) VALUES (?1, ?2, ?3)",
                 rusqlite::params![input.id, target, now],
             )?;
+        }
+    }
+
+    // Replace this note's asset references in `note_assets`. The editor's
+    // `editorRefs` mutation listener tracks ImageNode keys incrementally and
+    // delivers the deduplicated asset id set in `input.asset_ids`, so we just
+    // mirror it. This is the structural replacement for the old O(content_bytes)
+    // Aho-Corasick scan in `gc_orphan_assets`.
+    tx.execute(
+        "DELETE FROM note_assets WHERE note_id = ?1",
+        rusqlite::params![input.id],
+    )?;
+    if !input.asset_ids.is_empty() {
+        let mut insert = tx.prepare(
+            "INSERT OR IGNORE INTO note_assets (note_id, asset_id)
+             SELECT ?1, ?2 WHERE EXISTS (SELECT 1 FROM assets WHERE id = ?2)",
+        )?;
+        for asset_id in &input.asset_ids {
+            insert.execute(rusqlite::params![input.id, asset_id])?;
         }
     }
 

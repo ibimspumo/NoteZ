@@ -57,28 +57,47 @@ export const TabContent: Component<Props> = (props) => {
   // loaded (e.g. it was purged between sessions and the layout still
   // referenced it), null the tab's noteId so the picker shows up instead of
   // a stuck spinner.
-  createEffect(async () => {
+  //
+  // Critical: do NOT use `createEffect(async () => …)`. Solid only tracks
+  // signal reads up to the first `await`; everything after runs outside the
+  // reactive graph and `onCleanup` cannot wait on the promise. So a fast
+  // double-switch (User clicks two notes in rapid succession) used to race
+  // - the first loadNote could still resolve and clobber the second's state.
+  //
+  // Pattern: a sync createEffect captures the dependency, then drives an
+  // inner async IIFE with a cancellation flag tied to onCleanup. Each
+  // subsequent run cancels the prior load before starting its own.
+  createEffect(() => {
     const id = props.noteId;
     if (!id) {
       setActiveNote(null);
       return;
     }
-    if (save.hasPending()) await save.flush();
-    try {
-      const note = await loadNote(id);
-      setActiveNote(note);
-      save.resetBaseline(note.id, note.content_json);
-      setEditorKey((k) => k + 1);
-    } catch (e) {
-      console.warn(`[TabContent ${props.tabId}] loadNote failed for ${id}`, e);
-      setActiveNote(null);
-      // Writing to the panes store from inside an effect that depends on its
-      // own props can cause a reactive loop. Schedule it out-of-band so the
-      // current update cycle finishes first.
-      queueMicrotask(() => {
-        openNoteInPane(props.paneId, null);
-      });
-    }
+    let cancelled = false;
+    onCleanup(() => {
+      cancelled = true;
+    });
+    void (async () => {
+      if (save.hasPending()) await save.flush();
+      if (cancelled) return;
+      try {
+        const note = await loadNote(id);
+        if (cancelled || props.noteId !== id) return;
+        setActiveNote(note);
+        save.resetBaseline(note.id, note.content_json);
+        setEditorKey((k) => k + 1);
+      } catch (e) {
+        if (cancelled) return;
+        console.warn(`[TabContent ${props.tabId}] loadNote failed for ${id}`, e);
+        setActiveNote(null);
+        // Writing to the panes store from inside an effect that depends on
+        // its own props can cause a reactive loop. Schedule it out-of-band
+        // so the current update cycle finishes first.
+        queueMicrotask(() => {
+          openNoteInPane(props.paneId, null);
+        });
+      }
+    })();
   });
 
   onMount(() => {
@@ -90,6 +109,7 @@ export const TabContent: Component<Props> = (props) => {
       applyExternalUpdate,
       syncActiveNote,
       savingState: save.savingState,
+      cancelPendingSave: save.cancelPending,
     });
   });
 

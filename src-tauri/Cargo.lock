@@ -2258,7 +2258,7 @@ dependencies = [
 
 [[package]]
 name = "notez"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -2286,6 +2286,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "unicode-segmentation",
  "uuid",
  "window-vibrancy",
 ]

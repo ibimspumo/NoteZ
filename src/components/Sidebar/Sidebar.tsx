@@ -1,5 +1,5 @@
 import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
-import { type Bucket, bucketFor } from "../../lib/buckets";
+import { type Bucket, bucketBoundaries, bucketFor } from "../../lib/buckets";
 import {
   bindRowHeightProbeContainer,
   rowHeightForPreview,
@@ -52,18 +52,20 @@ export const Sidebar: Component<Props> = (props) => {
   // updated_at DESC, so a single linear scan is enough - bucket transitions
   // happen at predictable points. O(n) on loaded items only (≤ a few page
   // chunks at any time), and re-runs only when items mutate.
+  //
+  // We pre-compute bucket boundaries once per tick (rather than allocating
+  // a Date inside `bucketFor` for every row). At ITEMS_SLIDING_WINDOW_MAX
+  // = 5000 rows × 1 tick / minute that's ~5000 fewer Date allocations per
+  // minute - small but free.
   const rows = createMemo<ListRow[]>(() => {
     const items = notesState.items;
-    // Reactive on nowTick so buckets re-assign as time passes (e.g. Today
-    // rolls into Yesterday at midnight). Same dependency keeps the headers
-    // in sync with the per-row time labels below.
-    const now = new Date(nowTick());
+    const boundaries = bucketBoundaries(new Date(nowTick()));
     if (items.length === 0) return [];
     const out: ListRow[] = [];
     let last: Bucket | null = null;
     for (let i = 0; i < items.length; i++) {
       const note = items[i];
-      const b = bucketFor(note.updated_at, now);
+      const b = bucketFor(note.updated_at, boundaries);
       if (b !== last) {
         out.push({ kind: "header", label: b });
         last = b;

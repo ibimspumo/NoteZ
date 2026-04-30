@@ -31,7 +31,6 @@ export const NoteListItem: Component<Props> = (props) => {
   const preview = () => truncate(props.note.preview || "", 160);
 
   const handleDragStart = (e: DragEvent) => {
-    console.log("[dnd] dragstart on note", props.note.id, "dataTransfer=", !!e.dataTransfer);
     if (!liRef || !e.dataTransfer) {
       startNoteDrag(props.note.id);
       return;

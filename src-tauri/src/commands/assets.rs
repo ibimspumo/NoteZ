@@ -1,8 +1,8 @@
-use crate::constants::{BLURHASH_DECODE_SIZE, MAX_ASSET_BYTES};
+use crate::constants::{BLURHASH_DECODE_SIZE, DEFAULT_PAGE_SIZE, MAX_ASSET_BYTES, MAX_PAGE_SIZE};
 use crate::db::{now_iso, Db};
 use crate::error::{NoteZError, Result};
-use crate::models::{Asset, AssetRef};
-use aho_corasick::AhoCorasick;
+use crate::models::{Asset, AssetRef, AssetsCursor, AssetsPage};
+use crate::pagination::{collect_page, next_cursor};
 use image::GenericImageView;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
@@ -155,74 +155,130 @@ pub fn get_assets_dir(db: State<Db>) -> Result<String> {
     Ok(db.assets_dir.to_string_lossy().to_string())
 }
 
+/// Paginated list of stored assets. Same `(created_at DESC, id DESC)` cursor
+/// pattern as everywhere else - a 1M-asset DB no longer silently truncates
+/// at 1000 (the previous hard cap).
 #[tauri::command]
-pub fn list_assets(db: State<Db>) -> Result<Vec<Asset>> {
+pub fn list_assets(
+    db: State<Db>,
+    cursor: Option<AssetsCursor>,
+    limit: Option<u32>,
+) -> Result<AssetsPage> {
     let conn = db.conn()?;
-    let mut stmt = conn.prepare(
-        "SELECT id, mime, ext, width, height, blurhash, byte_size, created_at
-         FROM assets ORDER BY created_at DESC LIMIT 1000",
-    )?;
-    let rows = stmt.query_map([], row_to_asset)?;
-    Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    let limit = limit.unwrap_or(DEFAULT_PAGE_SIZE).clamp(1, MAX_PAGE_SIZE);
+    let fetch = (limit + 1) as i64;
+
+    let (items, has_more) = if let Some(c) = cursor.as_ref() {
+        let mut stmt = conn.prepare(
+            "SELECT id, mime, ext, width, height, blurhash, byte_size, created_at
+             FROM assets
+             WHERE (created_at, id) < (?1, ?2)
+             ORDER BY created_at DESC, id DESC
+             LIMIT ?3",
+        )?;
+        collect_page(
+            &mut stmt,
+            rusqlite::params![c.created_at, c.id, fetch],
+            limit,
+            row_to_asset,
+        )?
+    } else {
+        let mut stmt = conn.prepare(
+            "SELECT id, mime, ext, width, height, blurhash, byte_size, created_at
+             FROM assets
+             ORDER BY created_at DESC, id DESC
+             LIMIT ?1",
+        )?;
+        collect_page(&mut stmt, rusqlite::params![fetch], limit, row_to_asset)?
+    };
+
+    let next = next_cursor(&items, has_more, |a| AssetsCursor {
+        created_at: a.created_at.clone(),
+        id: a.id.clone(),
+    });
+    Ok(AssetsPage { items, next_cursor: next })
 }
 
 /// Garbage-collect assets that no live note or snapshot references.
 ///
-/// Two-stage:
-///   1. Reference set - Aho-Corasick over every `content_json` blob (notes +
-///      snapshots), single pass per blob. O(total_json_bytes), not O(notes ×
-///      assets).
-///   2. Then, for each known id NOT in the reference set, remove file + row.
-///   3. Finally, walk the on-disk shard directories and delete any orphan file
-///      whose id is not in the assets table - heals leaks from prior crash paths.
+/// Pipeline:
+///   1. Stage 1: an asset is orphaned iff `note_assets` has no row pointing
+///      at it. The join table is maintained incrementally by `update_note`
+///      (and seeded once at v5 migration time), so this is an O(assets)
+///      LEFT JOIN - no Aho-Corasick over content blobs, no O(corpus_bytes).
+///   2. Stage 2: also keep assets referenced by SNAPSHOTS - those don't have
+///      a join table because snapshots are immutable, but they're bounded
+///      (50 auto + ≤500 manual per note) so a one-pass substring scan over
+///      snapshot blobs is acceptable. We ONLY scan snapshots for assets that
+///      stage 1 already declared orphaned, so the work is O(orphans × snapshot_bytes)
+///      which collapses to nothing when there are few orphans (the common case).
+///   3. Stage 3: walk on-disk shard directories and delete any file whose id
+///      isn't in the assets table - heals leaks from prior crash paths.
+///
+/// Off-thread: the whole pipeline runs in `spawn_blocking` because step 3
+/// hits the filesystem (recursive read_dir) and the snapshot fallback can
+/// touch many rows. On a 1M-asset DB step 1 is sub-100ms, step 3 dominates.
 #[tauri::command]
-pub fn gc_orphan_assets(db: State<Db>) -> Result<u64> {
+pub async fn gc_orphan_assets(db: State<'_, Db>) -> Result<u64> {
+    let db = db.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || -> Result<u64> { gc_orphan_assets_blocking(&db) })
+        .await
+        .map_err(|e| NoteZError::Other(format!("gc join: {e}")))?
+}
+
+fn gc_orphan_assets_blocking(db: &Db) -> Result<u64> {
     let conn = db.conn()?;
 
-    // (id, ext) for everything we know about.
-    let known: Vec<(String, String)> = {
-        let mut stmt = conn.prepare("SELECT id, ext FROM assets")?;
+    // Stage 1: orphans per the join table. LEFT JOIN returns the asset rows
+    // that have NO matching note_assets entry. Bounded by the assets table
+    // size, not the content size.
+    let stage1_orphans: Vec<(String, String)> = {
+        let mut stmt = conn.prepare(
+            "SELECT a.id, a.ext
+               FROM assets a
+               LEFT JOIN note_assets na ON na.asset_id = a.id
+              WHERE na.asset_id IS NULL",
+        )?;
         let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
-        let collected: rusqlite::Result<Vec<_>> = rows.collect();
-        collected?
+        rows.collect::<rusqlite::Result<Vec<_>>>()?
     };
 
-    if known.is_empty() {
-        // Still walk the disk to clear stray files (e.g. left over from a crash).
-        return reap_disk_orphans(&db.assets_dir, &HashSet::new());
-    }
-
-    let ids: Vec<&str> = known.iter().map(|(id, _)| id.as_str()).collect();
-    let ac = AhoCorasick::new(&ids).map_err(|e| NoteZError::Other(format!("aho-corasick: {e}")))?;
-    let mut referenced: HashSet<String> = HashSet::with_capacity(ids.len());
-
-    // One pass over notes + snapshots, one substring search per blob.
-    {
-        let mut stmt = conn.prepare("SELECT content_json FROM notes")?;
+    let known_ids_for_disk: HashSet<String> = {
+        let mut stmt = conn.prepare("SELECT id FROM assets")?;
         let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
-        for r in rows {
-            let blob = r?;
-            for m in ac.find_iter(&blob) {
-                referenced.insert(known[m.pattern().as_usize()].0.clone());
-            }
-        }
+        rows.collect::<rusqlite::Result<HashSet<_>>>()?
+    };
+
+    if stage1_orphans.is_empty() {
+        // No DB-side orphans: just heal disk leaks.
+        return reap_disk_orphans(&db.assets_dir, &known_ids_for_disk);
     }
+
+    // Stage 2: of the stage-1 orphans, exclude any that are still referenced
+    // by a snapshot. Snapshots are NOT in note_assets (they're immutable
+    // historical content), so we substring-scan the snapshot blobs - but ONLY
+    // for the orphan candidates, so the pattern set is tiny.
+    let mut still_referenced: HashSet<String> = HashSet::new();
     {
+        let candidate_ids: Vec<&str> =
+            stage1_orphans.iter().map(|(id, _)| id.as_str()).collect();
+        let ac = aho_corasick::AhoCorasick::new(&candidate_ids)
+            .map_err(|e| NoteZError::Other(format!("aho-corasick: {e}")))?;
         let mut stmt = conn.prepare("SELECT content_json FROM snapshots")?;
         let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
         for r in rows {
             let blob = r?;
             for m in ac.find_iter(&blob) {
-                referenced.insert(known[m.pattern().as_usize()].0.clone());
+                still_referenced.insert(stage1_orphans[m.pattern().as_usize()].0.clone());
             }
         }
     }
 
-    // Collect orphans, then drop them in one DELETE.
+    // True orphans = stage 1 orphans MINUS snapshot-referenced ones.
     let mut orphan_ids: Vec<String> = Vec::new();
     let mut orphan_paths: Vec<PathBuf> = Vec::new();
-    for (id, ext) in &known {
-        if referenced.contains(id) {
+    for (id, ext) in &stage1_orphans {
+        if still_referenced.contains(id) {
             continue;
         }
         orphan_ids.push(id.clone());
@@ -231,8 +287,9 @@ pub fn gc_orphan_assets(db: State<Db>) -> Result<u64> {
 
     let mut deleted: u64 = 0;
     if !orphan_ids.is_empty() {
-        // Batch DELETE.
-        let placeholders = std::iter::repeat_n("?", orphan_ids.len()).collect::<Vec<_>>().join(",");
+        let placeholders = std::iter::repeat_n("?", orphan_ids.len())
+            .collect::<Vec<_>>()
+            .join(",");
         let sql = format!("DELETE FROM assets WHERE id IN ({})", placeholders);
         let params: Vec<&dyn rusqlite::ToSql> =
             orphan_ids.iter().map(|s| s as &dyn rusqlite::ToSql).collect();
@@ -243,9 +300,13 @@ pub fn gc_orphan_assets(db: State<Db>) -> Result<u64> {
         deleted = orphan_ids.len() as u64;
     }
 
-    // Heal disk-side leaks (crash-time half-writes, etc.).
-    let live: HashSet<String> = known.iter().map(|(id, _)| id.clone()).collect();
-    deleted += reap_disk_orphans(&db.assets_dir, &live)?;
+    // Recompute the live-id set after deletes for the disk reaper.
+    let live_after: HashSet<String> = known_ids_for_disk
+        .iter()
+        .filter(|id| !orphan_ids.iter().any(|o| o == *id))
+        .cloned()
+        .collect();
+    deleted += reap_disk_orphans(&db.assets_dir, &live_after)?;
 
     Ok(deleted)
 }
@@ -319,24 +380,55 @@ fn decode_image_metadata(bytes: &[u8]) -> std::result::Result<(u32, u32, Option<
 /// of `number[]` entries to serialise/deserialise (~150 ms+ on M1). Reading
 /// from a path the renderer just told us about is O(file_size) on disk, no JSON.
 ///
-/// Security: the path is fully trusted (it has to be, the renderer constructs
-/// it from a `File` the user just dropped). We do not allow path traversal
-/// outside the assets dir on save - the *target* path is content-addressed and
-/// always inside `assets_dir`. The *source* path is the user's just-dropped
-/// file; reading it is no riskier than the renderer reading it itself.
+/// Security:
+///  - We `metadata()` the path FIRST and reject anything that isn't a regular
+///    file or whose declared size is over `MAX_ASSET_BYTES`. Without this,
+///    `fs::read` would happily slurp a 50 GB file into memory before any cap
+///    check, OOMing the process (a malicious drop or a buggy DnD source could
+///    trigger this).
+///  - We refuse symlinks. A user drop produces a real file path; symlinks
+///    only appear when something automated (e.g. a malicious extension) is
+///    constructing the IPC payload, and refusing them prevents follow-the-
+///    symlink reads of arbitrary user files (`~/.ssh/id_rsa`, etc.).
+///  - The *target* path is content-addressed and always inside `assets_dir`,
+///    so there's no traversal risk on the write side.
 #[tauri::command]
 pub async fn save_asset_from_path(
     db: State<'_, Db>,
     path: String,
     mime: String,
 ) -> Result<AssetRef> {
-    let bytes = tauri::async_runtime::spawn_blocking({
-        let p = path.clone();
-        move || std::fs::read(&p)
+    // Validate the source on the blocking pool: metadata() is cheap but it's
+    // still a syscall, and `read` itself MUST happen there.
+    let path_for_meta = path.clone();
+    let bytes = tauri::async_runtime::spawn_blocking(move || -> Result<Vec<u8>> {
+        // `symlink_metadata` doesn't follow symlinks, so the file_type check
+        // sees the link itself rather than its target.
+        let meta = std::fs::symlink_metadata(&path_for_meta)?;
+        let ft = meta.file_type();
+        if ft.is_symlink() {
+            return Err(NoteZError::InvalidInput(
+                "symlinked asset paths are not allowed".into(),
+            ));
+        }
+        if !ft.is_file() {
+            return Err(NoteZError::InvalidInput(
+                "asset path is not a regular file".into(),
+            ));
+        }
+        if meta.len() > MAX_ASSET_BYTES {
+            return Err(NoteZError::InvalidInput(format!(
+                "asset too large: {} bytes (max {MAX_ASSET_BYTES})",
+                meta.len()
+            )));
+        }
+        if meta.len() == 0 {
+            return Err(NoteZError::InvalidInput("empty asset".into()));
+        }
+        Ok(std::fs::read(&path_for_meta)?)
     })
     .await
-    .map_err(|e| NoteZError::Other(format!("read join: {e}")))?
-    .map_err(NoteZError::Io)?;
+    .map_err(|e| NoteZError::Other(format!("read join: {e}")))??;
 
     save_asset(db, bytes, mime).await
 }

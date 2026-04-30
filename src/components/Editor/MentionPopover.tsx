@@ -1,4 +1,4 @@
-import { type Component, For, Show, createEffect, createSignal, onCleanup } from "solid-js";
+import { type Component, For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import { Portal } from "solid-js/web";
 import { api } from "../../lib/tauri";
 import type { SearchHit } from "../../lib/types";
@@ -16,43 +16,65 @@ type Props = {
 export const MentionPopover: Component<Props> = (props) => {
   const [results, setResults] = createSignal<SearchHit[]>([]);
   const [activeIdx, setActiveIdx] = createSignal(0);
+  // Solid evaluates the component body once on mount. Calling the parent's
+  // register* setters here used to install a closure that captured the
+  // signal accessors of THIS instance - if the popover unmounted and
+  // remounted (a quick @-trigger churn) without the parent clearing the
+  // setter, the dead closure stuck around. By gating the registration in
+  // onMount and clearing it in onCleanup we keep the Editor's `navigateFn`
+  // / `confirmFn` slots strictly tied to the live popover instance.
 
+  // Debounce the FTS query so rapid typing doesn't fire one IPC per
+  // keystroke. 60ms matches the command bar's debounce - users perceive
+  // the popover as "instant" while burst-typing only fires the final query.
   createEffect(() => {
     const q = props.match.query;
     let cancelled = false;
-    api
-      .quickLookup(q, 8)
-      .then((hits) => {
-        if (cancelled) return;
-        const filtered = hits.filter((h) => h.id !== props.currentNoteId);
-        setResults(filtered);
-        setActiveIdx(0);
-      })
-      .catch(() => {
-        if (!cancelled) setResults([]);
-      });
+    const handle = window.setTimeout(() => {
+      api
+        .quickLookup(q, 8)
+        .then((hits) => {
+          if (cancelled) return;
+          const filtered = hits.filter((h) => h.id !== props.currentNoteId);
+          setResults(filtered);
+          setActiveIdx(0);
+        })
+        .catch(() => {
+          if (!cancelled) setResults([]);
+        });
+    }, 60);
     onCleanup(() => {
       cancelled = true;
+      window.clearTimeout(handle);
     });
   });
 
-  props.registerNavigate((dir) => {
-    const len = results().length;
-    if (len === 0) return;
-    setActiveIdx((i) => {
-      if (dir === "down") return (i + 1) % len;
-      return (i - 1 + len) % len;
+  onMount(() => {
+    props.registerNavigate((dir) => {
+      const len = results().length;
+      if (len === 0) return;
+      setActiveIdx((i) => {
+        if (dir === "down") return (i + 1) % len;
+        return (i - 1 + len) % len;
+      });
+    });
+
+    props.registerConfirm(() => {
+      const r = results()[activeIdx()];
+      if (!r) {
+        props.onClose();
+        return false;
+      }
+      props.onSelect(r.id, r.title || "Untitled");
+      return true;
     });
   });
 
-  props.registerConfirm(() => {
-    const r = results()[activeIdx()];
-    if (!r) {
-      props.onClose();
-      return false;
-    }
-    props.onSelect(r.id, r.title || "Untitled");
-    return true;
+  onCleanup(() => {
+    // Drop the parent's references to our closed-over closures so they
+    // don't keep our (dead) signal accessors alive across a fresh mount.
+    props.registerNavigate(() => {});
+    props.registerConfirm(() => false);
   });
 
   const positionStyle = () => {

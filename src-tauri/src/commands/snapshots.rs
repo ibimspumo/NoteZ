@@ -80,18 +80,30 @@ pub fn create_snapshot(
     )?;
 
     if !manual {
-        conn.execute(
-            "DELETE FROM snapshots
-             WHERE note_id = ?1
-               AND is_manual = 0
-               AND id NOT IN (
-                   SELECT id FROM snapshots
-                   WHERE note_id = ?1 AND is_manual = 0
-                   ORDER BY created_at DESC
-                   LIMIT ?2
-               )",
-            rusqlite::params![note_id, MAX_AUTO_SNAPSHOTS_PER_NOTE],
-        )?;
+        // Keep only the newest MAX_AUTO_SNAPSHOTS_PER_NOTE auto-snapshots.
+        // The previous implementation used `DELETE … WHERE id NOT IN
+        // (SELECT id … LIMIT N)`, which forces SQLite to materialise the
+        // sub-select and run a NOT-IN scan per row - O(snapshots²) on large
+        // notes. Replacing it with a single boundary lookup makes the prune
+        // O(snapshots): find the cutoff `created_at` of the Nth-newest auto
+        // snapshot, then delete everything older.
+        let cutoff: Option<String> = conn
+            .query_row(
+                "SELECT created_at FROM snapshots
+                 WHERE note_id = ?1 AND is_manual = 0
+                 ORDER BY created_at DESC
+                 LIMIT 1 OFFSET ?2",
+                rusqlite::params![note_id, MAX_AUTO_SNAPSHOTS_PER_NOTE],
+                |r| r.get(0),
+            )
+            .ok();
+        if let Some(cutoff) = cutoff {
+            conn.execute(
+                "DELETE FROM snapshots
+                 WHERE note_id = ?1 AND is_manual = 0 AND created_at <= ?2",
+                rusqlite::params![note_id, cutoff],
+            )?;
+        }
     }
 
     fetch_snapshot(&conn, &id)

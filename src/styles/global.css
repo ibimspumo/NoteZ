@@ -25,6 +25,11 @@ body {
   text-rendering: optimizeLegibility;
   user-select: none;
   overflow: hidden;
+  /* Standards-track scrollbar styling. Firefox / non-WebKit browsers honour
+   * `scrollbar-*` properties; the existing ::-webkit-scrollbar rules below
+   * cover Tauri's WKWebView. Together this gives every shell the same look. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--nz-scrollbar) transparent;
 }
 
 input,
@@ -143,5 +148,21 @@ ol {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* Honor the OS-level "Increase Contrast" preference. We bump the divider
+ * tokens to use the strong variant (which themes already define for hover
+ * states) and tighten focus outlines so they're more visible. The themes
+ * keep ownership of color values; we only override token-aliasing here. */
+@media (prefers-contrast: more) {
+  :root {
+    --nz-divider: var(--nz-divider-strong);
+    --nz-text-muted: var(--nz-text);
+    --nz-text-faint: var(--nz-text-muted);
+  }
+  button:focus-visible {
+    outline-width: 3px;
+    outline-offset: 2px;
   }
 }

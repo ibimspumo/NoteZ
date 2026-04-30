@@ -1,6 +1,7 @@
 pub mod ai;
 pub mod assets;
 pub mod capture;
+pub mod cursors;
 #[cfg(debug_assertions)]
 pub mod dev;
 pub mod folders;

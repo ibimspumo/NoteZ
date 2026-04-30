@@ -1,4 +1,4 @@
-import { type Component, Show, createSignal, onCleanup, onMount } from "solid-js";
+import { type Component, Show, createSignal } from "solid-js";
 import {
   type PaneId,
   dragNoteId,
@@ -26,13 +26,6 @@ export const PaneDropOverlay: Component<Props> = (props) => {
   const [zone, setZone] = createSignal<Zone>(null);
   let overlayRef: HTMLDivElement | undefined;
 
-  onMount(() => {
-    console.log(`[dnd] PaneDropOverlay mounted for pane ${props.paneId}`);
-  });
-  onCleanup(() => {
-    console.log(`[dnd] PaneDropOverlay unmounted for pane ${props.paneId}`);
-  });
-
   const computeZone = (e: DragEvent): Zone => {
     if (!overlayRef) return null;
     const rect = overlayRef.getBoundingClientRect();
@@ -55,29 +48,21 @@ export const PaneDropOverlay: Component<Props> = (props) => {
   };
 
   const handleDragOver = (e: DragEvent) => {
-    if (!dragNoteId()) {
-      console.log(`[dnd] dragover on ${props.paneId} but no drag in progress`);
-      return;
-    }
+    if (!dragNoteId()) return;
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
     const z = computeZone(e);
-    if (z !== zone()) {
-      console.log(`[dnd] zone change on ${props.paneId}:`, zone(), "->", z);
-      setZone(z);
-    }
+    if (z !== zone()) setZone(z);
   };
 
   const handleDragLeave = (e: DragEvent) => {
     const related = e.relatedTarget as Node | null;
     if (overlayRef && (!related || !overlayRef.contains(related))) {
-      console.log(`[dnd] dragleave on ${props.paneId}, clearing zone`);
       setZone(null);
     }
   };
 
   const handleDrop = (e: DragEvent) => {
-    console.log(`[dnd] DROP on ${props.paneId}, zone=${zone()}, dragNoteId=${dragNoteId()}`);
     e.preventDefault();
     const id = dragNoteId();
     const z = zone();

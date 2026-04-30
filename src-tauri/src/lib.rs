@@ -337,6 +337,9 @@ pub fn run() {
             // capture
             commands::capture::toggle_capture_window,
             commands::capture::hide_capture_window,
+            // cursors (per-note caret position persistence)
+            commands::cursors::get_cursor,
+            commands::cursors::set_cursor,
             // ai
             commands::ai::get_ai_config,
             commands::ai::set_ai_enabled,

@@ -44,4 +44,43 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+
+  build: {
+    // Tauri's macOS WebView is current Safari/WebKit (≥17 on supported
+    // macOS versions). Targeting `safari17` lets esbuild emit modern
+    // syntax without polyfills - native async/await, top-level await,
+    // optional chaining, nullish coalescing - shaving ~5% off the bundle.
+    // We don't ship to Windows/Linux yet, so a single-target compile is
+    // safe.
+    target: "safari17",
+    // Enable explicit chunk naming so the lazy-loaded views show up as
+    // their own chunk in the dist/ directory and the capture window's
+    // first paint doesn't carry MainView's deps.
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Lexical + its plugins are ~150 KB and only the main view
+          // touches them. Putting them in their own chunk lets the
+          // capture window skip the parse cost on cold start.
+          lexical: [
+            "lexical",
+            "@lexical/code",
+            "@lexical/history",
+            "@lexical/link",
+            "@lexical/list",
+            "@lexical/markdown",
+            "@lexical/rich-text",
+            "@lexical/selection",
+            "@lexical/utils",
+          ],
+        },
+      },
+    },
+  },
+
+  // The dev server pre-bundles deps; force the heavy ones up front so the
+  // first navigation doesn't pay the Vite-discovery cost.
+  optimizeDeps: {
+    include: ["solid-js", "solid-js/store", "solid-js/web", "lexical"],
+  },
 }));

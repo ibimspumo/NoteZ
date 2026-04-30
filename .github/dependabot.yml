@@ -1,0 +1,61 @@
+version: 2
+
+# Dependabot pulls weekly PRs for outdated deps so the project never lands in
+# the "everything's a year old" state. Two ecosystems share the schedule so
+# the user opens GitHub once on Mondays and sees everything that needs review.
+#
+# - npm covers the renderer (Solid, Lexical, Vite, Biome, Vitest, Tauri JS bindings).
+# - cargo covers the Tauri backend (Tauri itself, rusqlite, reqwest, serde, etc.).
+# - github-actions keeps CI workflows from rotting on deprecated runner versions.
+#
+# `groups` collapses related ecosystem dumps into a single PR so the review
+# queue stays manageable. `ignore` blocks intentionally pinned majors that
+# need a separate, considered upgrade (Lexical 0.x → 1.x will be a project
+# of its own).
+
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      lexical:
+        patterns:
+          - "lexical"
+          - "@lexical/*"
+      tauri:
+        patterns:
+          - "@tauri-apps/*"
+      solid:
+        patterns:
+          - "solid-js"
+          - "@solidjs/*"
+      tooling:
+        patterns:
+          - "vite*"
+          - "vitest"
+          - "@biomejs/*"
+          - "typescript"
+
+  - package-ecosystem: cargo
+    directory: "/src-tauri"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      tauri:
+        patterns:
+          - "tauri*"
+      rusqlite:
+        patterns:
+          - "rusqlite"
+          - "r2d2*"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2

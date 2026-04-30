@@ -1,6 +1,6 @@
 import { batch, createMemo, createSignal } from "solid-js";
 import { createStore, produce } from "solid-js/store";
-import { bucketFor } from "../lib/buckets";
+import { bucketBoundaries, bucketFor } from "../lib/buckets";
 import {
   ITEMS_SLIDING_WINDOW_KEEP,
   ITEMS_SLIDING_WINDOW_MAX,
@@ -25,7 +25,13 @@ import {
   setActiveFolderFilter,
 } from "./folders";
 import { markAllTrashedAsMissing, setMentionStatus } from "./mentionRegistry";
-import { activePaneNoteId, openNoteInActivePane, openNoteInPane, paneForNote } from "./panes";
+import {
+  activePaneNoteId,
+  allTabApis,
+  openNoteInActivePane,
+  openNoteInPane,
+  paneForNote,
+} from "./panes";
 
 /**
  * Notes store. Two key invariants:
@@ -258,9 +264,10 @@ export async function updateNote(input: UpdateNoteInput): Promise<Note> {
       // the row when the only change is a bucket transition (e.g. the
       // single Yesterday note rolling into Today at idx 0, where the
       // splice/unshift below is skipped).
+      const boundaries = note.is_pinned ? null : bucketBoundaries();
       const bucketChanged =
-        !note.is_pinned &&
-        bucketFor(item.updated_at, new Date()) !== bucketFor(note.updated_at, new Date());
+        boundaries !== null &&
+        bucketFor(item.updated_at, boundaries) !== bucketFor(note.updated_at, boundaries);
       if (item.title !== note.title) item.title = note.title;
       if (item.preview !== newPreview) item.preview = newPreview;
       if (item.is_pinned !== note.is_pinned) item.is_pinned = note.is_pinned;
@@ -351,6 +358,14 @@ export async function moveNoteToFolder(noteId: string, folderId: string | null):
 export async function softDeleteNote(id: string): Promise<void> {
   // Capture summary before mutating so we can prepend to trash if loaded.
   const prev = state.pinned.find((n) => n.id === id) ?? state.items.find((n) => n.id === id);
+  // Pre-empt any debounced save aimed at this note BEFORE the IPC. If we
+  // softDelete first, the still-pending update_note arrives after the row
+  // is already deleted_at IS NOT NULL and returns NotFound, surfacing as
+  // an error toast. cancelPendingSave is best-effort: an in-flight save is
+  // already past the point of no abort, but the next-debounce-tick is.
+  for (const tabApi of allTabApis()) {
+    tabApi.cancelPendingSave(id);
+  }
   await api.softDeleteNote(id);
   // Note's folder loses one active note - decrement the badge so the count
   // stays in sync. Restore() bumps it back.
@@ -429,6 +444,11 @@ export async function restoreNote(id: string): Promise<Note> {
 }
 
 export async function purgeNote(id: string): Promise<void> {
+  // Same reasoning as softDeleteNote: any pending save targeting this id
+  // would land NotFound after the purge. Cancel before issuing the IPC.
+  for (const tabApi of allTabApis()) {
+    tabApi.cancelPendingSave(id);
+  }
   await api.purgeNote(id);
   setMentionStatus(id, "missing");
   setState(

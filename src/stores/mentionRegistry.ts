@@ -26,6 +26,18 @@ const [state, setState] = createStore<RegistryState>({});
 
 const inflight = new Set<string>();
 
+/**
+ * Soft cap on the registry. A power user cycling through tens of thousands
+ * of notes over a long session would otherwise accumulate every mention
+ * target ever seen in memory. When we exceed the cap, drop the oldest
+ * "alive" entries first - those are the cheapest to re-fetch (one IPC) and
+ * the editor will re-resolve them on the next render. Trashed/missing
+ * entries are kept longer because they carry user-visible state (the
+ * broken-mention pill).
+ */
+const MENTION_REGISTRY_MAX = 5_000;
+const MENTION_REGISTRY_TARGET = 4_000;
+
 export const mentionRegistry = state;
 
 /** Look up a target's current status. `undefined` means "unknown - the
@@ -49,11 +61,46 @@ export async function ensureMentionStatus(ids: string[]): Promise<void> {
         }
       }),
     );
+    enforceCap();
   } catch (e) {
     console.warn("getMentionStatusBulk failed", e);
   } finally {
     for (const id of need) inflight.delete(id);
   }
+}
+
+/** Trim the registry when it exceeds the soft cap. Drops "alive" entries
+ *  first (cheapest to re-fetch); keeps "trashed"/"missing" entries that
+ *  carry visible UI state. Iteration order is insertion-order in modern
+ *  engines, so older entries get evicted first by walking from the front. */
+function enforceCap() {
+  const keys = Object.keys(state);
+  if (keys.length <= MENTION_REGISTRY_MAX) return;
+  const toDrop = keys.length - MENTION_REGISTRY_TARGET;
+  let dropped = 0;
+  setState(
+    produce((s) => {
+      for (const k of keys) {
+        if (dropped >= toDrop) break;
+        if (s[k] === "alive") {
+          delete s[k];
+          dropped++;
+        }
+      }
+      // If alive entries alone weren't enough to hit the target (corner case:
+      // every entry is trashed/missing), drop oldest regardless to keep the
+      // hard cap as a real cap.
+      if (dropped < toDrop) {
+        for (const k of keys) {
+          if (dropped >= toDrop) break;
+          if (k in s) {
+            delete s[k];
+            dropped++;
+          }
+        }
+      }
+    }),
+  );
 }
 
 /** Mark a target as having changed status. Called from notes-store actions

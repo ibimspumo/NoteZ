@@ -136,6 +136,30 @@ pub struct Asset {
     pub created_at: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssetsCursor {
+    pub created_at: String,
+    pub id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssetsPage {
+    pub items: Vec<Asset>,
+    pub next_cursor: Option<AssetsCursor>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BacklinksCursor {
+    pub updated_at: String,
+    pub id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BacklinksPage {
+    pub items: Vec<NoteSummary>,
+    pub next_cursor: Option<BacklinksCursor>,
+}
+
 /// A folder in the notes hierarchy. Folders form a tree via `parent_id`
 /// (NULL = root). `sort_order` is a per-parent integer so siblings can be
 /// reordered without renumbering the whole tree; ties break alphabetically

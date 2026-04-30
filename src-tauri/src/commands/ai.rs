@@ -512,7 +512,8 @@ async fn call_openrouter(
     let status = resp.status();
     if !status.is_success() {
         let body = resp.text().await.unwrap_or_default();
-        return Err(format!("HTTP {status}: {}", body.chars().take(300).collect::<String>()));
+        let truncated: String = body.chars().take(300).collect();
+        return Err(format!("HTTP {status}: {}", scrub_secret_like(&truncated)));
     }
 
     let parsed: ChatResponse = resp.json().await.map_err(|e| format!("parse: {e}"))?;
@@ -538,6 +539,47 @@ async fn call_openrouter(
         usage.completion_tokens.unwrap_or(0),
         usage.cost.unwrap_or(0.0),
     ))
+}
+
+/// Strip anything that *looks* like an OpenRouter / OpenAI / generic Bearer
+/// token from a free-form error string before we persist it to the
+/// `ai_calls.error` column. OpenRouter's responses don't currently echo the
+/// caller's auth header, but other providers can; defense-in-depth keeps a
+/// future provider swap from leaking secrets into the user's local DB.
+fn scrub_secret_like(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for token in s.split_inclusive(|c: char| c.is_whitespace() || c == '"') {
+        let trimmed = token.trim_end_matches(|c: char| c.is_whitespace() || c == '"');
+        let punct = &token[trimmed.len()..];
+        if looks_secret_like(trimmed) {
+            out.push_str("[redacted]");
+            out.push_str(punct);
+        } else {
+            out.push_str(token);
+        }
+    }
+    out
+}
+
+fn looks_secret_like(s: &str) -> bool {
+    // Conservative heuristic: opaque token patterns we know about.
+    // - OpenRouter:   sk-or-v1-<hex>
+    // - OpenAI/Stripe-style: sk-<long>
+    // - Bearer prefix
+    // - Hex/Base64 strings ≥ 32 chars (random nonce / API key shape)
+    if s.starts_with("sk-") && s.len() >= 20 {
+        return true;
+    }
+    if s.eq_ignore_ascii_case("Bearer") {
+        return true;
+    }
+    if s.len() >= 32
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '+' || c == '/' || c == '=')
+    {
+        return true;
+    }
+    false
 }
 
 fn sanitize_title(raw: &str) -> String {

@@ -50,6 +50,10 @@ impl Db {
 
         let manager = SqliteConnectionManager::file(&path).with_init(|c| {
             c.busy_timeout(std::time::Duration::from_secs(DB_BUSY_TIMEOUT_SECS))?;
+            // `cache_spill=0` keeps in-flight transactions in RAM rather than
+            // spilling pages to the OS. NoteZ transactions are tiny (single-
+            // note save, single-folder mutation) so we never come close to
+            // the 64 MB cache - allowing spill would be wasted disk traffic.
             c.execute_batch(
                 "PRAGMA synchronous=NORMAL;
                  PRAGMA foreign_keys=ON;
@@ -57,7 +61,8 @@ impl Db {
                  PRAGMA mmap_size=268435456;
                  PRAGMA cache_size=-65536;
                  PRAGMA wal_autocheckpoint=1000;
-                 PRAGMA journal_size_limit=67108864;",
+                 PRAGMA journal_size_limit=67108864;
+                 PRAGMA cache_spill=0;",
             )
         });
         let pool = Pool::builder().max_size(DB_POOL_SIZE).build(manager)?;
@@ -83,17 +88,35 @@ impl Db {
             (2, MIGRATION_002),
             (3, MIGRATION_003),
             (4, MIGRATION_004),
+            (5, MIGRATION_005),
+            (6, MIGRATION_006),
+            (7, MIGRATION_007),
         ];
 
         let tx = conn.transaction()?;
+        let mut crossed_v5 = false;
         for (version, sql) in migrations {
             if *version > current {
                 tracing::info!("applying migration v{}", version);
                 tx.execute_batch(sql)?;
                 tx.execute_batch(&format!("PRAGMA user_version = {}", version))?;
+                if *version == 5 {
+                    crossed_v5 = true;
+                }
             }
         }
         tx.commit()?;
+
+        // Post-migration data backfill for v5: scan every existing note's
+        // content_json for asset id substrings (the old GC logic) and seed
+        // the note_assets join table. We do this exactly once - subsequent
+        // updates to note_assets flow through `update_note` from the editor's
+        // tracked asset_ids set, no more O(content_bytes) scans.
+        if crossed_v5 {
+            if let Err(e) = backfill_note_assets(&conn) {
+                tracing::warn!("note_assets backfill failed (will retry on next launch): {e}");
+            }
+        }
         Ok(())
     }
 }
@@ -295,6 +318,188 @@ CREATE INDEX IF NOT EXISTS idx_notes_folder_active_updated
     ON notes(folder_id, updated_at DESC) WHERE deleted_at IS NULL;
 "#;
 
+// v5: explicit note→asset reference table for GC.
+//
+// Before this migration, `gc_orphan_assets` ran an Aho-Corasick scan over
+// every note's `content_json` blob to find which assets were referenced -
+// O(total_json_bytes). With 1M notes × ~10 KB = ~10 GB of text streamed
+// through pattern matching on every GC. That's a desktop-app deal-breaker
+// once the corpus grows.
+//
+// `note_assets(note_id, asset_id)` makes the relationship first-class: the
+// `update_note` IPC populates it from `input.asset_ids` (the editor's mutation
+// tracker already tracks ImageNode keys, see `editorRefs.ts`), and `gc_orphan_assets`
+// becomes a single LEFT JOIN that runs in O(assets), not O(content).
+//
+// CASCADE on note delete removes orphaned references automatically. Snapshots
+// can still hold references via the `note_id` of their owning note (snapshots
+// are deleted with their note via the existing FK CASCADE on `snapshots`),
+// so a snapshot's content_json *only* references assets that the live note
+// also references - no need for `snapshot_assets` separately.
+//
+// Bootstrap: the migration backfills the table from the existing notes by
+// substring-matching every known asset id in every note's content_json. This
+// is the same Aho-Corasick logic the old GC ran, but it runs ONCE here at
+// migration time rather than every GC. After this migration commits, normal
+// updates keep the table in sync incrementally.
+const MIGRATION_005: &str = r#"
+CREATE TABLE IF NOT EXISTS note_assets (
+    note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+    asset_id TEXT NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+    PRIMARY KEY (note_id, asset_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_note_assets_asset ON note_assets(asset_id);
+"#;
+
+// v6: denormalized `folders.note_count` for cheap sidebar counts.
+//
+// Before this, `list_folders` ran a `LEFT JOIN (SELECT folder_id, COUNT(*) ...
+// GROUP BY folder_id)` aggregation against every active note. At 1M notes
+// that's an index-only scan of millions of rows on every cold app boot - the
+// partial index keeps it sub-100ms but it's still proportional to corpus size.
+//
+// Maintaining `folders.note_count` via SQLite triggers makes `list_folders`
+// O(folders), independent of note count. Triggers fire on the four ways a
+// note's effective folder membership changes:
+//   - INSERT (folder_id set)        : +1
+//   - UPDATE folder_id              : -1 old, +1 new
+//   - UPDATE deleted_at NULL→NOTNULL: -1 (soft delete leaves the row)
+//   - UPDATE deleted_at NOTNULL→NULL: +1 (restore from trash)
+//   - DELETE                        : -1 (only if was active; partial)
+//
+// Counts are clamped to 0 in case of trigger gaps (e.g. data loaded from
+// legacy backups before this migration).
+//
+// Bootstrap: the migration recomputes counts from the current state of the
+// notes table.
+const MIGRATION_006: &str = r#"
+ALTER TABLE folders ADD COLUMN note_count INTEGER NOT NULL DEFAULT 0;
+
+UPDATE folders SET note_count = (
+    SELECT COUNT(*) FROM notes
+    WHERE notes.folder_id = folders.id AND notes.deleted_at IS NULL
+);
+
+CREATE TRIGGER IF NOT EXISTS notes_folder_count_ai
+AFTER INSERT ON notes
+WHEN new.folder_id IS NOT NULL AND new.deleted_at IS NULL
+BEGIN
+    UPDATE folders SET note_count = note_count + 1 WHERE id = new.folder_id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS notes_folder_count_ad
+AFTER DELETE ON notes
+WHEN old.folder_id IS NOT NULL AND old.deleted_at IS NULL
+BEGIN
+    UPDATE folders
+       SET note_count = MAX(note_count - 1, 0)
+     WHERE id = old.folder_id;
+END;
+
+-- Single trigger handles both folder moves and trash/restore by reasoning
+-- about the four-way (was-active, is-active) × (old-folder, new-folder)
+-- transition. The CASE expressions branch on the active/inactive state.
+CREATE TRIGGER IF NOT EXISTS notes_folder_count_au
+AFTER UPDATE OF folder_id, deleted_at ON notes
+BEGIN
+    -- Decrement the old folder if the row WAS active and IS now leaving it
+    -- (either via soft-delete or via folder_id change to a different value).
+    UPDATE folders
+       SET note_count = MAX(note_count - 1, 0)
+     WHERE old.deleted_at IS NULL
+       AND old.folder_id IS NOT NULL
+       AND id = old.folder_id
+       AND (
+            new.deleted_at IS NOT NULL
+            OR new.folder_id IS NOT old.folder_id
+       );
+
+    -- Increment the new folder if the row IS active and IS now joining it
+    -- (either via restore from trash or via folder_id change from elsewhere).
+    UPDATE folders
+       SET note_count = note_count + 1
+     WHERE new.deleted_at IS NULL
+       AND new.folder_id IS NOT NULL
+       AND id = new.folder_id
+       AND (
+            old.deleted_at IS NOT NULL
+            OR new.folder_id IS NOT old.folder_id
+       );
+END;
+"#;
+
+// v7: dedicated `cursors` table to move per-note caret state out of the
+// `settings` kitchen-sink.
+//
+// Before this, the editor persisted caret position via `settings(key, value)`
+// with `key = "cursor:<uuid>"`. With 100k notes that's 100k+ rows in the
+// settings table, and `list_settings` (called on every `loadSettings`) had to
+// stream all of them just to find the half-dozen real settings keys. Worst
+// case: a settings IPC RTT proportional to corpus size. Splitting them out
+// makes both `list_settings` and the cursor lookups O(1) per query.
+//
+// `note_id` is a primary key (one cursor per note). FK CASCADE on note
+// deletion drops orphaned cursor rows automatically.
+//
+// Migration backfills from existing `settings` rows whose key matches the
+// `cursor:<uuid>` prefix, then deletes those rows from settings.
+const MIGRATION_007: &str = r#"
+CREATE TABLE IF NOT EXISTS cursors (
+    note_id TEXT PRIMARY KEY REFERENCES notes(id) ON DELETE CASCADE,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+INSERT OR IGNORE INTO cursors (note_id, value, updated_at)
+SELECT
+    substr(s.key, length('cursor:') + 1) AS note_id,
+    s.value,
+    s.updated_at
+FROM settings s
+JOIN notes n ON n.id = substr(s.key, length('cursor:') + 1)
+WHERE s.key LIKE 'cursor:%';
+
+DELETE FROM settings WHERE key LIKE 'cursor:%';
+"#;
+
+/// One-shot backfill of the `note_assets` join table from the existing
+/// notes/snapshots content_json blobs. Used at v4→v5 migration time only.
+/// Idempotent (uses INSERT OR IGNORE) and bounded - skips if no assets exist.
+fn backfill_note_assets(conn: &rusqlite::Connection) -> Result<()> {
+    let known: Vec<String> = {
+        let mut stmt = conn.prepare("SELECT id FROM assets")?;
+        let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()?
+    };
+    if known.is_empty() {
+        return Ok(());
+    }
+
+    let ac = aho_corasick::AhoCorasick::new(&known)
+        .map_err(|e| crate::error::NoteZError::Other(format!("aho-corasick: {e}")))?;
+
+    let mut insert = conn.prepare("INSERT OR IGNORE INTO note_assets (note_id, asset_id) VALUES (?1, ?2)")?;
+    let mut select = conn.prepare("SELECT id, content_json FROM notes WHERE deleted_at IS NULL")?;
+    let mut count: u64 = 0;
+    let rows = select.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+    for row in rows {
+        let (note_id, blob) = row?;
+        // Use a small Set so the same asset referenced multiple times in
+        // one note results in only one INSERT call.
+        let mut seen = std::collections::HashSet::new();
+        for m in ac.find_iter(&blob) {
+            let asset_id = &known[m.pattern().as_usize()];
+            if seen.insert(asset_id.clone()) {
+                insert.execute(rusqlite::params![note_id, asset_id])?;
+                count += 1;
+            }
+        }
+    }
+    tracing::info!("note_assets backfill seeded {} entries", count);
+    Ok(())
+}
+
 pub fn now_iso() -> String {
     chrono::Utc::now().to_rfc3339()
 }
@@ -304,12 +509,22 @@ pub fn now_iso() -> String {
 /// WAL (`empty_trash`, `dev_delete_generated_notes`, big migrations) so the
 /// WAL doesn't keep eating disk between auto-checkpoints.
 ///
+/// Also runs `PRAGMA optimize` so SQLite refreshes its query-planner stats
+/// after the bulk write - the recommended `0x10002` mask only does work
+/// when stale stats are actually detected, so this is cheap when there's
+/// nothing to do.
+///
 /// Best-effort: the result is logged but never bubbles up - failure means the
 /// WAL stays large until the next auto-checkpoint, which is harmless.
 pub fn wal_checkpoint(db: &Db) -> Result<()> {
     let conn = db.conn()?;
     if let Err(e) = conn.pragma_update(None, "wal_checkpoint", "TRUNCATE") {
         tracing::warn!("wal_checkpoint(TRUNCATE) failed: {e}");
+    }
+    // SQLite reference: https://sqlite.org/pragma.html#pragma_optimize -
+    // 0x10002 is the recommended mask for periodic tuning passes.
+    if let Err(e) = conn.execute_batch("PRAGMA optimize=0x10002;") {
+        tracing::warn!("PRAGMA optimize failed: {e}");
     }
     Ok(())
 }

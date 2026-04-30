@@ -1,6 +1,7 @@
 import { mergeRegister } from "@lexical/utils";
 import {
   $createTextNode,
+  $getNodeByKey,
   $getSelection,
   $isRangeSelection,
   $isTextNode,
@@ -124,7 +125,9 @@ export function insertMention(
   title: string,
 ) {
   editor.update(() => {
-    const node = editor.getEditorState()._nodeMap.get(match.textNodeKey);
+    // $getNodeByKey is the public Lexical 0.44+ API; reading from
+    // editor.getEditorState()._nodeMap directly is private and unstable.
+    const node = $getNodeByKey(match.textNodeKey);
     if (!node || !$isTextNode(node)) return;
 
     const textNode = node as TextNode;

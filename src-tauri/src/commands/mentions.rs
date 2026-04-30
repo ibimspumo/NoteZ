@@ -1,20 +1,29 @@
-use crate::constants::PREVIEW_MAX_CHARS;
+use crate::constants::{DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, PREVIEW_MAX_CHARS};
 use crate::db::Db;
 use crate::error::Result;
-use crate::models::{MentionTargetStatus, NoteSummary};
+use crate::models::{BacklinksCursor, BacklinksPage, MentionTargetStatus, NoteSummary};
+use crate::pagination::{collect_page, next_cursor};
 use tauri::State;
 
+/// Paginated list of notes that mention the given note.
+///
+/// Stable cursor: `(updated_at DESC, id DESC)` mirrors the active-notes
+/// listing so a popular note's backlinks paginate predictably even when
+/// several mention sources share an updated_at timestamp. A "FAQ"-style
+/// note with hundreds of backlinks no longer ships them all in a single
+/// IPC frame.
 #[tauri::command]
-pub fn list_backlinks(db: State<Db>, note_id: String) -> Result<Vec<NoteSummary>> {
+pub fn list_backlinks(
+    db: State<Db>,
+    note_id: String,
+    cursor: Option<BacklinksCursor>,
+    limit: Option<u32>,
+) -> Result<BacklinksPage> {
     let conn = db.conn()?;
-    let mut stmt = conn.prepare(
-        "SELECT n.id, n.title, n.content_text, n.is_pinned, n.pinned_at, n.updated_at, n.folder_id
-         FROM mentions m
-         JOIN notes n ON n.id = m.source_note_id
-         WHERE m.target_note_id = ?1 AND n.deleted_at IS NULL
-         ORDER BY n.updated_at DESC",
-    )?;
-    let rows = stmt.query_map(rusqlite::params![note_id], |row| {
+    let limit = limit.unwrap_or(DEFAULT_PAGE_SIZE).clamp(1, MAX_PAGE_SIZE);
+    let fetch = (limit + 1) as i64;
+
+    let map_row = |row: &rusqlite::Row<'_>| -> rusqlite::Result<NoteSummary> {
         let content_text: String = row.get("content_text")?;
         Ok(NoteSummary {
             id: row.get("id")?,
@@ -25,12 +34,42 @@ pub fn list_backlinks(db: State<Db>, note_id: String) -> Result<Vec<NoteSummary>
             updated_at: row.get("updated_at")?,
             folder_id: row.get("folder_id")?,
         })
-    })?;
-    let mut out = Vec::new();
-    for r in rows {
-        out.push(r?);
-    }
-    Ok(out)
+    };
+
+    let (items, has_more) = if let Some(c) = cursor.as_ref() {
+        let mut stmt = conn.prepare(
+            "SELECT n.id, n.title, n.content_text, n.is_pinned, n.pinned_at, n.updated_at, n.folder_id
+             FROM mentions m
+             JOIN notes n ON n.id = m.source_note_id
+             WHERE m.target_note_id = ?1
+               AND n.deleted_at IS NULL
+               AND (n.updated_at, n.id) < (?2, ?3)
+             ORDER BY n.updated_at DESC, n.id DESC
+             LIMIT ?4",
+        )?;
+        collect_page(
+            &mut stmt,
+            rusqlite::params![note_id, c.updated_at, c.id, fetch],
+            limit,
+            map_row,
+        )?
+    } else {
+        let mut stmt = conn.prepare(
+            "SELECT n.id, n.title, n.content_text, n.is_pinned, n.pinned_at, n.updated_at, n.folder_id
+             FROM mentions m
+             JOIN notes n ON n.id = m.source_note_id
+             WHERE m.target_note_id = ?1 AND n.deleted_at IS NULL
+             ORDER BY n.updated_at DESC, n.id DESC
+             LIMIT ?2",
+        )?;
+        collect_page(&mut stmt, rusqlite::params![note_id, fetch], limit, map_row)?
+    };
+
+    let next = next_cursor(&items, has_more, |s| BacklinksCursor {
+        updated_at: s.updated_at.clone(),
+        id: s.id.clone(),
+    });
+    Ok(BacklinksPage { items, next_cursor: next })
 }
 
 /// Resolve the live status (`alive` / `trashed` / `missing`) for a batch of

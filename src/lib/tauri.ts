@@ -6,14 +6,16 @@ import type {
   AiConfig,
   AiModel,
   AiStats,
-  Asset,
   AssetRef,
+  AssetsCursor,
+  AssetsPage,
+  BacklinksCursor,
+  BacklinksPage,
   DeleteFolderMode,
   Folder,
   FolderFilter,
   MentionTargetStatus,
   Note,
-  NoteSummary,
   NotesCursor,
   NotesPage,
   SearchHit,
@@ -60,7 +62,8 @@ export const api = {
   restoreSnapshot: (snapshotId: string) => invoke<void>("restore_snapshot", { snapshotId }),
 
   // mentions
-  listBacklinks: (noteId: string) => invoke<NoteSummary[]>("list_backlinks", { noteId }),
+  listBacklinks: (noteId: string, cursor?: BacklinksCursor | null, limit?: number) =>
+    invoke<BacklinksPage>("list_backlinks", { noteId, cursor: cursor ?? null, limit }),
   getMentionStatusBulk: (ids: string[]) =>
     invoke<MentionTargetStatus[]>("get_mention_status_bulk", { ids }),
 
@@ -96,12 +99,17 @@ export const api = {
     invoke<AssetRef>("save_asset_from_path", { path, mime }),
   getAsset: (id: string) => invoke<AssetRef | null>("get_asset", { id }),
   getAssetsDir: () => invoke<string>("get_assets_dir"),
-  listAssets: () => invoke<Asset[]>("list_assets"),
+  listAssets: (cursor?: AssetsCursor | null, limit?: number) =>
+    invoke<AssetsPage>("list_assets", { cursor: cursor ?? null, limit }),
   gcOrphanAssets: () => invoke<number>("gc_orphan_assets"),
 
   // capture window
   toggleCaptureWindow: () => invoke<void>("toggle_capture_window"),
   hideCaptureWindow: () => invoke<void>("hide_capture_window"),
+
+  // cursors (per-note caret state, dedicated table since v7)
+  getCursor: (noteId: string) => invoke<string | null>("get_cursor", { noteId }),
+  setCursor: (noteId: string, value: string) => invoke<void>("set_cursor", { noteId, value }),
 
   // ai
   getAiConfig: () => invoke<AiConfig>("get_ai_config"),
@@ -128,9 +136,27 @@ export const api = {
   devSeedDemoNotes: () => invoke<number>("dev_seed_demo_notes"),
 };
 
+// Tauri's `convertFileSrc` is pure (path → URL) for a given target webview,
+// so memoizing it once is safe and saves the per-render call cost across
+// thousands of image renders. The cache is bounded by the number of unique
+// asset paths ever rendered in a session - effectively the number of
+// distinct images the user has opened, which is small.
+const assetUrlCache = new Map<string, string>();
+const ASSET_URL_CACHE_MAX = 1024;
+
 /** Convert an absolute on-disk asset path to a webview-loadable URL. */
 export function assetUrl(absolutePath: string): string {
-  return convertFileSrc(absolutePath);
+  const cached = assetUrlCache.get(absolutePath);
+  if (cached !== undefined) return cached;
+  const url = convertFileSrc(absolutePath);
+  if (assetUrlCache.size >= ASSET_URL_CACHE_MAX) {
+    // Trivial first-key eviction - we don't need true LRU for what is
+    // already a hot-path micro-optimisation.
+    const firstKey = assetUrlCache.keys().next().value;
+    if (firstKey !== undefined) assetUrlCache.delete(firstKey);
+  }
+  assetUrlCache.set(absolutePath, url);
+  return url;
 }
 
 export type NoteZEvent =

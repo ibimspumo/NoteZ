@@ -42,6 +42,13 @@ jobs:
       - name: Test
         run: pnpm test
 
+      # Surface high-severity CVEs in the npm dep tree. `--audit-level=high`
+      # so the build fails only on real issues, not advisory noise about
+      # dev-only transitive deps. Auditing the lockfile costs ~5s.
+      - name: pnpm audit
+        run: pnpm audit --audit-level=high --prod
+        continue-on-error: true
+
   backend:
     name: Backend (cargo check + clippy + test)
     runs-on: macos-latest
@@ -71,3 +78,12 @@ jobs:
 
       - name: Cargo test
         run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      # Audit the Rust dep tree against RustSec advisories. We install the
+      # tool inline rather than via a pre-existing action so the version
+      # is pinned by Cargo.toml and not by an opaque GitHub Action.
+      - name: Install cargo-audit
+        run: cargo install --locked cargo-audit
+      - name: Cargo audit
+        run: cargo audit --file src-tauri/Cargo.lock
+        continue-on-error: true

@@ -84,6 +84,36 @@ pub const MAX_ASSET_BYTES: u64 = 16 * 1024 * 1024;
 /// Blurhash thumbnail decode size.
 pub const BLURHASH_DECODE_SIZE: u32 = 256;
 
+// ─── Per-note content caps ────────────────────────────────────────────────
+
+/// Hard cap on a single note's `content_text`. 16 MB of plain text is enough
+/// for several novels worth of content while preventing a buggy paste from
+/// inflating the DB or stalling FTS5 indexing.
+pub const MAX_NOTE_TEXT_BYTES: usize = 16 * 1024 * 1024;
+
+/// Hard cap on a single note's `content_json`. Lexical state is structurally
+/// 3-5x bigger than its plain-text content, so allow proportionally more.
+pub const MAX_NOTE_JSON_BYTES: usize = 64 * 1024 * 1024;
+
+/// Maximum number of mention targets a single note can declare. Prevents a
+/// pathological note (or a buggy save) from hammering the mentions table.
+pub const MAX_MENTION_TARGETS_PER_NOTE: usize = 5_000;
+
+/// Maximum number of asset references a single note can declare.
+pub const MAX_ASSET_REFS_PER_NOTE: usize = 5_000;
+
+// ─── Settings caps ────────────────────────────────────────────────────────
+
+/// Max settings-value length. The Lexical-pane-layout blob is the heaviest
+/// known consumer (~10 KB at MAX_PANES + tabs); 1 MB leaves comfortable
+/// headroom while preventing a runaway `cursor:<uuid>` write from filling
+/// the table.
+pub const MAX_SETTING_VALUE_BYTES: usize = 1024 * 1024;
+
+/// Max settings-key length. Real keys are ≤ 80 chars; this just blocks
+/// pathological writes.
+pub const MAX_SETTING_KEY_BYTES: usize = 256;
+
 // ─── Database / SQLite ────────────────────────────────────────────────────
 
 /// `r2d2` pool max size.
@@ -147,9 +177,11 @@ pub const KNOWN_SETTING_KEYS: &[&str] = &[
     SETTING_FOLDERS_SECTION_OPEN,
 ];
 
-/// Dynamic keys that match a prefix. The remainder is opaque (a UUID for
-/// `cursor:`) so we don't validate it further.
-pub const KNOWN_SETTING_PREFIXES: &[&str] = &["cursor:"];
+/// Dynamic keys that match a prefix. None left as of v7 - cursor data
+/// moved to the dedicated `cursors` table. Kept as an empty array for
+/// future expansion (e.g. per-pane scratch state) without re-introducing
+/// the `cursor:` allowlist hole.
+pub const KNOWN_SETTING_PREFIXES: &[&str] = &[];
 
 // ─── Keychain ─────────────────────────────────────────────────────────────
 

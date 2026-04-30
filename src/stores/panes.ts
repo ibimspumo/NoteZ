@@ -55,6 +55,11 @@ export type EditorPaneApi = {
   applyExternalUpdate: (note: Note) => void;
   syncActiveNote: (note: Note) => void;
   savingState: () => SavingState;
+  /** Drop any debounced/pending save targeting `noteId` (or unconditionally
+   *  when omitted). Used when the note is being soft-deleted/purged so the
+   *  pipeline doesn't fire an `update_note` against a row that no longer
+   *  exists, which would surface as a NotFound error toast. */
+  cancelPendingSave: (noteId?: string) => void;
 };
 
 /** Soft cap on panes. Beyond this, splits no-op with a toast. The cost per
@@ -298,12 +303,28 @@ export function openEmptyTabInActivePane(): TabId | null {
  *
  * If this was the active tab and there are other tabs → focus the next tab
  * (right of the closed one, or the new last tab if we closed the rightmost).
+ *
+ * Best-effort save flush: if the tab being closed has unsaved edits in its
+ * pipeline (350 ms debounce window after the last keystroke), we kick the
+ * pipeline first. The structural mutation below is synchronous and does NOT
+ * await the flush - the flush continues in the background after the tab DOM
+ * is gone, the editor instance unmounts via onCleanup, and the in-flight
+ * IPC lands on the persisted Db state. Without this, a fast ⌘W during a
+ * burst of edits could lose up to 350 ms of typing.
  */
 export function closeTab(paneId: PaneId, tabId: TabId) {
   const pane = findPane(unwrap(state.root), paneId);
   if (!pane) return;
   const idx = pane.tabs.findIndex((t) => t.id === tabId);
   if (idx < 0) return;
+
+  const closingTab = pane.tabs[idx];
+  if (closingTab) {
+    const api = apis.get(closingTab.id);
+    if (api?.hasPendingSave()) {
+      void api.flushSave().catch((e) => console.warn("closeTab: flushSave failed", e));
+    }
+  }
 
   // Last tab in pane → either clear to empty or remove the pane.
   if (pane.tabs.length === 1) {

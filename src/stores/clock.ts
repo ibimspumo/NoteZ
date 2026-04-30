@@ -18,16 +18,43 @@ import { createSignal } from "solid-js";
  * the visible rows + the open note + (if open) the command-bar results.
  * Cost is bounded by what's on-screen, not by the database size.
  *
- * Visibilitychange: when the laptop wakes from sleep we want labels to
- * update immediately, not on the next 60s boundary.
+ * Visibility-aware: when the page is hidden (window minimised, app in
+ * background, laptop lid closed), we pause the interval so the renderer
+ * doesn't spend CPU/wakeups on labels nobody can see. On `visibilitychange`
+ * back to visible we tick once immediately so labels jump to the current
+ * time, then resume the regular cadence.
  */
 const [now, setNow] = createSignal(Date.now());
 
+let intervalHandle: number | null = null;
+
+function startTick() {
+  if (intervalHandle != null) return;
+  intervalHandle = window.setInterval(() => setNow(Date.now()), 60_000);
+}
+
+function stopTick() {
+  if (intervalHandle == null) return;
+  window.clearInterval(intervalHandle);
+  intervalHandle = null;
+}
+
 if (typeof window !== "undefined") {
-  window.setInterval(() => setNow(Date.now()), 60_000);
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) setNow(Date.now());
-  });
+  if (typeof document === "undefined" || !document.hidden) {
+    startTick();
+  }
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        stopTick();
+      } else {
+        // Catch up immediately on resume so labels reflect the current time
+        // rather than the moment the tick was paused.
+        setNow(Date.now());
+        startTick();
+      }
+    });
+  }
 }
 
 export const nowTick = now;
