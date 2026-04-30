@@ -19,6 +19,7 @@ import {
   sidebarCollapsed,
 } from "../../stores/ui";
 import {
+  checkForUpdatesNow,
   downloadAndInstall,
   updateAvailable,
   updateProgress,
@@ -234,48 +235,74 @@ export const Sidebar: Component<Props> = (props) => {
           <SettingsGearIcon width="14" height="14" />
         </button>
         <Show
-          when={updateAvailable() && updateStage() !== "idle" && updateStage() !== "checking"}
+          when={updateStage() === "checking"}
           fallback={
-            <button
-              class="nz-version-button"
-              aria-label={`About NoteZ - version ${APP_VERSION}`}
-              title="About NoteZ"
-              onClick={() => setAboutOpen(true)}
-            >
-              v{APP_VERSION}
-            </button>
-          }
-        >
-          <button
-            class="nz-version-button nz-version-button-update"
-            data-stage={updateStage()}
-            aria-label={`Update auf v${updateAvailable()?.version} verfügbar - jetzt installieren`}
-            title={
-              updateStage() === "downloading"
-                ? `Lade v${updateAvailable()?.version}…`
-                : updateStage() === "installing"
-                  ? "Installiere und starte neu…"
-                  : `Update auf v${updateAvailable()?.version} - klick zum Installieren`
-            }
-            disabled={updateStage() === "downloading" || updateStage() === "installing"}
-            onClick={() => {
-              void downloadAndInstall();
-            }}
-          >
             <Show
-              when={updateStage() === "downloading"}
+              when={updateAvailable() && updateStage() !== "idle"}
               fallback={
-                <Show
-                  when={updateStage() === "installing"}
-                  fallback={<>v{updateAvailable()?.version} ↓</>}
+                <button
+                  class="nz-version-button"
+                  aria-label={`About NoteZ - version ${APP_VERSION}`}
+                  title="About NoteZ · ⌘-click to check for updates"
+                  onClick={(e) => {
+                    // ⌘/Ctrl-click forces an immediate update check instead
+                    // of opening the About dialog. Mouse-modifier dispatch
+                    // mirrors the convention used by NoteListItem and the
+                    // mention pills.
+                    if (e.metaKey || e.ctrlKey) {
+                      e.preventDefault();
+                      void checkForUpdatesNow();
+                      return;
+                    }
+                    setAboutOpen(true);
+                  }}
                 >
-                  Installiere…
-                </Show>
+                  v{APP_VERSION}
+                </button>
               }
             >
-              {updateProgress() ?? 0}%
+              <button
+                class="nz-version-button nz-version-button-update"
+                data-stage={updateStage()}
+                style={{ "--nz-update-progress": `${updateProgress() ?? 0}%` }}
+                aria-label={`Update to v${updateAvailable()?.version} available - click to install`}
+                title={
+                  updateStage() === "downloading"
+                    ? `Downloading v${updateAvailable()?.version}… ${updateProgress() ?? 0}%`
+                    : updateStage() === "installing"
+                      ? "Installing and relaunching…"
+                      : `Update to v${updateAvailable()?.version} - click to install`
+                }
+                disabled={updateStage() === "downloading" || updateStage() === "installing"}
+                onClick={() => {
+                  void downloadAndInstall();
+                }}
+              >
+                <Show
+                  when={updateStage() === "downloading"}
+                  fallback={
+                    <Show
+                      when={updateStage() === "installing"}
+                      fallback={<>v{updateAvailable()?.version} ↓</>}
+                    >
+                      Installing…
+                    </Show>
+                  }
+                >
+                  v{updateAvailable()?.version} · {updateProgress() ?? 0}%
+                </Show>
+              </button>
             </Show>
-          </button>
+          }
+        >
+          <span
+            class="nz-version-button nz-version-button-checking"
+            aria-label="Checking for updates…"
+            title="Checking for updates…"
+          >
+            <span class="nz-version-spinner" aria-hidden="true" />
+            Checking…
+          </span>
         </Show>
       </div>
 

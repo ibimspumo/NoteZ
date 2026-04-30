@@ -2,6 +2,7 @@
 import { render } from "solid-js/web";
 import App from "./App";
 import { applyTheme } from "./lib/applyTheme";
+import { installExternalLinkGuard } from "./lib/externalLinks";
 import { BUILTIN_THEMES, DEFAULT_THEME_ID } from "./themes";
 import "./styles/global.css";
 import "./styles/theme.css";
@@ -25,5 +26,10 @@ import "./styles/dev-panel.css";
 import "./styles/toast.css";
 import "./styles/snapshots.css";
 import "./styles/print.css";
+
+// Route every external link through the system browser. Without this, the
+// webview's right-click "Open Link" or middle-click would navigate the
+// app in place and there'd be no way back without a restart.
+installExternalLinkGuard();
 
 render(() => <App />, document.getElementById("root") as HTMLElement);

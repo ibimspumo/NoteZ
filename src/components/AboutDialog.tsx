@@ -19,13 +19,6 @@ export const AboutDialog: Component<Props> = (props) => {
     onCleanup(() => window.removeEventListener("keydown", onKey));
   });
 
-  // Tauri's webview intercepts window.open and routes external URLs to the
-  // system browser, so this is the simplest cross-target way to open a link.
-  const openAgentZ = (e: MouseEvent) => {
-    e.preventDefault();
-    window.open(AGENTZ_URL, "_blank", "noopener,noreferrer");
-  };
-
   return (
     <Show when={props.open}>
       <div class="nz-about-backdrop" onClick={props.onClose}>
@@ -68,19 +61,14 @@ export const AboutDialog: Component<Props> = (props) => {
 
           <div class="nz-about-section">
             <div class="nz-about-section-label">Made by</div>
-            <a
-              class="nz-about-brand"
-              href={AGENTZ_URL}
-              onClick={openAgentZ}
-              title="Open agent-z.de"
-            >
+            <a class="nz-about-brand" href={AGENTZ_URL} title="Open agent-z.de">
               <AgentZLogo class="nz-about-logo" height={28} />
             </a>
             <p class="nz-about-blurb">
               AgentZ Media is a social media agency from Schwerin, producing 365 videos a year for
               businesses - reach through content, not ads.
             </p>
-            <a class="nz-about-link" href={AGENTZ_URL} onClick={openAgentZ}>
+            <a class="nz-about-link" href={AGENTZ_URL}>
               www.agent-z.de
               <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
                 <path

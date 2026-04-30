@@ -27,6 +27,7 @@
 import { relaunch } from "@tauri-apps/plugin-process";
 import { type Update, check } from "@tauri-apps/plugin-updater";
 import { createSignal } from "solid-js";
+import { APP_VERSION } from "../lib/version";
 import { toast } from "./toasts";
 
 export type UpdateStage =
@@ -51,10 +52,16 @@ export const updateProgress = progress;
 let pollHandle: ReturnType<typeof setInterval> | null = null;
 let inFlight = false;
 
-/** Single-flight check. Network failures and "no signing key configured yet"
- *  errors are intentionally silent - the pill simply doesn't appear. */
-async function pollOnce(): Promise<void> {
-  if (inFlight) return;
+/** Single-flight check. `manual=true` switches on user-facing feedback
+ *  (success toast when up-to-date, error toast on failure). Background
+ *  polls stay silent: a perpetually-broken network shouldn't yell every
+ *  hour, and "you're already on the newest version" isn't worth a toast
+ *  every time the timer fires. */
+async function pollOnce(manual = false): Promise<void> {
+  if (inFlight) {
+    if (manual) toast.info("Update check already in progress…");
+    return;
+  }
   // If the user is mid-download or already saw an update, don't clobber that
   // state with a fresh check. The available Update object would be replaced
   // and the in-progress download would be orphaned.
@@ -66,18 +73,22 @@ async function pollOnce(): Promise<void> {
     if (update) {
       setAvailable(update);
       setStage("available");
+      // No toast on the "available" path - the green pill in the sidebar
+      // is the surfacing UI, and a toast on top would be redundant noise.
     } else {
       setAvailable(null);
       // Only flip back to idle if we hadn't already surfaced an update from
       // a prior poll. This avoids a transient "available → idle → available"
       // flicker if GitHub returns 200 then a stale cache.
       if (stage() === "checking") setStage("idle");
+      if (manual) toast.success(`NoteZ is up to date (v${APP_VERSION}).`);
     }
   } catch (e) {
-    // Don't toast - the user didn't ask for an update check, and a
-    // perpetually broken network shouldn't yell every hour.
     console.warn("update check failed:", e);
     if (stage() === "checking") setStage("idle");
+    if (manual) {
+      toast.error("Update check failed. Check your internet connection.");
+    }
   } finally {
     inFlight = false;
   }
@@ -100,10 +111,11 @@ export function startUpdateChecker(): void {
   }, HOUR_MS);
 }
 
-/** Manual re-check. Wired to the "Check for updates" path in case we ever
- *  add one to the About dialog. Returns once the check resolves. */
+/** Manual re-check. Bound to ⌘-click on the sidebar version label. Surfaces
+ *  toast feedback (success when already current, error on network failure)
+ *  so the click feels acknowledged even when nothing visually changes. */
 export async function checkForUpdatesNow(): Promise<void> {
-  await pollOnce();
+  await pollOnce(true);
 }
 
 /** Click handler for the version pill when an update is available. Drives
@@ -150,9 +162,7 @@ export async function downloadAndInstall(): Promise<void> {
     console.error("update install failed:", e);
     setStage("error");
     setProgress(null);
-    toast.error(
-      "Update fehlgeschlagen. Versuche es später erneut oder lade die neue Version manuell von GitHub.",
-    );
+    toast.error("Update failed. Try again later or download the new version manually from GitHub.");
     // Drop back to "available" after a beat so the user can retry without
     // refreshing the app. The Update object is still valid.
     setTimeout(() => {

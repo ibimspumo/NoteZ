@@ -1,6 +1,6 @@
 [package]
 name = "notez"
-version = "0.8.7"
+version = "0.8.8"
 description = "NoteZ - fast, local, beautiful notes for Mac."
 authors = ["NoteZ Contributors"]
 edition = "2021"
@@ -20,6 +20,7 @@ tauri-plugin-os = "2"
 tauri-plugin-window-state = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+tauri-plugin-opener = "2"
 
 # Database
 rusqlite = { version = "0.32", features = ["bundled"] }
