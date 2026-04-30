@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.8.3-1f883d?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-0.8.4-1f883d?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/platform-macOS-1f883d?style=flat-square" alt="macOS" />
   <img src="https://img.shields.io/badge/storage-local%20only-1f883d?style=flat-square" alt="local-only" />
   <img src="https://img.shields.io/badge/telemetry-none-1f883d?style=flat-square" alt="no telemetry" />
@@ -57,6 +57,11 @@ link to jump there. Build a web of ideas without folders or tags getting in
 the way.
 
 **Pin what matters.** Keep your most-used notes at the top of the sidebar.
+
+**Organize with folders.** Group notes into nested folders, drag them around
+to reorganize, and scope the sidebar to one folder at a time. Notes you
+haven't filed yet stay in Inbox. Deleting a folder asks where the contents
+should go - move them up, into another folder, or to Trash.
 
 **Work side-by-side.** Drag a note from the sidebar onto an editor edge to
 split the view, or hit `Cmd+D` to open a fresh pane. Tile up to eight panes,
@@ -130,7 +135,7 @@ you ever want to look inside.
 ## Roadmap
 
 **Now.** Editor, search, pinning, snapshots, mentions, quick capture, trash,
-images, split panes.
+images, split panes, folders.
 
 **Next.** Slash menu. Code blocks with syntax highlighting. Backlinks panel.
 Hashtag tags. Daily notes. Templates. Note sharing via `notez://` deep links

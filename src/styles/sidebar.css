@@ -416,3 +416,364 @@
   color: var(--nz-text-faint);
   background: var(--nz-bg-hover);
 }
+
+/* ─── Folders ───────────────────────────────────────────────────────────
+ * Sits above the Pinned region. Collapsed = single filter row + chevron;
+ * expanded reveals the virtual roots ("All Notes", "Inbox") and the user's
+ * tree. Indentation is driven by the inline `--folder-depth` custom prop
+ * so depth changes don't need a new class per level.
+ */
+.nz-folders {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid transparent;
+  margin: 0 0 4px;
+}
+
+.nz-folders.open {
+  border-bottom-color: var(--nz-divider);
+  padding-bottom: 6px;
+}
+
+.nz-folders-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px 2px 8px;
+  min-height: 26px;
+}
+
+.nz-folders-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--nz-text-faint);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  text-align: left;
+  border-radius: var(--nz-radius-sm);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.nz-folders-toggle:hover {
+  background: var(--nz-bg-hover);
+  color: var(--nz-text);
+}
+
+.nz-folders-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  color: var(--nz-text-whisper);
+  transition: transform var(--nz-dur) var(--nz-ease);
+  flex: 0 0 12px;
+}
+
+.nz-folders-chevron.open {
+  transform: rotate(90deg);
+}
+
+.nz-folders-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.nz-folder-add {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+}
+
+.nz-folders-tree {
+  display: flex;
+  flex-direction: column;
+  padding: 2px 6px 0;
+  gap: 1px;
+}
+
+.nz-folder-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 24px;
+  padding: 3px 6px 3px calc(8px + 12px * var(--folder-depth, 0));
+  border: 0;
+  background: transparent;
+  color: var(--nz-text);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  border-radius: var(--nz-radius-sm);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.nz-folder-row:hover {
+  background: var(--nz-bg-hover);
+}
+
+.nz-folder-row.active {
+  background: var(--nz-accent-soft);
+  color: var(--nz-text);
+  box-shadow: inset 0 0 0 1px var(--nz-accent-glow);
+}
+
+/* Drop affordance during a note or folder drag. Subtler than the active
+ * highlight so the user can tell them apart - active = where I am, drop =
+ * where I'd land. */
+.nz-folder-row.drop-target {
+  background: var(--nz-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--nz-accent);
+}
+
+.nz-folder-row.drag-source {
+  opacity: 0.4;
+}
+
+.nz-folder-row.virtual {
+  color: var(--nz-text-faint);
+}
+
+.nz-folder-row.virtual.active {
+  color: var(--nz-text);
+}
+
+.nz-folder-row-twist {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 14px;
+  border: 0;
+  background: transparent;
+  color: var(--nz-text-whisper);
+  cursor: pointer;
+  transition: transform var(--nz-dur) var(--nz-ease);
+  flex: 0 0 12px;
+  padding: 0;
+}
+
+.nz-folder-row-twist.open {
+  transform: rotate(90deg);
+}
+
+.nz-folder-row-twist.no-kids {
+  cursor: default;
+  pointer-events: none;
+}
+
+.nz-folder-row-spacer {
+  flex: 0 0 12px;
+}
+
+.nz-folder-row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  color: var(--nz-text-faint);
+  flex: 0 0 14px;
+}
+
+.nz-folder-row.active .nz-folder-row-icon {
+  color: var(--nz-accent);
+}
+
+.nz-folder-row-icon.inbox {
+  color: var(--nz-text-whisper);
+}
+
+.nz-folder-row-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nz-folder-row-count {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  color: var(--nz-text-whisper);
+  font-variant-numeric: tabular-nums;
+}
+
+.nz-folder-row-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 1px 4px;
+  border: 1px solid var(--nz-accent-glow);
+  background: var(--nz-bg-sidebar);
+  color: var(--nz-text);
+  font: inherit;
+  font-size: 12px;
+  border-radius: 4px;
+  outline: none;
+}
+
+/* ─── Delete-folder confirmation dialog ─────────────────────────────────
+ * Reuses the .nz-trash-backdrop overlay so the blur / animation stays
+ * consistent with the other dialogs.
+ */
+.nz-delete-folder-dialog {
+  position: relative;
+  width: min(440px, 92vw);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--nz-bg-overlay);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid var(--nz-divider-strong);
+  border-radius: var(--nz-radius-lg);
+  box-shadow: var(--nz-shadow);
+  padding: 18px 20px 16px;
+  animation: nz-rise 140ms var(--nz-ease);
+}
+
+.nz-delete-folder-header {
+  margin-bottom: 8px;
+}
+
+.nz-delete-folder-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--nz-text-strong);
+  letter-spacing: -0.01em;
+}
+
+.nz-delete-folder-blurb {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--nz-text-faint);
+}
+
+.nz-delete-folder-blurb strong {
+  color: var(--nz-text);
+  font-weight: 600;
+}
+
+.nz-delete-folder-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.nz-delete-folder-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--nz-divider);
+  background: transparent;
+  border-radius: var(--nz-radius-md);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--nz-dur) var(--nz-ease),
+    border-color var(--nz-dur) var(--nz-ease);
+}
+
+.nz-delete-folder-option:hover {
+  background: var(--nz-bg-hover);
+  border-color: var(--nz-divider-strong);
+}
+
+.nz-delete-folder-option.active {
+  background: var(--nz-accent-soft);
+  border-color: var(--nz-accent);
+}
+
+.nz-delete-folder-option.danger.active {
+  background: rgba(213, 74, 58, 0.08);
+  border-color: var(--nz-danger);
+}
+
+.nz-delete-folder-option-title {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--nz-text);
+}
+
+.nz-delete-folder-option.danger .nz-delete-folder-option-title {
+  color: var(--nz-danger);
+}
+
+.nz-delete-folder-option-sub {
+  font-size: 11.5px;
+  color: var(--nz-text-faint);
+}
+
+.nz-delete-folder-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.nz-delete-folder-footer .nz-pill-btn.primary {
+  background: var(--nz-accent);
+  color: var(--nz-bg);
+}
+
+.nz-delete-folder-footer .nz-pill-btn.primary:hover {
+  background: var(--nz-accent-hot, var(--nz-accent));
+  filter: brightness(1.05);
+}
+
+/* Inline folder picker shown when "Move to a different folder" is chosen. */
+.nz-folder-picker {
+  margin-top: 10px;
+  max-height: 220px;
+  overflow-y: auto;
+  border-top: 1px solid var(--nz-divider);
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.nz-folder-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 5px calc(8px + 12px * var(--folder-depth, 0));
+  border: 0;
+  background: transparent;
+  color: var(--nz-text);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  border-radius: var(--nz-radius-sm);
+  cursor: pointer;
+}
+
+.nz-folder-picker-row:hover {
+  background: var(--nz-bg-hover);
+}
+
+.nz-folder-picker-row.active {
+  background: var(--nz-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--nz-accent-glow);
+}
+
+.nz-folder-picker-label {
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

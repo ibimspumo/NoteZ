@@ -2,23 +2,47 @@ use crate::constants::{DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_PINNED, PREVIEW_MAX
 use crate::db::{make_preview, note_row_to_summary, now_iso, wal_checkpoint, Db};
 use crate::error::{NoteZError, Result};
 use crate::models::{
-    Note, NoteSummary, NotesCursor, NotesPage, TrashCursor, TrashPage, TrashSummary,
-    UpdateNoteInput,
+    FolderFilter, Note, NoteSummary, NotesCursor, NotesPage, TrashCursor, TrashPage,
+    TrashSummary, UpdateNoteInput,
 };
 use crate::pagination::{collect_page, next_cursor};
+use rusqlite::types::Value;
 use rusqlite::Connection;
 use tauri::State;
 use uuid::Uuid;
 
+/// Pre-resolved folder filter, ready to splice into a SQL WHERE clause.
+/// `Inbox` becomes `folder_id IS NULL`, `Set` becomes `folder_id IN (?, ?, ...)`,
+/// an empty `Set` short-circuits to "no rows" (the asked-for folder doesn't
+/// exist). Built once per request so a list call doesn't re-walk the folder
+/// tree for both the pinned and the unpinned subqueries.
+enum FolderScope {
+    All,
+    Inbox,
+    Set(Vec<String>),
+}
+
 #[tauri::command]
-pub fn create_note(db: State<Db>) -> Result<Note> {
+pub fn create_note(db: State<Db>, folder_id: Option<String>) -> Result<Note> {
     let conn = db.conn()?;
+    if let Some(fid) = folder_id.as_ref() {
+        let exists: i64 = conn
+            .query_row(
+                "SELECT COUNT(1) FROM folders WHERE id = ?1",
+                rusqlite::params![fid],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        if exists == 0 {
+            return Err(NoteZError::NotFound(fid.clone()));
+        }
+    }
     let id = Uuid::new_v4().to_string();
     let now = now_iso();
     conn.execute(
-        "INSERT INTO notes (id, title, content_json, content_text, created_at, updated_at)
-         VALUES (?1, '', '{}', '', ?2, ?2)",
-        rusqlite::params![id, now],
+        "INSERT INTO notes (id, title, content_json, content_text, folder_id, created_at, updated_at)
+         VALUES (?1, '', '{}', '', ?2, ?3, ?3)",
+        rusqlite::params![id, folder_id, now],
     )?;
     fetch_note(&conn, &id)
 }
@@ -79,18 +103,20 @@ pub fn list_notes(
     db: State<Db>,
     cursor: Option<NotesCursor>,
     limit: Option<u32>,
+    folder: Option<FolderFilter>,
 ) -> Result<NotesPage> {
     let conn = db.conn()?;
     let limit = clamp_limit(limit, DEFAULT_PAGE_SIZE);
+    let scope = resolve_folder_scope(&conn, &folder.unwrap_or_default())?;
 
     // Pinned notes only on the first page.
     let pinned = if cursor.is_none() {
-        load_pinned_summaries(&conn)?
+        load_pinned_summaries(&conn, &scope)?
     } else {
         Vec::new()
     };
 
-    let (items, has_more) = load_unpinned_page(&conn, cursor.as_ref(), limit)?;
+    let (items, has_more) = load_unpinned_page(&conn, cursor.as_ref(), limit, &scope)?;
     let next = next_cursor(&items, has_more, |last| NotesCursor {
         updated_at: last.updated_at.clone(),
         id: last.id.clone(),
@@ -251,7 +277,7 @@ pub fn purge_old_trash(db: State<Db>, days: u32) -> Result<u64> {
 fn fetch_note(conn: &rusqlite::Connection, id: &str) -> Result<Note> {
     let note = conn
         .query_row(
-            "SELECT id, title, content_json, content_text, is_pinned, pinned_at, created_at, updated_at, deleted_at
+            "SELECT id, title, content_json, content_text, is_pinned, pinned_at, created_at, updated_at, deleted_at, folder_id
              FROM notes WHERE id = ?1",
             rusqlite::params![id],
             |row| {
@@ -265,6 +291,7 @@ fn fetch_note(conn: &rusqlite::Connection, id: &str) -> Result<Note> {
                     created_at: row.get("created_at")?,
                     updated_at: row.get("updated_at")?,
                     deleted_at: row.get("deleted_at")?,
+                    folder_id: row.get("folder_id")?,
                 })
             },
         )
@@ -279,15 +306,55 @@ fn clamp_limit(requested: Option<u32>, default: u32) -> u32 {
     requested.unwrap_or(default).clamp(1, MAX_PAGE_SIZE)
 }
 
-fn load_pinned_summaries(conn: &Connection) -> Result<Vec<NoteSummary>> {
-    let mut stmt = conn.prepare(
-        "SELECT id, title, content_text, is_pinned, pinned_at, updated_at
+fn resolve_folder_scope(conn: &Connection, filter: &FolderFilter) -> Result<FolderScope> {
+    match filter {
+        FolderFilter::All => Ok(FolderScope::All),
+        FolderFilter::Inbox => Ok(FolderScope::Inbox),
+        FolderFilter::Folder { id, include_descendants } => {
+            if *include_descendants {
+                let ids = crate::commands::folders::resolve_descendants(conn, id)?;
+                Ok(FolderScope::Set(ids))
+            } else {
+                Ok(FolderScope::Set(vec![id.clone()]))
+            }
+        }
+    }
+}
+
+/// Build the folder-scoped clause to splice into a `WHERE deleted_at IS NULL`
+/// query. Returns the SQL fragment (with `?` placeholders) and the matching
+/// parameters - they're spliced into the caller's full param list in order.
+fn folder_clause(scope: &FolderScope) -> (String, Vec<Value>) {
+    match scope {
+        FolderScope::All => (String::new(), Vec::new()),
+        FolderScope::Inbox => (" AND folder_id IS NULL".to_string(), Vec::new()),
+        // Empty set = "filter for a folder that doesn't exist". The `AND 0`
+        // short-circuit is the simplest way to make the query return zero rows
+        // without adding a special code path.
+        FolderScope::Set(ids) if ids.is_empty() => (" AND 0".to_string(), Vec::new()),
+        FolderScope::Set(ids) => {
+            let placeholders = vec!["?"; ids.len()].join(",");
+            let clause = format!(" AND folder_id IN ({})", placeholders);
+            let params: Vec<Value> = ids.iter().map(|s| Value::from(s.clone())).collect();
+            (clause, params)
+        }
+    }
+}
+
+fn load_pinned_summaries(conn: &Connection, scope: &FolderScope) -> Result<Vec<NoteSummary>> {
+    let (folder_sql, folder_params) = folder_clause(scope);
+    let sql = format!(
+        "SELECT id, title, content_text, is_pinned, pinned_at, updated_at, folder_id
          FROM notes
-         WHERE deleted_at IS NULL AND is_pinned = 1
+         WHERE deleted_at IS NULL AND is_pinned = 1{folder_sql}
          ORDER BY pinned_at DESC, updated_at DESC
-         LIMIT ?1",
-    )?;
-    let rows = stmt.query_map(rusqlite::params![MAX_PINNED], |row| {
+         LIMIT ?",
+    );
+    let mut params: Vec<Value> = folder_params;
+    params.push(Value::from(MAX_PINNED));
+
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(rusqlite::params_from_iter(params), |row| {
         note_row_to_summary(conn, row)
     })?;
     let mut out = Vec::new();
@@ -301,38 +368,35 @@ fn load_unpinned_page(
     conn: &Connection,
     cursor: Option<&NotesCursor>,
     limit: u32,
+    scope: &FolderScope,
 ) -> Result<(Vec<NoteSummary>, bool)> {
+    let (folder_sql, folder_params) = folder_clause(scope);
     let fetch = (limit + 1) as i64;
-    if let Some(c) = cursor {
-        let mut stmt = conn.prepare(
-            "SELECT id, title, content_text, is_pinned, pinned_at, updated_at
-             FROM notes
-             WHERE deleted_at IS NULL
-               AND is_pinned = 0
-               AND (updated_at, id) < (?1, ?2)
-             ORDER BY updated_at DESC, id DESC
-             LIMIT ?3",
-        )?;
-        Ok(collect_page(
-            &mut stmt,
-            rusqlite::params![c.updated_at, c.id, fetch],
-            limit,
-            |row| note_row_to_summary(conn, row),
-        )?)
+    let cursor_sql = if cursor.is_some() {
+        " AND (updated_at, id) < (?, ?)"
     } else {
-        let mut stmt = conn.prepare(
-            "SELECT id, title, content_text, is_pinned, pinned_at, updated_at
-             FROM notes
-             WHERE deleted_at IS NULL
-               AND is_pinned = 0
-             ORDER BY updated_at DESC, id DESC
-             LIMIT ?1",
-        )?;
-        Ok(collect_page(
-            &mut stmt,
-            rusqlite::params![fetch],
-            limit,
-            |row| note_row_to_summary(conn, row),
-        )?)
+        ""
+    };
+    let sql = format!(
+        "SELECT id, title, content_text, is_pinned, pinned_at, updated_at, folder_id
+         FROM notes
+         WHERE deleted_at IS NULL AND is_pinned = 0{folder_sql}{cursor_sql}
+         ORDER BY updated_at DESC, id DESC
+         LIMIT ?"
+    );
+
+    let mut params: Vec<Value> = folder_params;
+    if let Some(c) = cursor {
+        params.push(Value::from(c.updated_at.clone()));
+        params.push(Value::from(c.id.clone()));
     }
+    params.push(Value::from(fetch));
+
+    let mut stmt = conn.prepare(&sql)?;
+    Ok(collect_page(
+        &mut stmt,
+        rusqlite::params_from_iter(params),
+        limit,
+        |row| note_row_to_summary(conn, row),
+    )?)
 }

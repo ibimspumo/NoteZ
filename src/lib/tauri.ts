@@ -8,6 +8,9 @@ import type {
   AiStats,
   Asset,
   AssetRef,
+  DeleteFolderMode,
+  Folder,
+  FolderFilter,
   MentionTargetStatus,
   Note,
   NoteSummary,
@@ -24,11 +27,12 @@ import type {
 
 export const api = {
   // notes
-  createNote: () => invoke<Note>("create_note"),
+  createNote: (folderId?: string | null) =>
+    invoke<Note>("create_note", { folderId: folderId ?? null }),
   getNote: (id: string) => invoke<Note>("get_note", { id }),
   updateNote: (input: UpdateNoteInput) => invoke<Note>("update_note", { input }),
-  listNotes: (cursor?: NotesCursor | null, limit?: number) =>
-    invoke<NotesPage>("list_notes", { cursor: cursor ?? null, limit }),
+  listNotes: (cursor?: NotesCursor | null, limit?: number, folder?: FolderFilter | null) =>
+    invoke<NotesPage>("list_notes", { cursor: cursor ?? null, limit, folder: folder ?? null }),
   listTrash: (cursor?: TrashCursor | null, limit?: number) =>
     invoke<TrashPage>("list_trash", { cursor: cursor ?? null, limit }),
   togglePin: (id: string) => invoke<Note>("toggle_pin", { id }),
@@ -59,6 +63,18 @@ export const api = {
   listBacklinks: (noteId: string) => invoke<NoteSummary[]>("list_backlinks", { noteId }),
   getMentionStatusBulk: (ids: string[]) =>
     invoke<MentionTargetStatus[]>("get_mention_status_bulk", { ids }),
+
+  // folders
+  listFolders: () => invoke<Folder[]>("list_folders"),
+  createFolder: (name: string, parentId?: string | null) =>
+    invoke<Folder>("create_folder", { name, parentId: parentId ?? null }),
+  renameFolder: (id: string, name: string) => invoke<Folder>("rename_folder", { id, name }),
+  deleteFolder: (id: string, mode?: DeleteFolderMode) =>
+    invoke<void>("delete_folder", { id, mode: mode ?? null }),
+  moveFolder: (id: string, newParentId: string | null) =>
+    invoke<Folder>("move_folder", { id, newParentId }),
+  moveNoteToFolder: (noteId: string, folderId: string | null) =>
+    invoke<void>("move_note_to_folder", { noteId, folderId }),
 
   // settings
   getSetting: (key: string) => invoke<string | null>("get_setting", { key }),

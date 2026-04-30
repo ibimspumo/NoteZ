@@ -22,6 +22,7 @@ import { AboutDialog } from "../AboutDialog";
 import { MeasuredVirtualList } from "../MeasuredVirtualList";
 import { TrashDialog } from "../TrashDialog";
 import { NewNoteIcon, SearchIcon, SettingsGearIcon, TrashIcon } from "../icons";
+import { FolderTree } from "./FolderTree";
 import { NoteListItem } from "./NoteListItem";
 
 type Props = {
@@ -119,6 +120,8 @@ export const Sidebar: Component<Props> = (props) => {
       </div>
 
       <div class="nz-sidebar-body" classList={{ "has-rows": rows().length > 0 }}>
+        <FolderTree />
+
         <Show when={notesState.pinned.length > 0}>
           <div class="nz-pinned-region">
             <div class="nz-section-label">Pinned</div>

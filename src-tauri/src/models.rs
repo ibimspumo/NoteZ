@@ -11,6 +11,7 @@ pub struct Note {
     pub created_at: String,
     pub updated_at: String,
     pub deleted_at: Option<String>,
+    pub folder_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,6 +22,11 @@ pub struct NoteSummary {
     pub is_pinned: bool,
     pub pinned_at: Option<String>,
     pub updated_at: String,
+    /// Owning folder id (None = Inbox). The frontend reads this to keep
+    /// per-folder counts accurate after a move and to decide whether a
+    /// row should remain in the visible list when the active filter
+    /// excludes the new folder.
+    pub folder_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -128,6 +134,85 @@ pub struct Asset {
     pub blurhash: Option<String>,
     pub byte_size: u64,
     pub created_at: String,
+}
+
+/// A folder in the notes hierarchy. Folders form a tree via `parent_id`
+/// (NULL = root). `sort_order` is a per-parent integer so siblings can be
+/// reordered without renumbering the whole tree; ties break alphabetically
+/// by name.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Folder {
+    pub id: String,
+    pub parent_id: Option<String>,
+    pub name: String,
+    pub sort_order: i64,
+    pub created_at: String,
+    pub updated_at: String,
+    /// Count of active (non-trashed) notes whose `folder_id` is exactly this
+    /// folder. Subfolder notes are NOT included - the sidebar adds those up
+    /// itself when rendering, so the same counts can drive both the
+    /// per-row badge and an "include descendants" rollup.
+    pub note_count: u32,
+}
+
+/// Filter passed to `list_notes` to scope the listing by folder.
+///
+///  - `All`     - no folder filter (legacy behaviour)
+///  - `Inbox`   - only notes with `folder_id IS NULL`
+///  - `Folder { id, include_descendants }` - notes in this folder and
+///    optionally its descendant folders
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum FolderFilter {
+    All,
+    Inbox,
+    Folder {
+        id: String,
+        #[serde(default = "default_true")]
+        include_descendants: bool,
+    },
+}
+
+impl Default for FolderFilter {
+    fn default() -> Self {
+        FolderFilter::All
+    }
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// What `delete_folder` should do with the contents (notes + subfolders) of
+/// the folder being deleted.
+///
+///  - `ReparentToParent` (default, legacy behaviour) - everything moves up
+///    one level. Safest. Subfolders inherit the deleted folder's parent;
+///    notes inherit it too. If the deleted folder was a root-level folder,
+///    contents land at the root (notes -> Inbox).
+///  - `ReparentTo { folder_id }` - everything moves into a specific folder
+///    chosen by the user. `folder_id = None` is equivalent to "Inbox" for
+///    notes, and "root" for subfolders. Refuses a destination that is the
+///    folder being deleted or one of its descendants (would create a cycle).
+///  - `TrashNotes` - the destructive option: all notes in this folder *and*
+///    its descendant folders get soft-deleted (visible in Trash). All those
+///    folders themselves are then removed. Treats the whole subtree as a
+///    unit so the user doesn't end up with empty subfolders.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum DeleteFolderMode {
+    ReparentToParent,
+    ReparentTo {
+        #[serde(default)]
+        folder_id: Option<String>,
+    },
+    TrashNotes,
+}
+
+impl Default for DeleteFolderMode {
+    fn default() -> Self {
+        Self::ReparentToParent
+    }
 }
 
 /// Returned by `save_asset` - what the editor needs to render the image.

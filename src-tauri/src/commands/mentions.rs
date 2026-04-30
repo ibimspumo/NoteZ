@@ -8,7 +8,7 @@ use tauri::State;
 pub fn list_backlinks(db: State<Db>, note_id: String) -> Result<Vec<NoteSummary>> {
     let conn = db.conn()?;
     let mut stmt = conn.prepare(
-        "SELECT n.id, n.title, n.content_text, n.is_pinned, n.pinned_at, n.updated_at
+        "SELECT n.id, n.title, n.content_text, n.is_pinned, n.pinned_at, n.updated_at, n.folder_id
          FROM mentions m
          JOIN notes n ON n.id = m.source_note_id
          WHERE m.target_note_id = ?1 AND n.deleted_at IS NULL
@@ -23,6 +23,7 @@ pub fn list_backlinks(db: State<Db>, note_id: String) -> Result<Vec<NoteSummary>
             is_pinned: row.get::<_, i64>("is_pinned")? != 0,
             pinned_at: row.get("pinned_at")?,
             updated_at: row.get("updated_at")?,
+            folder_id: row.get("folder_id")?,
         })
     })?;
     let mut out = Vec::new();

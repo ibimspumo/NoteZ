@@ -120,6 +120,13 @@ pub const SETTING_OPENROUTER_KEY_PRESENT: &str = "openrouter_api_key_present";
 /// Serialized pane-tree layout + active-pane id, so the app reopens with the
 /// same split topology and last-focused note.
 pub const SETTING_PANES_LAYOUT: &str = "panes:layout";
+/// JSON-encoded `FolderFilter` so the sidebar reopens scoped to the same
+/// folder the user last had selected.
+pub const SETTING_ACTIVE_FOLDER_FILTER: &str = "folders:active_filter";
+/// JSON-encoded array of folder ids that were expanded in the sidebar tree.
+pub const SETTING_EXPANDED_FOLDERS: &str = "folders:expanded";
+/// "1" if the folders section in the sidebar was open at last save, else absent.
+pub const SETTING_FOLDERS_SECTION_OPEN: &str = "folders:section_open";
 
 /// All known top-level setting keys. The allowlist in `set_setting` accepts
 /// either an exact match here or a recognized dynamic prefix (`cursor:`).
@@ -135,6 +142,9 @@ pub const KNOWN_SETTING_KEYS: &[&str] = &[
     SETTING_OPENROUTER_KEY_LEGACY,
     SETTING_OPENROUTER_KEY_PRESENT,
     SETTING_PANES_LAYOUT,
+    SETTING_ACTIVE_FOLDER_FILTER,
+    SETTING_EXPANDED_FOLDERS,
+    SETTING_FOLDERS_SECTION_OPEN,
 ];
 
 /// Dynamic keys that match a prefix. The remainder is opaque (a UUID for

@@ -208,3 +208,30 @@
 .nz-row-menu button.danger:hover {
   background: rgba(213, 74, 58, 0.12);
 }
+
+.nz-row-menu-sep {
+  height: 1px;
+  background: var(--nz-divider);
+  margin: 4px 0;
+}
+
+.nz-row-menu-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--nz-text-whisper);
+  padding: 6px 11px 2px;
+}
+
+.nz-row-menu button.move-to {
+  padding-left: calc(11px + 12px * var(--folder-depth, 0));
+  font-size: 12.5px;
+  color: var(--nz-text);
+}
+
+.nz-row-menu button.move-to.current {
+  color: var(--nz-text-faint);
+  background: var(--nz-bg-hover);
+  cursor: default;
+}

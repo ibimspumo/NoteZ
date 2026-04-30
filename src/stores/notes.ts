@@ -10,6 +10,7 @@ import {
 import { LRU } from "../lib/lru";
 import { api } from "../lib/tauri";
 import type {
+  FolderFilter,
   Note,
   NoteSummary,
   NotesCursor,
@@ -17,6 +18,12 @@ import type {
   TrashSummary,
   UpdateNoteInput,
 } from "../lib/types";
+import {
+  activeFolderFilter,
+  bumpFolderNoteCount,
+  noteFitsFilter,
+  setActiveFolderFilter,
+} from "./folders";
 import { markAllTrashedAsMissing, setMentionStatus } from "./mentionRegistry";
 import { activePaneNoteId, openNoteInActivePane, openNoteInPane, paneForNote } from "./panes";
 
@@ -89,9 +96,11 @@ function flashMoved(id: string) {
   });
 }
 
-/** First-page load. Replaces both pinned + items. */
+/** First-page load. Replaces both pinned + items. Reads the current
+ *  folder filter from the folders store so the sidebar list scopes
+ *  correctly when a folder is active. */
 export async function refreshNotes() {
-  const page = await api.listNotes(null, PAGE_SIZE);
+  const page = await api.listNotes(null, PAGE_SIZE, activeFolderFilter());
   setState(
     produce((s) => {
       s.pinned = page.pinned;
@@ -100,6 +109,24 @@ export async function refreshNotes() {
       s.initialLoaded = true;
     }),
   );
+}
+
+/** Switch the active folder filter and refresh the list from page 1.
+ *  Resets the loaded prefix so the user sees the new scope immediately
+ *  rather than the previous folder's notes scrolling away as more pages
+ *  load. The active note selection isn't touched - the user can still see
+ *  what they have open even if it isn't in the visible filter. */
+export async function applyFolderFilter(filter: FolderFilter) {
+  setActiveFolderFilter(filter);
+  setState(
+    produce((s) => {
+      s.items = [];
+      s.pinned = [];
+      s.nextCursor = null;
+      s.initialLoaded = false;
+    }),
+  );
+  await refreshNotes();
 }
 
 /** Catastrophic reset. Clears the per-note cache, all loaded list state, and
@@ -134,7 +161,7 @@ export async function loadMoreNotes() {
   if (state.loadingMore || !state.nextCursor) return;
   setState("loadingMore", true);
   try {
-    const page = await api.listNotes(state.nextCursor, PAGE_SIZE);
+    const page = await api.listNotes(state.nextCursor, PAGE_SIZE, activeFolderFilter());
     setState(
       produce((s) => {
         // Drop the top of the loaded prefix once we exceed the cap. The
@@ -193,13 +220,19 @@ export function patchCachedNote(note: Note) {
 }
 
 export async function createNote(): Promise<Note> {
-  const note = await api.createNote();
+  // If a real folder is currently filtered, the new note inherits it so it
+  // shows up in the active view. "Inbox" and "All" both produce a note with
+  // folder_id = NULL (Inbox is the implicit default).
+  const filter = activeFolderFilter();
+  const folderId = filter.kind === "folder" ? filter.id : null;
+  const note = await api.createNote(folderId);
   cache.set(note.id, note);
   setState(
     produce((s) => {
       s.items.unshift(summaryFromNote(note));
     }),
   );
+  bumpFolderNoteCount(folderId, +1);
   return note;
 }
 
@@ -276,10 +309,52 @@ export async function togglePin(id: string): Promise<Note> {
   return note;
 }
 
+/** Move a note to a different folder (or to Inbox if `folderId` is null).
+ *  Updates folder badge counts in place, patches the loaded summary's
+ *  `folder_id`, and removes the note from the visible list if its new
+ *  folder is no longer in the active filter's scope. */
+export async function moveNoteToFolder(noteId: string, folderId: string | null): Promise<void> {
+  // Find the source folder from whichever bucket holds the row right now.
+  // We need this before the mutation so the folder-count bump on the source
+  // side is correct.
+  const summary =
+    state.pinned.find((n) => n.id === noteId) ?? state.items.find((n) => n.id === noteId);
+  const previousFolderId = summary?.folder_id ?? getCachedNote(noteId)?.folder_id ?? null;
+  if (previousFolderId === folderId) return;
+
+  await api.moveNoteToFolder(noteId, folderId);
+
+  bumpFolderNoteCount(previousFolderId, -1);
+  bumpFolderNoteCount(folderId, +1);
+
+  // Patch cached note + visible summary in place.
+  const cached = cache.get(noteId);
+  if (cached) cache.set(noteId, { ...cached, folder_id: folderId });
+  const filter = activeFolderFilter();
+  const stillVisible = noteFitsFilter(folderId, filter);
+
+  setState(
+    produce((s) => {
+      const inItems = s.items.findIndex((n) => n.id === noteId);
+      const inPinned = s.pinned.findIndex((n) => n.id === noteId);
+      if (!stillVisible) {
+        if (inItems >= 0) s.items.splice(inItems, 1);
+        if (inPinned >= 0) s.pinned.splice(inPinned, 1);
+        return;
+      }
+      if (inItems >= 0) s.items[inItems].folder_id = folderId;
+      if (inPinned >= 0) s.pinned[inPinned].folder_id = folderId;
+    }),
+  );
+}
+
 export async function softDeleteNote(id: string): Promise<void> {
   // Capture summary before mutating so we can prepend to trash if loaded.
   const prev = state.pinned.find((n) => n.id === id) ?? state.items.find((n) => n.id === id);
   await api.softDeleteNote(id);
+  // Note's folder loses one active note - decrement the badge so the count
+  // stays in sync. Restore() bumps it back.
+  bumpFolderNoteCount(prev?.folder_id ?? null, -1);
   cache.delete(id);
   // Any open editor that mentions this note should now show it as trashed.
   setMentionStatus(id, "trashed");
@@ -335,13 +410,19 @@ export async function restoreNote(id: string): Promise<Note> {
   const note = await api.restoreNote(id);
   cache.set(note.id, note);
   setMentionStatus(id, "alive");
+  bumpFolderNoteCount(note.folder_id, +1);
   setState(
     produce((s) => {
       const idx = s.trash.findIndex((n) => n.id === id);
       if (idx >= 0) s.trash.splice(idx, 1);
       const summary = summaryFromNote(note);
-      if (note.is_pinned) s.pinned.unshift(summary);
-      else s.items.unshift(summary);
+      // Only show in the visible list if the note's folder fits the active
+      // filter - otherwise the user would see it pop into a list it
+      // shouldn't belong to.
+      if (noteFitsFilter(note.folder_id, activeFolderFilter())) {
+        if (note.is_pinned) s.pinned.unshift(summary);
+        else s.items.unshift(summary);
+      }
     }),
   );
   return note;
@@ -378,6 +459,7 @@ function summaryFromNote(note: Note): NoteSummary {
     is_pinned: note.is_pinned,
     pinned_at: note.pinned_at,
     updated_at: note.updated_at,
+    folder_id: note.folder_id,
   };
 }
 

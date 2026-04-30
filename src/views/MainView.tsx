@@ -9,6 +9,7 @@ import { HistoryIcon, SidebarIcon } from "../components/icons";
 import { matchHotkey } from "../lib/keymap";
 import { findPane } from "../lib/paneTree";
 import { api, onEvent } from "../lib/tauri";
+import { loadFolderPrefs, refreshFolders } from "../stores/folders";
 import {
   createNote,
   ensureSelection,
@@ -225,6 +226,16 @@ export const MainView: Component = () => {
     const days = trashRetentionDays();
     if (days > 0) {
       api.purgeOldTrash(days).catch((e) => console.warn("purge_old_trash failed:", e));
+    }
+    // Folders + persisted UI prefs must load BEFORE the initial notes
+    // refresh: the prefs hydrate the active folder filter, which in turn
+    // scopes `refreshNotes`. Loading folders first also lets the prefs
+    // loader drop a stale filter pointing at a since-deleted folder.
+    try {
+      await refreshFolders();
+      await loadFolderPrefs();
+    } catch (e) {
+      console.warn("folders bootstrap failed:", e);
     }
     await refreshNotes();
     // Restore the saved layout BEFORE ensureSelection so the layout drives the

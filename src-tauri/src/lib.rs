@@ -313,6 +313,13 @@ pub fn run() {
             // mentions
             commands::mentions::list_backlinks,
             commands::mentions::get_mention_status_bulk,
+            // folders
+            commands::folders::list_folders,
+            commands::folders::create_folder,
+            commands::folders::rename_folder,
+            commands::folders::delete_folder,
+            commands::folders::move_folder,
+            commands::folders::move_note_to_folder,
             // settings
             commands::settings::get_setting,
             commands::settings::set_setting,

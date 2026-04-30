@@ -140,6 +140,44 @@ export const ChevronDownIcon = wrap(
   "0 0 10 10",
 );
 
+export const ChevronRightIcon = wrap(
+  () => (
+    <path
+      d="M4 2l3 3-3 3"
+      stroke="currentColor"
+      stroke-width="1.4"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  ),
+  "0 0 10 10",
+);
+
+export const PlusIcon = wrap(
+  () => (
+    <path
+      d="M5.5 1.5v8M1.5 5.5h8"
+      stroke="currentColor"
+      stroke-width="1.4"
+      stroke-linecap="round"
+    />
+  ),
+  "0 0 11 11",
+);
+
+export const FolderIcon = wrap(
+  () => (
+    <path
+      d="M1.5 3.5a1 1 0 0 1 1-1h3l1 1.2h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-6.2Z"
+      stroke="currentColor"
+      stroke-width="1.2"
+      fill="none"
+      stroke-linejoin="round"
+    />
+  ),
+  "0 0 13 13",
+);
+
 export const HistoryIcon = wrap(
   () => (
     <>

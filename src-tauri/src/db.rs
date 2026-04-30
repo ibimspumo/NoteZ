@@ -82,6 +82,7 @@ impl Db {
             (1, MIGRATION_001),
             (2, MIGRATION_002),
             (3, MIGRATION_003),
+            (4, MIGRATION_004),
         ];
 
         let tx = conn.transaction()?;
@@ -264,6 +265,36 @@ CREATE TABLE IF NOT EXISTS ai_calls (
 CREATE INDEX IF NOT EXISTS idx_ai_calls_created_at ON ai_calls(created_at DESC);
 "#;
 
+// v4: folders for organizing notes.
+//   - `folders`: hierarchical tree via self-referential parent_id. parent_id
+//     uses ON DELETE SET NULL so a buggy delete leaves orphans rather than
+//     losing data; the app's `delete_folder` command reparents children to
+//     the deleted folder's parent before removing it.
+//   - `notes.folder_id`: nullable, ON DELETE SET NULL - deleting a folder
+//     drops its notes back to Inbox rather than nuking them.
+//   - `idx_notes_folder_active_updated`: covers the per-folder list query
+//     (folder_id + updated_at DESC range scan, deleted_at IS NULL filter
+//     pushed into the partial-index predicate).
+const MIGRATION_004: &str = r#"
+CREATE TABLE IF NOT EXISTS folders (
+    id TEXT PRIMARY KEY,
+    parent_id TEXT REFERENCES folders(id) ON DELETE SET NULL,
+    name TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_folders_parent
+    ON folders(parent_id, sort_order, name);
+
+ALTER TABLE notes ADD COLUMN folder_id TEXT
+    REFERENCES folders(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_notes_folder_active_updated
+    ON notes(folder_id, updated_at DESC) WHERE deleted_at IS NULL;
+"#;
+
 pub fn now_iso() -> String {
     chrono::Utc::now().to_rfc3339()
 }
@@ -296,6 +327,7 @@ pub fn note_row_to_summary(
         is_pinned: row.get::<_, i64>("is_pinned")? != 0,
         pinned_at: row.get("pinned_at")?,
         updated_at: row.get("updated_at")?,
+        folder_id: row.get("folder_id")?,
     })
 }
 

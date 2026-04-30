@@ -8,6 +8,8 @@ export type Note = {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  /** Owning folder id. `null` = Inbox (no folder). */
+  folder_id: string | null;
 };
 
 export type NoteSummary = {
@@ -17,6 +19,7 @@ export type NoteSummary = {
   is_pinned: boolean;
   pinned_at: string | null;
   updated_at: string;
+  folder_id: string | null;
 };
 
 export type SearchHit = {
@@ -164,3 +167,33 @@ export type AiStats = {
   total_cost_usd: number;
   error_calls: number;
 };
+
+export type Folder = {
+  id: string;
+  parent_id: string | null;
+  name: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  /** Direct note count (notes whose folder_id == this folder, excluding trashed). */
+  note_count: number;
+};
+
+/** Folder filter passed to `list_notes`. Mirrors the Rust enum:
+ *   - `all`    - no folder filter (default)
+ *   - `inbox`  - only notes with no folder
+ *   - `folder` - notes inside this folder, optionally including descendants */
+export type FolderFilter =
+  | { kind: "all" }
+  | { kind: "inbox" }
+  | { kind: "folder"; id: string; include_descendants?: boolean };
+
+/** What `delete_folder` should do with the contents of the folder:
+ *   - `reparent_to_parent` - everything moves up one level (legacy default)
+ *   - `reparent_to`        - everything moves into a specific folder
+ *                            (folder_id = null means Inbox / root)
+ *   - `trash_notes`        - notes go to Trash, subfolders are wiped */
+export type DeleteFolderMode =
+  | { kind: "reparent_to_parent" }
+  | { kind: "reparent_to"; folder_id: string | null }
+  | { kind: "trash_notes" };
