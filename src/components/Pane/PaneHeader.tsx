@@ -1,4 +1,4 @@
-import { Show, type Component } from "solid-js";
+import { type Component, Show } from "solid-js";
 import { type PaneId, closePane, totalPaneCount } from "../../stores/panes";
 import { PinIcon } from "../icons";
 

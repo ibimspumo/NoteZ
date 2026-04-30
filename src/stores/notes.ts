@@ -151,7 +151,7 @@ export async function loadMoreNotes() {
         s.nextCursor = page.next_cursor;
       }),
     );
-    } finally {
+  } finally {
     setState("loadingMore", false);
   }
 }

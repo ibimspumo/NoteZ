@@ -350,11 +350,7 @@ export const MainView: Component = () => {
             </Show>
           </header>
           <div class="nz-pane-host">
-            <PaneTree
-              node={layoutRoot()}
-              onOpenNote={handleOpenNote}
-              onCreate={handleCreateNote}
-            />
+            <PaneTree node={layoutRoot()} onOpenNote={handleOpenNote} onCreate={handleCreateNote} />
           </div>
         </Show>
       </main>

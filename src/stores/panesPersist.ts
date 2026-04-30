@@ -1,11 +1,7 @@
 import { createEffect, createRoot } from "solid-js";
 import { unwrap } from "solid-js/store";
+import { type LayoutNode, type PaneId, reconcileWithExistingNotes } from "../lib/paneTree";
 import { api } from "../lib/tauri";
-import {
-  type LayoutNode,
-  type PaneId,
-  reconcileWithExistingNotes,
-} from "../lib/paneTree";
 import { activePaneId, panesState, replaceLayout } from "./panes";
 
 const SETTING_KEY = "panes:layout";

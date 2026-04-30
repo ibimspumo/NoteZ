@@ -126,9 +126,7 @@ export function splitTreeAt(
 
   // Walk children. If a direct child is the target AND our split has the
   // same direction, flatten in place rather than nesting a new split.
-  const directIdx = node.children.findIndex(
-    (c) => c.kind === "pane" && c.id === targetPaneId,
-  );
+  const directIdx = node.children.findIndex((c) => c.kind === "pane" && c.id === targetPaneId);
   if (directIdx >= 0 && node.direction === dir) {
     const newChildren = [...node.children];
     const newSizes = [...node.sizes];

@@ -1,11 +1,9 @@
 import type { LexicalEditor } from "lexical";
 import { batch, createMemo, createSignal } from "solid-js";
 import { createStore, produce, unwrap } from "solid-js/store";
-import type { Note } from "../lib/types";
-import type { SavingState } from "../views/useSavePipeline";
 import {
-  MIN_PANE_FRACTION,
   type LayoutNode,
+  MIN_PANE_FRACTION,
   type PaneId,
   type Side,
   type SplitId,
@@ -19,6 +17,8 @@ import {
   removePane,
   splitTreeAt,
 } from "../lib/paneTree";
+import type { Note } from "../lib/types";
+import type { SavingState } from "../views/useSavePipeline";
 
 export type { LayoutNode, LeafPane, SplitNode, PaneId, Side, SplitId } from "../lib/paneTree";
 
@@ -299,8 +299,7 @@ export function replaceLayout(root: LayoutNode, activeId?: PaneId) {
     });
     return;
   }
-  const nextActive =
-    activeId && leaves.some((l) => l.id === activeId) ? activeId : leaves[0].id;
+  const nextActive = activeId && leaves.some((l) => l.id === activeId) ? activeId : leaves[0].id;
   batch(() => {
     commitRoot(normalized);
     setState("activePaneId", nextActive);

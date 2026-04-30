@@ -16,9 +16,7 @@ export const BUILTIN_THEMES: readonly BuiltinTheme[] = [
   { ...(monoTheme as ThemeFile), builtin: true },
 ];
 
-export const BUILTIN_THEME_IDS: ReadonlySet<string> = new Set(
-  BUILTIN_THEMES.map((t) => t.id),
-);
+export const BUILTIN_THEME_IDS: ReadonlySet<string> = new Set(BUILTIN_THEMES.map((t) => t.id));
 
 export const DEFAULT_THEME_ID = "default";
 

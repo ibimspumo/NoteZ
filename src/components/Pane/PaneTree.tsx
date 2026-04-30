@@ -1,10 +1,5 @@
 import { type Component, For, Match, Show, Switch } from "solid-js";
-import {
-  type LayoutNode,
-  type LeafPane,
-  type SplitNode,
-  totalPaneCount,
-} from "../../stores/panes";
+import { type LayoutNode, type LeafPane, type SplitNode, totalPaneCount } from "../../stores/panes";
 import { EditorPane } from "./EditorPane";
 import { PaneSplitter } from "./PaneSplitter";
 

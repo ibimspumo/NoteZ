@@ -182,9 +182,7 @@ export const Sidebar: Component<Props> = (props) => {
                       <NoteListItem
                         note={r.note}
                         selected={r.note.id === selectedId()}
-                        openElsewhere={
-                          openNoteIds().has(r.note.id) && r.note.id !== selectedId()
-                        }
+                        openElsewhere={openNoteIds().has(r.note.id) && r.note.id !== selectedId()}
                         onSelect={() => selectNote(r.note.id)}
                         onTogglePin={() => props.onTogglePin(r.note.id)}
                         onDelete={() => props.onDelete(r.note.id)}

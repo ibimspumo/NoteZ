@@ -122,16 +122,10 @@ export const EmptyPanePicker: Component<Props> = (props) => {
             )}
           </For>
           <Show when={filtered().length === 0}>
-            <div class="nz-empty-pane-empty">
-              {query() ? "No matches." : "No notes available."}
-            </div>
+            <div class="nz-empty-pane-empty">{query() ? "No matches." : "No notes available."}</div>
           </Show>
         </div>
-        <button
-          type="button"
-          class="nz-empty-pane-create"
-          onClick={() => void props.onCreate()}
-        >
+        <button type="button" class="nz-empty-pane-create" onClick={() => void props.onCreate()}>
           + New note
         </button>
       </div>

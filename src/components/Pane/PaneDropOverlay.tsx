@@ -1,5 +1,11 @@
-import { Show, type Component, createSignal, onCleanup, onMount } from "solid-js";
-import { type PaneId, dragNoteId, endNoteDrag, openNoteInPane, splitPane } from "../../stores/panes";
+import { type Component, Show, createSignal, onCleanup, onMount } from "solid-js";
+import {
+  type PaneId,
+  dragNoteId,
+  endNoteDrag,
+  openNoteInPane,
+  splitPane,
+} from "../../stores/panes";
 
 type Zone = "center" | "left" | "right" | "top" | "bottom" | null;
 

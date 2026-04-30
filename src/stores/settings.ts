@@ -9,12 +9,7 @@ import {
   DEFAULT_TRASH_RETENTION_DAYS,
 } from "../lib/constants";
 import { api } from "../lib/tauri";
-import {
-  BUILTIN_THEMES,
-  BUILTIN_THEME_IDS,
-  DEFAULT_THEME_ID,
-  getBuiltin,
-} from "../themes";
+import { BUILTIN_THEMES, BUILTIN_THEME_IDS, DEFAULT_THEME_ID, getBuiltin } from "../themes";
 
 export type SidebarPreviewLines = 0 | 1 | 2;
 
