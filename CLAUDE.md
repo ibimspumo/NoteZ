@@ -180,18 +180,22 @@ The version stays 3-digit semver (`X.Y.Z`). What differs is **whether a bump
 publishes a downloadable build**:
 
 - **Patch bump (3rd digit, e.g. `0.4.5` → `0.4.6`)** - the **default** for any
-  user-visible change: bug fix, polish, copy, small feature. Updates all five
-  version files and commits. **Does NOT tag, does NOT trigger CI, does NOT
-  publish a GitHub Release.** These bump the in-app label only - they're
-  "small releases" for tracking but don't ship a new `.dmg`. Bump as often
-  as work warrants.
+  user-visible change: bug fix, polish, copy, small feature. Updates all
+  version files and commits. By default **does NOT tag** - the bump is
+  commit-only, the in-app label updates but no `.dmg` is published. Bump as
+  often as work warrants.
 - **Minor bump (2nd digit, e.g. `0.4.x` → `0.5.0`)** - the "real" release.
-  This is the only bump tier that gets tagged and triggers the CI build to
-  publish a downloadable `.dmg` on GitHub Releases. Use this when there is
-  enough accumulated change since the last `.dmg` to justify asking users to
-  download a new build.
+  Tagged and pushed, which triggers the CI build to publish a downloadable
+  `.dmg` on GitHub Releases. Use this when there is enough accumulated
+  change since the last `.dmg` to justify asking users to download a new
+  build.
 - **Major bump (1st digit, e.g. `0.x.y` → `1.0.0`)** - same release behaviour
   as minor, used for breaking schema/migration or when leaving pre-1.0.
+
+The release workflow's tag filter accepts any `vX.Y.Z` tag, so a patch
+*can* be tagged as a one-off hotfix release if the user explicitly asks
+for it ("ship this as 0.8.4"). Don't do that on your own initiative - the
+default for patches is commit-only.
 
 **ALWAYS ASK before doing anything that creates a GitHub Release.** Before
 running `git tag vX.Y.Z && git push --tags`, ask the user explicitly: *"Publish
@@ -214,11 +218,11 @@ can't tell what version they're running. The version label is the contract.
 ## Releases
 
 Releases are built and published by GitHub Actions
-(`.github/workflows/release.yml`). The workflow's tag filter is **strict**: it
-fires only for `vX.Y.0` tags (minor and major bumps). Patch tags like `v0.4.6`
-are explicitly NOT in the filter and will not trigger a build even if pushed.
-This enforces the rule that only minor/major bumps publish a downloadable
-`.dmg`.
+(`.github/workflows/release.yml`). The workflow fires on any `vX.Y.Z` tag
+push (the four-part `v*.*.*.*` form is excluded). The convention is still
+that *minor and major bumps* are the planned release tiers - patches stay
+commit-only by default - but the workflow itself doesn't enforce that, so
+a patch tag will trigger a real build if the user explicitly asks for one.
 
 A matching tag triggers a build on `macos-latest` for `aarch64-apple-darwin`
 (Apple Silicon only - we don't ship Intel) via `tauri-apps/tauri-action`,
@@ -230,7 +234,7 @@ step, since the app is unsigned and Gatekeeper blocks it on first launch.
 Keep that block in sync with the README's Install section if you change the
 wording.
 
-**Cutting a release (minor or major bump only - ASK USER FIRST):**
+**Cutting a release (minor or major bump - ASK USER FIRST; patch only on explicit user request):**
 
 ```bash
 # 1. Confirm the target version with the user. Do not assume.
