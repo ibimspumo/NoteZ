@@ -5,78 +5,141 @@
 <h1 align="center">NoteZ</h1>
 
 <p align="center">
-  <em>Fast, local, beautiful notes for Mac.</em>
+  <strong>The note app that stays fast at one million notes.</strong>
+</p>
+
+<p align="center">
+  <em>Local. Private. Beautiful. Mac-first.</em>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-0.8.5-1f883d?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/platform-macOS-1f883d?style=flat-square" alt="macOS" />
-  <img src="https://img.shields.io/badge/storage-local%20only-1f883d?style=flat-square" alt="local-only" />
+  <img src="https://img.shields.io/badge/Apple_Silicon-native-1f883d?style=flat-square" alt="Apple Silicon" />
+  <img src="https://img.shields.io/badge/storage-local_only-1f883d?style=flat-square" alt="local-only" />
   <img src="https://img.shields.io/badge/telemetry-none-1f883d?style=flat-square" alt="no telemetry" />
   <img src="https://img.shields.io/badge/license-MIT-1f883d?style=flat-square" alt="license" />
 </p>
 
+<p align="center">
+  <img src="GitHub/S1.png" alt="NoteZ - split panes, sidebar with folders and pinned notes, mention pills" />
+</p>
+
 ---
 
-NoteZ is the note app for people who think Apple Notes is too simple and Notion is
-too much. It opens instantly, searches across thousands of notes in under a
-hundred milliseconds, and keeps every word you write in a single file on
-your Mac - no cloud, no account, no waiting.
+## The pitch in one paragraph
 
-## Why NoteZ
+Apple Notes is too simple. Notion is too much. **NoteZ is the middle that
+nobody else built.** It opens instantly, searches a hundred thousand notes
+in under a fifth of a second, looks like an Apple app because it's built
+out of the same materials, and keeps every word you write in a single file
+on your Mac. No account. No cloud. No telemetry. No permission to ask
+anyone for.
 
-**It's actually fast.** Most note apps slow down once you have a few thousand
-notes. NoteZ uses a real database under the hood and stays snappy whether you
-have ten notes or a hundred thousand. Search results appear as you type.
+---
 
-**Your notes are yours.** Everything lives in a single file on your Mac. You can
-back it up, sync it with iCloud Drive or Dropbox, copy it to a USB stick, or
-do nothing at all. There is no NoteZ server. There is no account to make. There
-is no internet connection required, ever.
+## What makes it different
 
-**No Markdown in your face.** Type `# ` for a heading and the `# ` disappears.
-Type `**bold**` and the asterisks vanish. The shortcuts are there if you want
-them, but the screen always shows the finished page - never the source code.
+### Built for one million notes, not one hundred
 
-**Mac-first, properly.** Translucent sidebar, hidden traffic lights, native dark
-mode, global hotkeys. It looks and feels like an Apple app because it's built
-with the same materials.
+Most note apps are designed around the idea that "a power user has a few
+hundred notes." NoteZ assumes the opposite. The performance budget is
+**1,000,000 notes** - the sidebar virtualizes, the database paginates with
+cursors, the search index is FTS5 with custom BM25 + recency + title +
+pin ranking, and folder counts are denormalized so listing is `O(folders)`
+no matter how big the corpus gets.
 
-## What you can do
+If a feature can't survive the 1M-note test, it doesn't ship. The user
+with fourteen notes is happy either way. The user with fourteen thousand
+quietly leaves if you ignore them. NoteZ is for both.
 
-**Search anything in milliseconds.** Press `Cmd+K` for a Spotlight-style command
-bar. Find any note by title, content, or fragment. Smart ranking puts the most
-recent and most relevant matches first.
+### Your notes never leave the machine
 
-**Write without friction.** A clean editor that handles headings, bullets,
-numbered lists, bold, italic, links, and inline images - all through familiar
-keyboard shortcuts that get out of your way.
+Everything lives in **one SQLite file** on your Mac:
 
-**Link notes together.** Type `@` anywhere to link to another note. Click the
-link to jump there. Build a web of ideas without folders or tags getting in
-the way.
+```
+~/Library/Application Support/de.agent-z.notez/notez.db
+```
 
-**Pin what matters.** Keep your most-used notes at the top of the sidebar.
+Back it up however you like. Drop the folder in iCloud Drive or Dropbox to
+sync between Macs. Move it to an external drive. Open it with any SQLite
+tool to look inside. There is no NoteZ server. There is no account to
+make. There is no internet connection required, ever - the optional AI
+title feature is the only network call in the entire app, it's off by
+default, and the key sits in your macOS Keychain.
 
-**Organize with folders.** Group notes into nested folders, drag them around
-to reorganize, and scope the sidebar to one folder at a time. Notes you
-haven't filed yet stay in Inbox. Deleting a folder asks where the contents
-should go - move them up, into another folder, or to Trash.
+### No Markdown in your face
 
-**Work side-by-side.** Drag a note from the sidebar onto an editor edge to
-split the view, or hit `Cmd+D` to open a fresh pane. Tile up to eight panes,
-resize the dividers, focus any pane with `Cmd+1..9`, and your layout
+Type `# ` for a heading and the `# ` disappears. Type `**bold**` and the
+asterisks vanish. The shortcuts are there if you want them, but the
+screen always shows the finished page - never the source code. Built on
+**Lexical** (Meta's editor framework), wired up directly without React.
+
+### Mac-first, properly
+
+Translucent vibrancy sidebar. Hidden traffic lights that blend into the
+chrome. Native dark mode that reacts to the system. Global hotkeys that
+respect Accessibility permissions. The whole app is around ten megabytes
+because it's **Tauri + Rust**, not Electron.
+
+---
+
+## Tour
+
+### Split panes, up to eight
+
+<p align="center">
+  <img src="GitHub/S1.png" alt="Two side-by-side editor panes with independent tab strips" />
+</p>
+
+Drag a note from the sidebar onto an editor edge to split. Hit `Cmd+D` to
+split right, `Cmd+Shift+D` to split down. Tile up to eight panes, drag
+the dividers to resize, jump between them with `Cmd+1..9`. Your layout
 restores itself the next time you launch.
 
-**Never lose a thought.** A global hotkey (`Cmd+Shift+N`) opens a tiny capture
-window from anywhere on your Mac. Type, press `Cmd+Enter`, and it's saved.
+### Folders, drag-and-drop, scoped views
 
-**Undo yesterday.** Every five minutes of editing, NoteZ quietly takes a
-snapshot. Up to fifty history points per note. Roll back to any of them with
-one click.
+<p align="center">
+  <img src="GitHub/S2.png" alt="Folder tree in sidebar, single editor pane open" />
+</p>
 
-**Trust the trash.** Deleted notes sit in a 30-day Trash before they actually
-disappear. Plenty of time to change your mind.
+Group notes into nested folders. Drag notes onto folders, drag folders
+into folders. Click a folder to scope the sidebar to it. Inbox holds
+everything you haven't filed yet. Deleting a folder asks where the
+contents should go - reparent up, reparent into another folder, or move
+to trash recursively.
+
+### Mentions that link your thinking
+
+<p align="center">
+  <img src="GitHub/S3.png" alt="Note with mention pills linking to other notes" />
+</p>
+
+Type `@` anywhere to link to another note. The popover ranks suggestions
+by recency and relevance, fuzzy-matches as you type, and renders the
+result as a token - **not** a markdown link. Click the pill to jump.
+Build a web of ideas without folders or tags getting in the way.
+
+---
+
+## Features
+
+| | |
+|---|---|
+| **Spotlight-style search** | Press `Cmd+K` to open a command bar over everything. Smart ranking: BM25, recency, title hits, pinned bonus. CJK queries work end-to-end (per-character tokenization mirrors the index). |
+| **Quick capture** | `Cmd+Shift+N` from anywhere on your Mac opens a tiny capture window. Type, `Cmd+Enter`, saved. |
+| **Snapshots** | Every five minutes of editing, NoteZ silently saves a history point. Up to 50 per note. Plus manual snapshots whenever you want one. Roll back with one click. |
+| **Trash with retention** | Deleted notes sit in a configurable trash (7 days, 30 days, 6 months, never) before they actually disappear. |
+| **Pinned notes** | `Cmd+Shift+P` to pin. Pinned notes get their own section at the top of the sidebar. |
+| **Tangible images** | Drag images in, click to select, drag the corner to resize, drag the body to reorder. They're real objects, not embedded HTML. |
+| **Backlinks** | Every `@mention` is indexed in both directions. The data is there; the panel ships when it earns its space. |
+| **Themes** | Default (dark), Light, Mono. Custom themes are coming next. |
+| **AI titles, opt-in** | Optionally let an LLM suggest titles for untitled notes. Off by default. Key in macOS Keychain. Zero AI surface anywhere else in the app. |
+| **Per-note cursor memory** | Switch notes, come back, your cursor is exactly where you left it. Survives restarts. |
+| **Cmd+Z that actually works** | Full Lexical history per note. No multi-undo bugs. No silent data loss. |
+| **Live time labels** | "11h ago" and "Today" headings update without polling, without reflow, without battery cost when the window is hidden. |
+
+---
 
 ## Keyboard
 
@@ -84,28 +147,38 @@ disappear. Plenty of time to change your mind.
 |---|---|
 | `Cmd+K` | Search / command bar |
 | `Cmd+N` | New note |
-| `Cmd+Shift+N` | Quick Capture (works system-wide) |
+| `Cmd+T` | New tab in active pane |
+| `Cmd+W` | Close active tab/pane |
+| `Cmd+Shift+N` | Quick Capture (system-wide) |
 | `Cmd+\` | Toggle sidebar |
 | `Cmd+D` | Split pane right |
 | `Cmd+Shift+D` | Split pane down |
-| `Cmd+W` | Close active pane |
 | `Cmd+1..9` | Focus pane by index |
+| `Cmd+Tab` / `Cmd+Shift+Tab` | Cycle tabs in pane |
+| `Cmd+Alt+↑` / `Cmd+Alt+↓` | Previous / next note |
 | `Cmd+Shift+P` | Pin or unpin current note |
-| `Cmd+Backspace` | Move note to Trash |
+| `Cmd+Shift+H` | Open snapshots for current note |
+| `Cmd+Shift+Backspace` | Move note to Trash |
 | `@` | Open note-link suggestions |
 | `# `, `## `, `### ` | Headings |
 | `- ` or `* ` | Bullet list |
 | `1. ` | Numbered list |
+| `[] ` | Checklist item |
 | `**text**` | Bold |
 | `_text_` | Italic |
+| <code>&#96;code&#96;</code> | Inline code |
+
+Global shortcuts (Search, Quick Capture) are rebindable in Settings.
+
+---
 
 ## Install
 
-NoteZ is built for **Apple Silicon Macs**. Grab the latest
-`.dmg` from [Releases](https://github.com/ibimspumo/NoteZ/releases).
+NoteZ is built for **Apple Silicon Macs**. Grab the latest `.dmg` from
+[Releases](https://github.com/ibimspumo/NoteZ/releases).
 
 1. Open the `.dmg` and drag **NoteZ.app** into **Applications**.
-2. The app is unsigned (no Apple Developer account), so macOS Gatekeeper
+2. The app is unsigned (no Apple Developer account yet), so macOS Gatekeeper
    will block it on first launch. Run this once in Terminal to clear the
    quarantine flag:
 
@@ -113,46 +186,36 @@ NoteZ is built for **Apple Silicon Macs**. Grab the latest
    xattr -cr /Applications/NoteZ.app
    ```
 
-3. Open NoteZ from Applications - it will launch normally from now on.
+3. Open NoteZ from Applications. It will launch normally from now on.
 
 If you skip step 2, you'll see *"NoteZ is damaged and can't be opened"* or
-*"cannot be opened because the developer cannot be verified"*. That's macOS,
-not the app. The `xattr` command is safe - it just removes the
+*"cannot be opened because the developer cannot be verified"*. That's
+macOS, not the app. The `xattr` command is safe - it just removes the
 quarantine attribute that Safari/Finder added to the download.
 
-## Where your notes live
+---
 
-One SQLite file:
+## Promises
 
-```
-~/Library/Application Support/de.agent-z.notez/notez.db
-```
+- **No accounts.** Ever.
+- **No cloud.** Your notes never touch a server we control.
+- **No telemetry.** We don't watch how you write, when you write, or whether you write at all.
+- **No auto-update.** The app you installed is the app you keep until you choose to update.
+- **No AI surprises.** The one optional AI feature is opt-in, key-local, and clearly labeled.
+- **No lock-in.** It's a SQLite file. You own it.
 
-That's it. Back it up however you like. Sync the folder if you want it on
-multiple Macs. Move it to a different drive. Open it with any SQLite tool if
-you ever want to look inside.
-
-## Roadmap
-
-**Now.** Editor, search, pinning, snapshots, mentions, quick capture, trash,
-images, split panes, folders.
-
-**Next.** Slash menu. Code blocks with syntax highlighting. Backlinks panel.
-Hashtag tags. Daily notes. Templates. Note sharing via `notez://` deep links
-(no server, recipient also runs NoteZ).
-
-**Later.** Windows and Linux builds. Tables, callouts, LaTeX. End-to-end
-encrypted sync. Local semantic search. iOS companion. Optional cloud
-shortlinks for sharing with non-NoteZ users (E2E-encrypted, plan in
-[docs/sharing-plan.md](docs/sharing-plan.md)).
+---
 
 ## Built with
 
-Tauri 2, Rust, Solid.js, TypeScript, Lexical, SQLite (FTS5). No Electron, no
-React, no telemetry. The whole app is around ten megabytes.
+Tauri 2 + Rust on the back, Solid + TypeScript on the front, Lexical for
+the editor, SQLite (FTS5) for storage and search. No Electron. No React.
+The whole app is around ten megabytes.
 
 For development setup, see [CLAUDE.md](CLAUDE.md).
 
+---
+
 ## License
 
-MIT
+MIT. Take it. Read it. Fork it. Ship it.
