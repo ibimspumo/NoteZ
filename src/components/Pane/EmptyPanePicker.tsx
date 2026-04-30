@@ -11,6 +11,7 @@ import { formatRelative } from "../../lib/format";
 import { api } from "../../lib/tauri";
 import type { SearchHit } from "../../lib/types";
 import { nowTick } from "../../stores/clock";
+import { notesState } from "../../stores/notes";
 import { type PaneId, openNoteIds, openNoteInPane } from "../../stores/panes";
 
 type Props = {
@@ -46,6 +47,12 @@ export const EmptyPanePicker: Component<Props> = (props) => {
 
   createEffect(() => {
     const q = query();
+    // Track notes-list mutations so the picker refreshes when notes are
+    // created or deleted elsewhere (e.g. trashing rows from the sidebar
+    // while this empty pane is visible). Without these reads the effect
+    // would only re-run on query change and the recents list would go stale.
+    void notesState.items.length;
+    void notesState.pinned.length;
     let cancelled = false;
     const handle = window.setTimeout(() => {
       api

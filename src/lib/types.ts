@@ -39,6 +39,13 @@ export type Snapshot = {
   manual_label: string | null;
 };
 
+export type MentionStatus = "alive" | "trashed" | "missing";
+
+export type MentionTargetStatus = {
+  id: string;
+  status: MentionStatus;
+};
+
 export type UpdateNoteInput = {
   id: string;
   title: string;

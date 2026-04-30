@@ -4,23 +4,35 @@
  * pushes the result through `setState`. Keeping these pure means we can
  * unit-test them without touching SolidJS or the DOM.
  *
+ * Each leaf pane carries its own array of tabs (browser-style). A pane is
+ * never empty: even a "fresh" pane has one tab with `noteId: null` (the
+ * empty-state picker). `activeTabIdx` always points at a valid index.
+ *
  * Invariants the operations preserve:
- * - Each `SplitNode` has ≥ 2 children. Single-child splits are collapsed
+ * - Each `SplitNode` has >= 2 children. Single-child splits are collapsed
  *   by `normalize`.
  * - Adjacent splits with the same direction are flattened by `normalize`,
  *   so `[A | [B | C]]` becomes `[A | B | C]`. Keeps the user's mental
  *   model linear when they keep splitting in the same direction.
  * - `sizes.length === children.length` and the array sums to ~1.0.
- * - All `id` strings (pane + split) are globally unique within the tree.
+ * - Each `LeafPane.tabs` has length >= 1. `activeTabIdx` in [0, tabs.length).
+ * - All `id` strings (pane + split + tab) are globally unique within the tree.
  */
 
 export type PaneId = string;
 export type SplitId = string;
+export type TabId = string;
+
+export type Tab = {
+  id: TabId;
+  noteId: string | null;
+};
 
 export type LeafPane = {
   kind: "pane";
   id: PaneId;
-  noteId: string | null;
+  tabs: Tab[];
+  activeTabIdx: number;
 };
 
 export type SplitNode = {
@@ -45,8 +57,12 @@ function uid(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${idCounter.toString(36)}`;
 }
 
+export function newTab(noteId: string | null = null): Tab {
+  return { id: uid("t"), noteId };
+}
+
 export function newPane(noteId: string | null = null): LeafPane {
-  return { kind: "pane", id: uid("p"), noteId };
+  return { kind: "pane", id: uid("p"), tabs: [newTab(noteId)], activeTabIdx: 0 };
 }
 
 export function newSplit(
@@ -64,6 +80,17 @@ export function newSplit(
   };
 }
 
+/** Active tab of a pane. The pane invariant guarantees at least one tab,
+ *  and `activeTabIdx` is always in range. */
+export function activeTab(pane: LeafPane): Tab {
+  return pane.tabs[pane.activeTabIdx];
+}
+
+/** Active note id of a pane (or null if the active tab is empty). */
+export function activeNoteId(pane: LeafPane): string | null {
+  return activeTab(pane).noteId;
+}
+
 export function collectLeaves(node: LayoutNode): LeafPane[] {
   if (node.kind === "pane") return [node];
   const out: LeafPane[] = [];
@@ -79,33 +106,20 @@ export function findPane(node: LayoutNode, paneId: PaneId): LeafPane | undefined
   return collectLeaves(node).find((p) => p.id === paneId);
 }
 
-export function findPaneByNoteId(node: LayoutNode, noteId: string): LeafPane | undefined {
-  return collectLeaves(node).find((p) => p.noteId === noteId);
-}
-
-/** Replace the noteId on a single pane. Returns a new tree (structural sharing
- *  for unchanged subtrees). */
-export function replacePaneNote(
+/** Locate which pane and tab a given noteId is open in (the same noteId is
+ *  global-unique across the whole layout, so the first hit is the only hit). */
+export function findTabByNoteId(
   node: LayoutNode,
-  paneId: PaneId,
-  noteId: string | null,
-): LayoutNode {
-  if (node.kind === "pane") {
-    if (node.id !== paneId) return node;
-    if (node.noteId === noteId) return node;
-    return { ...node, noteId };
+  noteId: string,
+): { pane: LeafPane; tabIdx: number } | undefined {
+  for (const p of collectLeaves(node)) {
+    const idx = p.tabs.findIndex((t) => t.noteId === noteId);
+    if (idx >= 0) return { pane: p, tabIdx: idx };
   }
-  let changed = false;
-  const newChildren = node.children.map((c) => {
-    const next = replacePaneNote(c, paneId, noteId);
-    if (next !== c) changed = true;
-    return next;
-  });
-  if (!changed) return node;
-  return { ...node, children: newChildren };
+  return undefined;
 }
 
-/** Wrap the target pane in a new split with `newPane` placed on `side`.
+/** Wrap the target pane in a new split with `paneToInsert` placed on `side`.
  *  Smart-flattens when the parent split's direction matches: instead of
  *  nesting, the new pane becomes a sibling. */
 export function splitTreeAt(
@@ -243,15 +257,21 @@ function renormalize(sizes: number[]): number[] {
   return sizes.map((s) => s / sum);
 }
 
-/** Drop noteId references that no longer exist. Used at restore-from-disk
- *  time to handle "this layout was saved when notes existed that have since
- *  been purged." Returns a new tree with affected panes set to noteId=null. */
+/** Drop noteId references that no longer exist. Tabs with an invalid noteId
+ *  have their noteId nulled (so the empty picker shows up); the tab itself is
+ *  preserved so the user's tab topology survives. */
 export function reconcileWithExistingNotes(node: LayoutNode, validIds: Set<string>): LayoutNode {
   if (node.kind === "pane") {
-    if (node.noteId && !validIds.has(node.noteId)) {
-      return { ...node, noteId: null };
-    }
-    return node;
+    let changed = false;
+    const nextTabs = node.tabs.map((t) => {
+      if (t.noteId && !validIds.has(t.noteId)) {
+        changed = true;
+        return { ...t, noteId: null };
+      }
+      return t;
+    });
+    if (!changed) return node;
+    return { ...node, tabs: nextTabs };
   }
   let changed = false;
   const newChildren = node.children.map((c) => {
@@ -261,4 +281,61 @@ export function reconcileWithExistingNotes(node: LayoutNode, validIds: Set<strin
   });
   if (!changed) return node;
   return { ...node, children: newChildren };
+}
+
+/** Migrate a layout that was persisted under the old `{ noteId }` shape into
+ *  the new `{ tabs, activeTabIdx }` shape. Idempotent: tab-shaped panes are
+ *  returned unchanged. The persisted blob is `unknown` because it crosses the
+ *  serialization boundary. */
+export function migrateLegacyLayout(node: unknown): LayoutNode {
+  if (!node || typeof node !== "object") {
+    // Defensive fallback - caller shouldn't reach this with valid input.
+    return newPane(null);
+  }
+  const obj = node as Record<string, unknown>;
+  if (obj.kind === "pane") {
+    if (Array.isArray(obj.tabs)) {
+      // Already new shape - validate the minimum invariants and pass through.
+      const tabs = (obj.tabs as unknown[]).map((t) => {
+        const tobj = t as Record<string, unknown>;
+        return {
+          id: typeof tobj.id === "string" ? tobj.id : uid("t"),
+          noteId: typeof tobj.noteId === "string" ? tobj.noteId : null,
+        };
+      });
+      const finalTabs = tabs.length > 0 ? tabs : [newTab(null)];
+      const idx = typeof obj.activeTabIdx === "number" ? obj.activeTabIdx : 0;
+      return {
+        kind: "pane",
+        id: typeof obj.id === "string" ? obj.id : uid("p"),
+        tabs: finalTabs,
+        activeTabIdx: Math.max(0, Math.min(finalTabs.length - 1, idx)),
+      };
+    }
+    // Old shape: { kind: "pane", id, noteId }. Promote noteId to a single tab.
+    const noteId = typeof obj.noteId === "string" ? obj.noteId : null;
+    return {
+      kind: "pane",
+      id: typeof obj.id === "string" ? obj.id : uid("p"),
+      tabs: [newTab(noteId)],
+      activeTabIdx: 0,
+    };
+  }
+  if (obj.kind === "split") {
+    const children = Array.isArray(obj.children) ? obj.children : [];
+    const sizes = Array.isArray(obj.sizes) ? (obj.sizes as number[]) : [];
+    const migratedChildren = children.map(migrateLegacyLayout);
+    const safeSizes =
+      sizes.length === migratedChildren.length
+        ? sizes
+        : migratedChildren.map(() => 1 / Math.max(1, migratedChildren.length));
+    return {
+      kind: "split",
+      id: typeof obj.id === "string" ? obj.id : uid("s"),
+      direction: obj.direction === "column" ? "column" : "row",
+      children: migratedChildren,
+      sizes: renormalize(safeSizes),
+    };
+  }
+  return newPane(null);
 }

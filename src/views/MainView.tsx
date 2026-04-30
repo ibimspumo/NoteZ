@@ -7,6 +7,7 @@ import { Sidebar } from "../components/Sidebar/Sidebar";
 import { SnapshotsDialog } from "../components/SnapshotsDialog";
 import { HistoryIcon, SidebarIcon } from "../components/icons";
 import { matchHotkey } from "../lib/keymap";
+import { findPane } from "../lib/paneTree";
 import { api, onEvent } from "../lib/tauri";
 import {
   createNote,
@@ -26,10 +27,13 @@ import {
   activeApi,
   activeEditor,
   activePaneId,
-  closePane,
+  closeActiveTab,
+  openEmptyTabInActivePane,
+  openNoteInNewTab,
   panes,
   panesState,
   setActivePaneId,
+  setActiveTabIdx,
   splitPane,
   totalPaneCount,
 } from "../stores/panes";
@@ -63,7 +67,7 @@ export const MainView: Component = () => {
     if (a?.hasPendingSave()) await a.flushSave();
   };
 
-  const handleOpenNote = async (id: string, opts?: { split: boolean }) => {
+  const handleOpenNote = async (id: string, opts?: { split?: boolean; newTab?: boolean }) => {
     await flushIfPending();
     closeSettings();
     if (opts?.split) {
@@ -71,6 +75,13 @@ export const MainView: Component = () => {
       // pane, mirroring ⌘D. splitPane's same-note guard focuses an existing
       // pane if the note is already open elsewhere.
       splitPane(activePaneId(), "right", id);
+      return;
+    }
+    if (opts?.newTab) {
+      // ⌘/Ctrl+click on a sidebar row: open the note in a new tab in the
+      // active pane. Same-note guard focuses an existing tab if the note is
+      // already open anywhere.
+      openNoteInNewTab(activePaneId(), id);
       return;
     }
     setSelectedId(id);
@@ -178,9 +189,29 @@ export const MainView: Component = () => {
     splitPane(activePaneId(), side, null);
   };
 
-  const closeActivePane = () => {
-    if (totalPaneCount() <= 1) return;
-    closePane(activePaneId());
+  /** Cycle to the next/prev tab within the active pane. Wraps. No-op if the
+   *  pane only has one tab. Bound to Ctrl+Tab / Ctrl+Shift+Tab (browser
+   *  standard - matches Chrome/Firefox/Safari/VSCode). */
+  const cycleTabInActivePane = (step: 1 | -1) => {
+    const pane = findPane(panesState.root, activePaneId());
+    if (!pane || pane.tabs.length <= 1) return;
+    const next = (pane.activeTabIdx + step + pane.tabs.length) % pane.tabs.length;
+    setActiveTabIdx(pane.id, next);
+  };
+
+  /** ⌘W behavior:
+   *  - In a pane with only one empty tab AND the layout has only one pane,
+   *    fall through (return false) so Tauri's window-close binding takes over.
+   *  - Otherwise close the active tab. closeTab handles the cascade: last tab
+   *    in single-pane → clear to empty; last tab in multi-pane → drop the pane. */
+  const closeActiveTabSmart = (): false | void => {
+    const pane = findPane(panesState.root, activePaneId());
+    if (!pane) return false;
+    const t = pane.tabs[pane.activeTabIdx];
+    if (totalPaneCount() === 1 && pane.tabs.length === 1 && (!t || t.noteId === null)) {
+      return false;
+    }
+    closeActiveTab(activePaneId());
   };
 
   const focusPaneByIndex = (n: number) => {
@@ -260,14 +291,33 @@ export const MainView: Component = () => {
       hotkey: { key: "d", mods: ["mod", "shift"] },
       handler: () => splitActivePane("bottom"),
     },
-    // ⌘W: close active pane. Returns false (falls through) when there's only
-    // one pane left, so Tauri's window-close binding can still take it.
+    // ⌘T: open a new (empty) tab in the active pane.
+    {
+      hotkey: { key: "t", mods: ["mod"] },
+      handler: () => {
+        openEmptyTabInActivePane();
+      },
+    },
+    // Ctrl+Tab / Ctrl+Shift+Tab: cycle tabs in the active pane. The keymap's
+    // "mod" matches Cmd or Ctrl, but on macOS Cmd+Tab is the OS app switcher
+    // (the OS intercepts it before our app sees the event), so in practice
+    // only Ctrl+Tab reaches us - which is exactly the cross-platform browser
+    // convention.
+    {
+      hotkey: { key: "Tab", mods: ["mod"] },
+      handler: () => cycleTabInActivePane(1),
+    },
+    {
+      hotkey: { key: "Tab", mods: ["mod", "shift"] },
+      handler: () => cycleTabInActivePane(-1),
+    },
+    // ⌘W: close the active tab. Cascades to closing the pane when it was the
+    // last tab in a multi-pane layout. Falls through (returns false) only
+    // when the layout is a single empty tab in a single pane - that's the
+    // window-close case.
     {
       hotkey: { key: "w", mods: ["mod"] },
-      handler: () => {
-        if (totalPaneCount() <= 1) return false;
-        closeActivePane();
-      },
+      handler: closeActiveTabSmart,
     },
     // Dev-only: stress-test panel.
     {
@@ -311,7 +361,12 @@ export const MainView: Component = () => {
 
   return (
     <div class="nz-app" classList={{ "sidebar-collapsed": sidebarCollapsed() }}>
-      <Sidebar onCreate={handleCreateNote} onTogglePin={handleTogglePin} onDelete={handleDelete} />
+      <Sidebar
+        onCreate={handleCreateNote}
+        onTogglePin={handleTogglePin}
+        onDelete={handleDelete}
+        onOpenNote={handleOpenNote}
+      />
       <main class="nz-main">
         <Show when={!settingsOpen()} fallback={<SettingsView />}>
           <header class="nz-main-header" data-tauri-drag-region>
@@ -325,7 +380,10 @@ export const MainView: Component = () => {
               <SidebarIcon />
             </button>
             <div class="nz-main-header-toolbar" data-tauri-drag-region>
-              <Show when={activeEditor()}>{(ed) => <EditorToolbar editor={ed()} />}</Show>
+              {/* Always render the toolbar so the chrome stays stable on tab/note
+                  switches. EditorToolbar gracefully handles a null editor by
+                  rendering disabled buttons. */}
+              <EditorToolbar editor={activeEditor()} />
             </div>
             <div
               class="nz-saving-indicator"

@@ -312,6 +312,7 @@ pub fn run() {
             commands::snapshots::restore_snapshot,
             // mentions
             commands::mentions::list_backlinks,
+            commands::mentions::get_mention_status_bulk,
             // settings
             commands::settings::get_setting,
             commands::settings::set_setting,

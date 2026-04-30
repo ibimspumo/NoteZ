@@ -1,7 +1,10 @@
 import {
   $applyNodeReplacement,
+  $createTextNode,
+  $getNearestNodeFromDOMNode,
   type EditorConfig,
   ElementNode,
+  type LexicalEditor,
   type LexicalNode,
   type NodeKey,
   type RangeSelection,
@@ -139,9 +142,26 @@ export type MentionClickOpts = {
   split: boolean;
 };
 
+export type BrokenMentionClick = {
+  noteId: string;
+  /** The mention DOM element - the popover uses this both for positioning
+   *  and to resolve the corresponding Lexical node when the user picks an
+   *  action (Remove / Convert to text). */
+  el: HTMLElement;
+  rect: DOMRect;
+};
+
+export type MentionClickHandlers = {
+  /** Live target - open it normally. */
+  onOpen: (noteId: string, opts: MentionClickOpts) => void;
+  /** Trashed or missing target - show the actions popover instead of
+   *  trying to navigate. */
+  onBroken: (info: BrokenMentionClick) => void;
+};
+
 export function attachMentionClickHandler(
   rootEl: HTMLElement,
-  onClick: (noteId: string, opts: MentionClickOpts) => void,
+  handlers: MentionClickHandlers,
 ): () => void {
   const handler = (e: MouseEvent) => {
     const target = e.target as HTMLElement | null;
@@ -152,7 +172,16 @@ export function attachMentionClickHandler(
     if (!noteId) return;
     e.preventDefault();
     e.stopPropagation();
-    onClick(noteId, { split: e.metaKey || e.ctrlKey });
+    const status = mentionEl.getAttribute("data-mention-status");
+    if (status === "trashed" || status === "missing") {
+      handlers.onBroken({
+        noteId,
+        el: mentionEl,
+        rect: mentionEl.getBoundingClientRect(),
+      });
+      return;
+    }
+    handlers.onOpen(noteId, { split: e.metaKey || e.ctrlKey });
   };
   rootEl.addEventListener("click", handler);
   return () => rootEl.removeEventListener("click", handler);
@@ -162,3 +191,28 @@ export function attachMentionClickHandler(
 // incremental mutation listener instead of a full node-map scan, so saves on
 // huge notes don't pay an O(n) traversal cost.
 export { collectMentionTargets } from "./editorRefs";
+
+/** Remove a single mention node entirely - used by the broken-mention popover's
+ *  "Remove" action. The mention is resolved from its DOM element so the caller
+ *  doesn't need to track NodeKeys. */
+export function removeMentionByDOM(editor: LexicalEditor, el: HTMLElement) {
+  editor.update(() => {
+    const node = $getNearestNodeFromDOMNode(el);
+    if (node && $isMentionNode(node)) {
+      node.remove();
+    }
+  });
+}
+
+/** Replace a mention node with a plain text run of `@<title>` - used by the
+ *  broken-mention popover's "Convert to text" action. The persisted `__title`
+ *  is what the user saw in the editor, so converting on a stale title is
+ *  intentional (the visual hasn't changed; only the link is gone). */
+export function convertMentionToTextByDOM(editor: LexicalEditor, el: HTMLElement) {
+  editor.update(() => {
+    const node = $getNearestNodeFromDOMNode(el);
+    if (!node || !$isMentionNode(node)) return;
+    const text = $createTextNode(`@${node.getTitle()}`);
+    node.replace(text);
+  });
+}

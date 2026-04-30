@@ -17,6 +17,7 @@ import type {
   TrashSummary,
   UpdateNoteInput,
 } from "../lib/types";
+import { markAllTrashedAsMissing, setMentionStatus } from "./mentionRegistry";
 import { activePaneNoteId, openNoteInActivePane, openNoteInPane, paneForNote } from "./panes";
 
 /**
@@ -280,6 +281,8 @@ export async function softDeleteNote(id: string): Promise<void> {
   const prev = state.pinned.find((n) => n.id === id) ?? state.items.find((n) => n.id === id);
   await api.softDeleteNote(id);
   cache.delete(id);
+  // Any open editor that mentions this note should now show it as trashed.
+  setMentionStatus(id, "trashed");
   // Clear any pane showing this note so its editor doesn't keep saving into
   // a trashed row. Same-note guard means at most one pane references the id.
   const showingPane = paneForNote(id);
@@ -331,6 +334,7 @@ export async function loadMoreTrash() {
 export async function restoreNote(id: string): Promise<Note> {
   const note = await api.restoreNote(id);
   cache.set(note.id, note);
+  setMentionStatus(id, "alive");
   setState(
     produce((s) => {
       const idx = s.trash.findIndex((n) => n.id === id);
@@ -345,6 +349,7 @@ export async function restoreNote(id: string): Promise<Note> {
 
 export async function purgeNote(id: string): Promise<void> {
   await api.purgeNote(id);
+  setMentionStatus(id, "missing");
   setState(
     produce((s) => {
       const idx = s.trash.findIndex((n) => n.id === id);
@@ -355,6 +360,7 @@ export async function purgeNote(id: string): Promise<void> {
 
 export async function emptyTrash(): Promise<number> {
   const n = await api.emptyTrash();
+  markAllTrashedAsMissing();
   setState(
     produce((s) => {
       s.trash = [];

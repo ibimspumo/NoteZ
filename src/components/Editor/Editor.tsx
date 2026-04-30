@@ -2,7 +2,10 @@ import { $createParagraphNode, $getRoot, $isParagraphNode, type LexicalEditor } 
 import { type Component, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import { stringifyEditorState } from "../../lib/editorStringify";
 import { api } from "../../lib/tauri";
+import type { MentionStatus } from "../../lib/types";
+import { getMentionStatus } from "../../stores/mentionRegistry";
 import type { EditorSnapshot } from "../../views/useSavePipeline";
+import { BrokenMentionPopover } from "./BrokenMentionPopover";
 import { MentionPopover } from "./MentionPopover";
 import {
   createNoteZEditor,
@@ -15,8 +18,11 @@ import {
   type MentionClickOpts,
   attachMentionClickHandler,
   collectMentionTargets,
+  convertMentionToTextByDOM,
+  removeMentionByDOM,
 } from "./lexical/mentionNode";
 import { type MentionMatch, insertMention, registerMentionPlugin } from "./lexical/mentionPlugin";
+import { registerMentionStatusDecorator } from "./lexical/mentionStatusDecorator";
 import {
   type SerializedSelection,
   captureSelection,
@@ -73,6 +79,11 @@ export const Editor: Component<EditorProps> = (props) => {
   };
 
   const [activeMatch, setActiveMatch] = createSignal<MentionMatch | null>(null);
+  const [brokenMention, setBrokenMention] = createSignal<{
+    el: HTMLElement;
+    rect: DOMRect;
+    status: Extract<MentionStatus, "trashed" | "missing">;
+  } | null>(null);
   const [isEmpty, setIsEmpty] = createSignal(true);
   let confirmFn: (() => boolean) | null = null;
   let navigateFn: ((dir: "up" | "down") => void) | null = null;
@@ -83,9 +94,21 @@ export const Editor: Component<EditorProps> = (props) => {
     editorRef = handles.editor;
     props.onReady?.(handles.editor);
 
-    const cleanupClick = attachMentionClickHandler(containerRef, (id, opts) => {
-      props.onOpenNote(id, opts);
+    const cleanupClick = attachMentionClickHandler(containerRef, {
+      onOpen: (id, opts) => props.onOpenNote(id, opts),
+      onBroken: ({ el, rect }) => {
+        const id = el.getAttribute("data-note-id");
+        const s = id ? getMentionStatus(id) : undefined;
+        // Defensive: only "trashed" / "missing" should reach here, but the
+        // attribute is set asynchronously (loading -> resolved), so it's
+        // possible to click during the resolution window. Bail if the live
+        // status disagrees.
+        if (s !== "trashed" && s !== "missing") return;
+        setBrokenMention({ el, rect, status: s });
+      },
     });
+
+    const cleanupStatus = registerMentionStatusDecorator(handles.editor, containerRef);
 
     const cleanupMentions = registerMentionPlugin(handles.editor, {
       onOpen: (m) => setActiveMatch(m),
@@ -157,6 +180,7 @@ export const Editor: Component<EditorProps> = (props) => {
       }
       cleanupChange();
       cleanupMentions();
+      cleanupStatus();
       cleanupClick();
       props.onReady?.(null);
       handles.destroy();
@@ -185,6 +209,9 @@ export const Editor: Component<EditorProps> = (props) => {
     }
     lastNoteId = id;
     liveSelection = null;
+    // The broken-mention popover is anchored to a DOM element that's about
+    // to be torn down when we load the new note's editor state. Drop it.
+    setBrokenMention(null);
 
     suppressChange = true;
     if (props.initialJson && props.initialJson !== "{}") {
@@ -262,6 +289,23 @@ export const Editor: Component<EditorProps> = (props) => {
             onClose={() => setActiveMatch(null)}
             registerNavigate={(fn) => (navigateFn = fn)}
             registerConfirm={(fn) => (confirmFn = fn)}
+          />
+        )}
+      </Show>
+      <Show when={brokenMention()}>
+        {(bm) => (
+          <BrokenMentionPopover
+            status={bm().status}
+            rect={bm().rect}
+            onClose={() => setBrokenMention(null)}
+            onRemove={() => {
+              const ed = editorRef;
+              if (ed) removeMentionByDOM(ed, bm().el);
+            }}
+            onConvert={() => {
+              const ed = editorRef;
+              if (ed) convertMentionToTextByDOM(ed, bm().el);
+            }}
           />
         )}
       </Show>

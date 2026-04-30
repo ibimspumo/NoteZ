@@ -110,6 +110,229 @@
   color: var(--nz-text-strong);
 }
 
+/* Per-pane tab strip. Replaces the plain `.nz-pane-header` when a pane has
+   2+ tabs. Uses CSS custom properties for the wunsch/min widths so the
+   active-tab override only needs to flip one variable. */
+.nz-pane-tabs {
+  --nz-tab-wunsch: 140px;
+  --nz-tab-min: 80px;
+  --nz-tab-active-min: 120px;
+  flex: 0 0 30px;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  border-bottom: 1px solid var(--nz-divider);
+  background: transparent;
+  position: relative;
+  user-select: none;
+}
+.nz-pane-tabs-scroll {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none; /* Firefox */
+  scroll-behavior: smooth;
+}
+.nz-pane-tabs-scroll::-webkit-scrollbar {
+  display: none;
+}
+.nz-pane-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  /* Wunsch-Breite (140px) cap, gleichmäßig schrumpfen bis min-width (80px),
+     dann horizontal scroll. */
+  flex: 1 1 var(--nz-tab-wunsch);
+  max-width: var(--nz-tab-wunsch);
+  min-width: var(--nz-tab-min);
+  padding: 0 8px 0 12px;
+  font-size: var(--nz-text-sm);
+  color: var(--nz-text-muted);
+  cursor: pointer;
+  border-right: 1px solid var(--nz-divider);
+  background: transparent;
+  transition: background 100ms var(--nz-ease), color 100ms var(--nz-ease);
+}
+.nz-pane-tab:hover {
+  background: var(--nz-bg-hover);
+  color: var(--nz-text);
+}
+.nz-pane-tab.active {
+  background: var(--nz-bg-main);
+  color: var(--nz-text-strong);
+  /* The active tab keeps a generous min so it stays legible even when the
+     strip is heavily compressed. */
+  min-width: var(--nz-tab-active-min);
+  font-weight: 500;
+}
+.nz-pane-tab.active::after {
+  /* Subtle accent line at the top of the active tab - reads "this is the one"
+     without needing a heavy color block. */
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--nz-accent);
+}
+.nz-pane-tab.empty .nz-pane-tab-title {
+  font-style: italic;
+  color: var(--nz-text-faint);
+}
+.nz-pane-tab.drag-over {
+  background: var(--nz-accent-soft);
+}
+.nz-pane-tab-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nz-pane-tab-pin {
+  display: inline-flex;
+  align-items: center;
+  color: var(--nz-text-muted);
+  flex: 0 0 auto;
+}
+.nz-pane-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--nz-radius-sm);
+  font-size: 14px;
+  line-height: 1;
+  color: var(--nz-text-faint);
+  flex: 0 0 auto;
+  /* Hidden by default - only appears on tab hover or when the tab is active.
+     Browser-tab convention: keep the strip visually quiet and only show
+     close-affordances when the user is actually engaging with a tab. */
+  opacity: 0;
+  transition: background 100ms var(--nz-ease), color 100ms var(--nz-ease), opacity 80ms
+    var(--nz-ease);
+}
+.nz-pane-tab:hover .nz-pane-tab-close,
+.nz-pane-tab.active .nz-pane-tab-close {
+  opacity: 1;
+}
+.nz-pane-tab-close:hover {
+  background: var(--nz-bg-hover);
+  color: var(--nz-text-strong);
+}
+.nz-pane-tabs-new,
+.nz-pane-tabs-dropdown-trigger {
+  flex: 0 0 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--nz-text-md);
+  color: var(--nz-text-muted);
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--nz-divider);
+  cursor: pointer;
+  transition: background 100ms var(--nz-ease), color 100ms var(--nz-ease);
+}
+.nz-pane-tabs-new:hover,
+.nz-pane-tabs-dropdown-trigger:hover {
+  background: var(--nz-bg-hover);
+  color: var(--nz-text-strong);
+}
+.nz-pane-tabs-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  min-width: 220px;
+  max-width: 320px;
+  background: var(--nz-bg-elev);
+  border: 1px solid var(--nz-divider);
+  border-radius: var(--nz-radius-md);
+  box-shadow: var(--nz-shadow);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.nz-pane-tabs-dropdown-filter {
+  padding: 6px 8px;
+  border: 1px solid var(--nz-divider);
+  border-radius: var(--nz-radius-sm);
+  background: var(--nz-bg-row);
+  color: var(--nz-text);
+  font-size: var(--nz-text-md);
+  font-family: inherit;
+  outline: none;
+}
+.nz-pane-tabs-dropdown-filter:focus {
+  border-color: var(--nz-accent);
+}
+.nz-pane-tabs-dropdown-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.nz-pane-tabs-dropdown-row {
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: var(--nz-radius-sm);
+  font-size: var(--nz-text-md);
+  color: var(--nz-text);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.nz-pane-tabs-dropdown-row:hover {
+  background: var(--nz-bg-hover);
+}
+.nz-pane-tabs-dropdown-row.active {
+  background: var(--nz-bg-row);
+  color: var(--nz-text-strong);
+  font-weight: 500;
+}
+.nz-pane-tabs-dropdown-row-title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nz-pane-tabs-dropdown-empty {
+  padding: 12px 8px;
+  font-size: var(--nz-text-sm);
+  color: var(--nz-text-faint);
+  text-align: center;
+}
+
+/* Multi-tab content host. All tabs render simultaneously inside the pane;
+   only the active one is visible. CSS controls visibility so the inactive
+   editors keep their Lexical state, scroll position, and undo history alive. */
+.nz-pane-tabs-host {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+}
+.nz-tab-content {
+  flex: 1 1 auto;
+  display: none;
+  flex-direction: column;
+  min-height: 0;
+}
+.nz-tab-content.active {
+  display: flex;
+}
+
 /* Resizer handle. The visible line is 4px (::before, the layout size of
    the splitter element itself) but the pointer hit area is widened via an
    absolutely-positioned ::after that extends beyond the splitter into the

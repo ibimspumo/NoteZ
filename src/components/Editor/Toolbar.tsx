@@ -26,7 +26,11 @@ import { type Component, createEffect, createSignal, onCleanup } from "solid-js"
 type BlockKind = "paragraph" | "h1" | "h2" | "h3" | "ul" | "ol" | "check";
 
 type Props = {
-  editor: LexicalEditor;
+  /** Active editor, or null when there's no editor on screen (empty tab,
+   *  picker visible). When null, the toolbar still renders all buttons but
+   *  they're disabled - the strip stays visually present so the chrome
+   *  doesn't flicker on tab/note switches. */
+  editor: LexicalEditor | null;
 };
 
 export const EditorToolbar: Component<Props> = (props) => {
@@ -37,8 +41,22 @@ export const EditorToolbar: Component<Props> = (props) => {
   const [link, setLink] = createSignal(false);
   const [block, setBlock] = createSignal<BlockKind>("paragraph");
 
+  const isDisabled = () => props.editor === null;
+
   const refreshFromState = () => {
-    props.editor.getEditorState().read(() => {
+    const ed = props.editor;
+    if (!ed) {
+      // No editor → snap signals back to defaults so the buttons read
+      // "inactive" rather than carrying stale state from the previous tab.
+      setBold(false);
+      setItalic(false);
+      setUnderline(false);
+      setCodeFmt(false);
+      setLink(false);
+      setBlock("paragraph");
+      return;
+    }
+    ed.getEditorState().read(() => {
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return;
 
@@ -70,6 +88,12 @@ export const EditorToolbar: Component<Props> = (props) => {
   };
 
   createEffect(() => {
+    const ed = props.editor;
+    // Re-running on editor swap (tab switch) - the previous editor's command
+    // listener is torn down via onCleanup, the new one registers fresh below.
+    // When ed is null we still call refreshFromState so the signals reset.
+    refreshFromState();
+    if (!ed) return;
     // We deliberately do NOT subscribe to registerUpdateListener here. That
     // listener fires on every keystroke (Lexical fires it once per
     // transaction), and the toolbar state only changes when the *selection*
@@ -78,7 +102,7 @@ export const EditorToolbar: Component<Props> = (props) => {
     // saves us a $getEditorState().read() + tree walk per keystroke, which
     // for 100k-node notes is a measurable jank source.
     const cleanup = mergeRegister(
-      props.editor.registerCommand(
+      ed.registerCommand(
         SELECTION_CHANGE_COMMAND,
         () => {
           refreshFromState();
@@ -87,15 +111,12 @@ export const EditorToolbar: Component<Props> = (props) => {
         COMMAND_PRIORITY_LOW,
       ),
     );
-    // Initial sync - the command listener above only fires on subsequent
-    // selection changes, but the toolbar should reflect the current cursor
-    // immediately after mount.
-    refreshFromState();
     onCleanup(cleanup);
   });
 
   const applyBlock = (kind: BlockKind) => {
     const ed = props.editor;
+    if (!ed) return;
     const current = block();
 
     // Toggle off lists/headings when re-clicking the active one — drops back
@@ -145,14 +166,18 @@ export const EditorToolbar: Component<Props> = (props) => {
   };
 
   const fmt = (f: "bold" | "italic" | "underline" | "code") => {
-    props.editor.focus();
-    props.editor.dispatchCommand(FORMAT_TEXT_COMMAND, f);
+    const ed = props.editor;
+    if (!ed) return;
+    ed.focus();
+    ed.dispatchCommand(FORMAT_TEXT_COMMAND, f);
   };
 
   const handleLink = () => {
-    props.editor.focus();
+    const ed = props.editor;
+    if (!ed) return;
+    ed.focus();
     if (link()) {
-      props.editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
+      ed.dispatchCommand(TOGGLE_LINK_COMMAND, null);
       return;
     }
     const url = window.prompt("Enter link URL");
@@ -160,19 +185,28 @@ export const EditorToolbar: Component<Props> = (props) => {
     const trimmed = url.trim();
     if (!trimmed) return;
     const normalized = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-    props.editor.dispatchCommand(TOGGLE_LINK_COMMAND, normalized);
+    ed.dispatchCommand(TOGGLE_LINK_COMMAND, normalized);
   };
 
-  const undo = () => props.editor.dispatchCommand(UNDO_COMMAND, undefined);
-  const redo = () => props.editor.dispatchCommand(REDO_COMMAND, undefined);
+  const undo = () => props.editor?.dispatchCommand(UNDO_COMMAND, undefined);
+  const redo = () => props.editor?.dispatchCommand(REDO_COMMAND, undefined);
+
+  const disabled = isDisabled();
 
   return (
-    <div class="nz-toolbar" role="toolbar" aria-label="Formatting" data-tauri-drag-region>
+    <div
+      class="nz-toolbar"
+      classList={{ disabled }}
+      role="toolbar"
+      aria-label="Formatting"
+      aria-disabled={disabled}
+      data-tauri-drag-region
+    >
       <div class="nz-toolbar-group" data-tauri-drag-region>
-        <ToolbarBtn label="Undo" hint="Undo · ⌘Z" onPress={undo}>
+        <ToolbarBtn label="Undo" hint="Undo · ⌘Z" disabled={disabled} onPress={undo}>
           <IconUndo />
         </ToolbarBtn>
-        <ToolbarBtn label="Redo" hint="Redo · ⌘⇧Z" onPress={redo}>
+        <ToolbarBtn label="Redo" hint="Redo · ⌘⇧Z" disabled={disabled} onPress={redo}>
           <IconRedo />
         </ToolbarBtn>
       </div>
@@ -184,6 +218,7 @@ export const EditorToolbar: Component<Props> = (props) => {
           label="Body text"
           hint="Body"
           active={block() === "paragraph"}
+          disabled={disabled}
           onPress={() => applyBlock("paragraph")}
         >
           <IconParagraph />
@@ -192,6 +227,7 @@ export const EditorToolbar: Component<Props> = (props) => {
           label="Heading 1"
           hint="Heading 1"
           active={block() === "h1"}
+          disabled={disabled}
           onPress={() => applyBlock("h1")}
         >
           <IconH1 />
@@ -200,6 +236,7 @@ export const EditorToolbar: Component<Props> = (props) => {
           label="Heading 2"
           hint="Heading 2"
           active={block() === "h2"}
+          disabled={disabled}
           onPress={() => applyBlock("h2")}
         >
           <IconH2 />
@@ -208,6 +245,7 @@ export const EditorToolbar: Component<Props> = (props) => {
           label="Heading 3"
           hint="Heading 3"
           active={block() === "h3"}
+          disabled={disabled}
           onPress={() => applyBlock("h3")}
         >
           <IconH3 />
@@ -221,6 +259,7 @@ export const EditorToolbar: Component<Props> = (props) => {
           label="Bulleted list"
           hint="Bulleted list"
           active={block() === "ul"}
+          disabled={disabled}
           onPress={() => applyBlock("ul")}
         >
           <IconBullet />
@@ -229,6 +268,7 @@ export const EditorToolbar: Component<Props> = (props) => {
           label="Numbered list"
           hint="Numbered list"
           active={block() === "ol"}
+          disabled={disabled}
           onPress={() => applyBlock("ol")}
         >
           <IconOrdered />
@@ -237,6 +277,7 @@ export const EditorToolbar: Component<Props> = (props) => {
           label="Checklist"
           hint="Checklist"
           active={block() === "check"}
+          disabled={disabled}
           onPress={() => applyBlock("check")}
         >
           <IconCheck />
@@ -246,13 +287,20 @@ export const EditorToolbar: Component<Props> = (props) => {
       <span class="nz-toolbar-sep" aria-hidden="true" data-tauri-drag-region />
 
       <div class="nz-toolbar-group" data-tauri-drag-region>
-        <ToolbarBtn label="Bold" hint="Bold · ⌘B" active={bold()} onPress={() => fmt("bold")}>
+        <ToolbarBtn
+          label="Bold"
+          hint="Bold · ⌘B"
+          active={bold()}
+          disabled={disabled}
+          onPress={() => fmt("bold")}
+        >
           <IconBold />
         </ToolbarBtn>
         <ToolbarBtn
           label="Italic"
           hint="Italic · ⌘I"
           active={italic()}
+          disabled={disabled}
           onPress={() => fmt("italic")}
         >
           <IconItalic />
@@ -261,6 +309,7 @@ export const EditorToolbar: Component<Props> = (props) => {
           label="Underline"
           hint="Underline · ⌘U"
           active={underline()}
+          disabled={disabled}
           onPress={() => fmt("underline")}
         >
           <IconUnderline />
@@ -270,13 +319,20 @@ export const EditorToolbar: Component<Props> = (props) => {
       <span class="nz-toolbar-sep" aria-hidden="true" data-tauri-drag-region />
 
       <div class="nz-toolbar-group" data-tauri-drag-region>
-        <ToolbarBtn label="Link" hint="Link" active={link()} onPress={handleLink}>
+        <ToolbarBtn
+          label="Link"
+          hint="Link"
+          active={link()}
+          disabled={disabled}
+          onPress={handleLink}
+        >
           <IconLink />
         </ToolbarBtn>
         <ToolbarBtn
           label="Inline code"
           hint="Inline code"
           active={codeFmt()}
+          disabled={disabled}
           onPress={() => fmt("code")}
         >
           <IconCode />
@@ -290,14 +346,17 @@ const ToolbarBtn: Component<{
   label: string;
   hint?: string;
   active?: boolean;
+  disabled?: boolean;
   onPress: () => void;
   children: import("solid-js").JSX.Element;
 }> = (props) => (
   <button
     class="nz-tb-btn nz-tb-icon"
-    classList={{ active: !!props.active }}
+    classList={{ active: !!props.active, disabled: !!props.disabled }}
     aria-label={props.label}
     aria-pressed={props.active ? true : undefined}
+    aria-disabled={props.disabled ? true : undefined}
+    disabled={props.disabled}
     title={props.hint ?? props.label}
     onMouseDown={(e) => e.preventDefault()}
     onClick={props.onPress}

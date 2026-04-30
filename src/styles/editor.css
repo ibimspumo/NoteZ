@@ -101,6 +101,20 @@
   background: var(--nz-bg-active-strong);
 }
 
+/* No-editor state: the toolbar stays mounted so the chrome doesn't flicker
+   on tab switches, but interaction is suppressed. Buttons render at reduced
+   opacity, ignore pointer input, and keep their idle background on hover so
+   they don't pretend to be clickable. */
+.nz-toolbar.disabled .nz-tb-btn {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+.nz-toolbar.disabled .nz-tb-btn:hover {
+  background: transparent;
+  color: var(--nz-text-muted);
+}
+
 .nz-editor-shell {
   position: relative;
 }
@@ -226,8 +240,24 @@
   list-style: disc;
 }
 
+.nz-ul .nz-ul {
+  list-style: circle;
+}
+
+.nz-ul .nz-ul .nz-ul {
+  list-style: square;
+}
+
 .nz-ol {
   list-style: decimal;
+}
+
+.nz-ol .nz-ol {
+  list-style: lower-alpha;
+}
+
+.nz-ol .nz-ol .nz-ol {
+  list-style: lower-roman;
 }
 
 .nz-li {
@@ -387,6 +417,85 @@
 .nz-mention:hover {
   background: var(--nz-mention-bg-hover);
   border-color: var(--nz-accent-hot);
+}
+
+/* Trashed target: dimmed, muted color, dashed border. The mention is still
+   clickable - clicking opens a small actions popover with Remove / Convert
+   to text rather than navigating into the trashed note. */
+.nz-mention[data-mention-status="trashed"] {
+  opacity: 0.65;
+  border-style: dashed;
+  border-color: var(--nz-divider-strong);
+  color: var(--nz-text-muted);
+}
+
+.nz-mention[data-mention-status="trashed"]:hover {
+  opacity: 0.85;
+  border-color: var(--nz-text-muted);
+  background: var(--nz-bg-hover);
+}
+
+/* Missing target: hard-deleted, struck through, no link styling. */
+.nz-mention[data-mention-status="missing"] {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  opacity: 0.55;
+  border-style: dashed;
+  border-color: var(--nz-divider);
+  color: var(--nz-text-faint);
+}
+
+.nz-mention[data-mention-status="missing"]:hover {
+  opacity: 0.8;
+  background: var(--nz-bg-hover);
+  border-color: var(--nz-text-faint);
+}
+
+/* Two-action popover anchored under a broken mention pill. */
+.nz-broken-mention-popover {
+  position: fixed;
+  z-index: 1500;
+  min-width: 220px;
+  max-width: 280px;
+  background: var(--nz-bg-overlay);
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  border: 1px solid var(--nz-divider-strong);
+  border-radius: var(--nz-radius-lg);
+  box-shadow: var(--nz-shadow);
+  overflow: hidden;
+  padding: 4px;
+  animation: nz-rise 140ms var(--nz-ease);
+}
+
+.nz-broken-mention-headline {
+  padding: 8px 10px 6px;
+  font-size: 11.5px;
+  color: var(--nz-text-muted);
+  border-bottom: 1px solid var(--nz-divider);
+  margin-bottom: 4px;
+  letter-spacing: 0.01em;
+}
+
+.nz-broken-mention-action {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--nz-text-strong);
+  background: transparent;
+  border: 0;
+  border-radius: var(--nz-radius-sm);
+  cursor: pointer;
+  transition: background 100ms var(--nz-ease);
+}
+
+.nz-broken-mention-action:hover,
+.nz-broken-mention-action:focus-visible {
+  background: var(--nz-bg-active);
+  outline: none;
 }
 
 mark {

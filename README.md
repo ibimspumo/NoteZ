@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.8.0-1f883d?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-0.8.3-1f883d?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/platform-macOS-1f883d?style=flat-square" alt="macOS" />
   <img src="https://img.shields.io/badge/storage-local%20only-1f883d?style=flat-square" alt="local-only" />
   <img src="https://img.shields.io/badge/telemetry-none-1f883d?style=flat-square" alt="no telemetry" />

@@ -2,16 +2,18 @@ import { describe, expect, it } from "vitest";
 import {
   type LayoutNode,
   type LeafPane,
+  activeNoteId,
   collectLeaves,
   findPane,
-  findPaneByNoteId,
+  findTabByNoteId,
+  migrateLegacyLayout,
   newPane,
   newSplit,
+  newTab,
   normalize,
   paneCount,
   reconcileWithExistingNotes,
   removePane,
-  replacePaneNote,
   resizeBoundary,
   splitTreeAt,
 } from "./paneTree";
@@ -28,11 +30,25 @@ describe("paneTree", () => {
   it("newPane / newSplit produce valid nodes", () => {
     const p = newPane("note-1");
     expect(p.kind).toBe("pane");
-    expect(p.noteId).toBe("note-1");
+    expect(p.tabs).toHaveLength(1);
+    expect(p.tabs[0].noteId).toBe("note-1");
+    expect(p.activeTabIdx).toBe(0);
     const split = newSplit("row", [newPane(), newPane()]);
     expect(split.children).toHaveLength(2);
     expect(split.sizes).toEqual([0.5, 0.5]);
     expect(sumSizes(split)).toBe(true);
+  });
+
+  it("activeNoteId returns the active tab's noteId", () => {
+    const p: LeafPane = {
+      kind: "pane",
+      id: "p1",
+      tabs: [newTab("a"), newTab("b"), newTab(null)],
+      activeTabIdx: 1,
+    };
+    expect(activeNoteId(p)).toBe("b");
+    p.activeTabIdx = 2;
+    expect(activeNoteId(p)).toBeNull();
   });
 
   it("splitTreeAt on a root pane wraps it in a split", () => {
@@ -43,8 +59,8 @@ describe("paneTree", () => {
     if (next.kind !== "split") return;
     expect(next.direction).toBe("row");
     expect(next.children).toHaveLength(2);
-    expect((next.children[0] as LeafPane).noteId).toBe("a");
-    expect((next.children[1] as LeafPane).noteId).toBe("b");
+    expect(activeNoteId(next.children[0] as LeafPane)).toBe("a");
+    expect(activeNoteId(next.children[1] as LeafPane)).toBe("b");
     expect(sumSizes(next)).toBe(true);
   });
 
@@ -53,8 +69,8 @@ describe("paneTree", () => {
     const inserted = newPane("b");
     const next = splitTreeAt(root, root.id, "left", inserted);
     if (next.kind !== "split") throw new Error();
-    expect((next.children[0] as LeafPane).noteId).toBe("b");
-    expect((next.children[1] as LeafPane).noteId).toBe("a");
+    expect(activeNoteId(next.children[0] as LeafPane)).toBe("b");
+    expect(activeNoteId(next.children[1] as LeafPane)).toBe("a");
   });
 
   it("splitTreeAt flattens when parent split has the same direction", () => {
@@ -65,7 +81,7 @@ describe("paneTree", () => {
     const next = splitTreeAt(root, b.id, "right", c);
     if (next.kind !== "split") throw new Error();
     expect(next.children).toHaveLength(3);
-    expect((next.children[2] as LeafPane).noteId).toBe("c");
+    expect(activeNoteId(next.children[2] as LeafPane)).toBe("c");
     // b had 0.5, gets halved → 0.25 each
     expect(next.sizes[1]).toBeCloseTo(0.25);
     expect(next.sizes[2]).toBeCloseTo(0.25);
@@ -104,7 +120,7 @@ describe("paneTree", () => {
     const root = newSplit("row", [a, b]);
     const next = removePane(root, a.id);
     expect(next?.kind).toBe("pane");
-    expect((next as LeafPane).noteId).toBe("b");
+    expect(activeNoteId(next as LeafPane)).toBe("b");
   });
 
   it("removePane returns null when removing the only pane", () => {
@@ -169,7 +185,7 @@ describe("paneTree", () => {
     expect(sumSizes(next)).toBe(true);
   });
 
-  it("findPane / findPaneByNoteId / paneCount / collectLeaves", () => {
+  it("findPane / findTabByNoteId / paneCount / collectLeaves", () => {
     const a = newPane("note-a");
     const b = newPane("note-b");
     const c = newPane(null);
@@ -177,28 +193,88 @@ describe("paneTree", () => {
     const root = newSplit("row", [a, inner]);
     expect(paneCount(root)).toBe(3);
     expect(collectLeaves(root)).toHaveLength(3);
-    expect(findPane(root, b.id)?.noteId).toBe("note-b");
-    expect(findPaneByNoteId(root, "note-a")?.id).toBe(a.id);
-    expect(findPaneByNoteId(root, "note-missing")).toBeUndefined();
+    expect(findPane(root, b.id)?.id).toBe(b.id);
+    const hit = findTabByNoteId(root, "note-a");
+    expect(hit?.pane.id).toBe(a.id);
+    expect(hit?.tabIdx).toBe(0);
+    expect(findTabByNoteId(root, "note-missing")).toBeUndefined();
   });
 
-  it("replacePaneNote returns same ref when nothing changes", () => {
-    const a = newPane("note-a");
-    const root = newSplit("row", [a, newPane("note-b")]);
-    expect(replacePaneNote(root, a.id, "note-a")).toBe(root);
-    const next = replacePaneNote(root, a.id, "note-x");
-    expect(next).not.toBe(root);
-    expect(findPane(next, a.id)?.noteId).toBe("note-x");
+  it("findTabByNoteId locates the right tab in a multi-tab pane", () => {
+    const p: LeafPane = {
+      kind: "pane",
+      id: "p1",
+      tabs: [newTab("a"), newTab("b"), newTab("c")],
+      activeTabIdx: 0,
+    };
+    const root = newSplit("row", [p, newPane("z")]);
+    const hit = findTabByNoteId(root, "b");
+    expect(hit?.pane.id).toBe(p.id);
+    expect(hit?.tabIdx).toBe(1);
   });
 
-  it("reconcileWithExistingNotes nulls panes whose note no longer exists", () => {
+  it("reconcileWithExistingNotes nulls tabs whose note no longer exists", () => {
     const a = newPane("alive");
-    const b = newPane("ghost");
+    const b: LeafPane = {
+      kind: "pane",
+      id: "p2",
+      tabs: [newTab("alive2"), newTab("ghost"), newTab("alive3")],
+      activeTabIdx: 0,
+    };
     const root = newSplit("row", [a, b]);
-    const valid = new Set(["alive"]);
+    const valid = new Set(["alive", "alive2", "alive3"]);
     const next = reconcileWithExistingNotes(root, valid);
-    expect(findPaneByNoteId(next, "alive")?.id).toBe(a.id);
-    const ghostPane = collectLeaves(next).find((p) => p.id === b.id);
-    expect(ghostPane?.noteId).toBeNull();
+    // The "ghost" tab survives but its noteId is nulled.
+    const reconciledB = findPane(next, b.id);
+    expect(reconciledB?.tabs).toHaveLength(3);
+    expect(reconciledB?.tabs[0].noteId).toBe("alive2");
+    expect(reconciledB?.tabs[1].noteId).toBeNull();
+    expect(reconciledB?.tabs[2].noteId).toBe("alive3");
+  });
+
+  it("migrateLegacyLayout promotes old { noteId } pane to a single-tab pane", () => {
+    const old = {
+      kind: "pane",
+      id: "p1",
+      noteId: "n1",
+    };
+    const migrated = migrateLegacyLayout(old);
+    expect(migrated.kind).toBe("pane");
+    if (migrated.kind !== "pane") return;
+    expect(migrated.tabs).toHaveLength(1);
+    expect(migrated.tabs[0].noteId).toBe("n1");
+    expect(migrated.activeTabIdx).toBe(0);
+  });
+
+  it("migrateLegacyLayout preserves new tab-shaped panes", () => {
+    const cur: LeafPane = {
+      kind: "pane",
+      id: "p1",
+      tabs: [newTab("a"), newTab("b")],
+      activeTabIdx: 1,
+    };
+    const migrated = migrateLegacyLayout(cur);
+    if (migrated.kind !== "pane") throw new Error();
+    expect(migrated.tabs).toHaveLength(2);
+    expect(migrated.activeTabIdx).toBe(1);
+  });
+
+  it("migrateLegacyLayout walks splits recursively", () => {
+    const old = {
+      kind: "split",
+      id: "s1",
+      direction: "row",
+      sizes: [0.5, 0.5],
+      children: [
+        { kind: "pane", id: "p1", noteId: "n1" },
+        { kind: "pane", id: "p2", noteId: null },
+      ],
+    };
+    const migrated = migrateLegacyLayout(old);
+    if (migrated.kind !== "split") throw new Error();
+    const p1 = migrated.children[0] as LeafPane;
+    const p2 = migrated.children[1] as LeafPane;
+    expect(p1.tabs[0].noteId).toBe("n1");
+    expect(p2.tabs[0].noteId).toBeNull();
   });
 });

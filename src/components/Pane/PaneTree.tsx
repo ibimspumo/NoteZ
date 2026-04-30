@@ -4,7 +4,7 @@ import { EditorPane } from "./EditorPane";
 import { PaneSplitter } from "./PaneSplitter";
 
 type CommonProps = {
-  showHeader: boolean;
+  showChrome: boolean;
   onOpenNote: (id: string, opts?: { split: boolean }) => void;
   onCreate: () => Promise<void>;
 };
@@ -23,19 +23,21 @@ type TreeProps = CommonProps & {
  * Each split becomes a flex container (row/column). Children get a wrapper
  * cell whose `flex` carries the size fraction, with a `PaneSplitter`
  * interleaved between siblings.
+ *
+ * `showChrome` is true iff the layout has more than one pane - the single
+ * pane case keeps the original chrome-less look, and the per-pane chrome
+ * (header or tab strip) is decided inside EditorPane based on tab count.
  */
 export const PaneTree: Component<{
   node: LayoutNode;
   onOpenNote: (id: string, opts?: { split: boolean }) => void;
   onCreate: () => Promise<void>;
 }> = (props) => {
-  // Pane chrome (title row + close) shows only when more than one pane exists,
-  // so the single-pane layout looks identical to the pre-split version.
-  const showHeader = () => totalPaneCount() > 1;
+  const showChrome = () => totalPaneCount() > 1;
   return (
     <NodeView
       node={props.node}
-      showHeader={showHeader()}
+      showChrome={showChrome()}
       onOpenNote={props.onOpenNote}
       onCreate={props.onCreate}
     />
@@ -47,7 +49,7 @@ const NodeView: Component<TreeProps> = (props) => (
     <Match when={props.node.kind === "pane"}>
       <PaneLeaf
         node={props.node as LeafPane}
-        showHeader={props.showHeader}
+        showChrome={props.showChrome}
         onOpenNote={props.onOpenNote}
         onCreate={props.onCreate}
       />
@@ -55,7 +57,7 @@ const NodeView: Component<TreeProps> = (props) => (
     <Match when={props.node.kind === "split"}>
       <SplitView
         node={props.node as SplitNode}
-        showHeader={props.showHeader}
+        showChrome={props.showChrome}
         onOpenNote={props.onOpenNote}
         onCreate={props.onCreate}
       />
@@ -65,9 +67,8 @@ const NodeView: Component<TreeProps> = (props) => (
 
 const PaneLeaf: Component<CommonProps & { node: LeafPane }> = (props) => (
   <EditorPane
-    paneId={props.node.id}
-    noteId={props.node.noteId}
-    showHeader={props.showHeader}
+    pane={props.node}
+    showChrome={props.showChrome}
     onOpenNote={props.onOpenNote}
     onCreate={props.onCreate}
   />
@@ -87,7 +88,7 @@ const SplitView: Component<CommonProps & { node: SplitNode }> = (props) => (
           <div class="nz-split-cell" style={{ flex: `${props.node.sizes[i()]} 1 0%` }}>
             <NodeView
               node={child}
-              showHeader={props.showHeader}
+              showChrome={props.showChrome}
               onOpenNote={props.onOpenNote}
               onCreate={props.onCreate}
             />

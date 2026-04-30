@@ -28,6 +28,9 @@ type Props = {
   onCreate: () => void;
   onTogglePin: (id: string) => void;
   onDelete: (id: string) => void;
+  /** Forwarded to NoteListItem rows so ⌘-click and "Open in new tab" can
+   *  reach the MainView's open-note pipeline (which knows about panes/tabs). */
+  onOpenNote: (id: string, opts?: { newTab?: boolean }) => void;
 };
 
 type ListRow = { kind: "header"; label: Bucket } | { kind: "note"; note: NoteSummary };
@@ -79,8 +82,12 @@ export const Sidebar: Component<Props> = (props) => {
     openCommandBar();
   };
 
-  const selectNote = (id: string) => {
+  const selectNote = (id: string, opts?: { newTab?: boolean }) => {
     closeSettings();
+    if (opts?.newTab) {
+      props.onOpenNote(id, { newTab: true });
+      return;
+    }
     setSelectedId(id);
   };
 
@@ -122,7 +129,7 @@ export const Sidebar: Component<Props> = (props) => {
                     note={n}
                     selected={n.id === selectedId()}
                     openElsewhere={openNoteIds().has(n.id) && n.id !== selectedId()}
-                    onSelect={() => selectNote(n.id)}
+                    onSelect={(opts) => selectNote(n.id, opts)}
                     onTogglePin={() => props.onTogglePin(n.id)}
                     onDelete={() => props.onDelete(n.id)}
                   />
@@ -183,7 +190,7 @@ export const Sidebar: Component<Props> = (props) => {
                         note={r.note}
                         selected={r.note.id === selectedId()}
                         openElsewhere={openNoteIds().has(r.note.id) && r.note.id !== selectedId()}
-                        onSelect={() => selectNote(r.note.id)}
+                        onSelect={(opts) => selectNote(r.note.id, opts)}
                         onTogglePin={() => props.onTogglePin(r.note.id)}
                         onDelete={() => props.onDelete(r.note.id)}
                       />

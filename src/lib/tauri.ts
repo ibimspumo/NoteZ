@@ -8,6 +8,7 @@ import type {
   AiStats,
   Asset,
   AssetRef,
+  MentionTargetStatus,
   Note,
   NoteSummary,
   NotesCursor,
@@ -56,6 +57,8 @@ export const api = {
 
   // mentions
   listBacklinks: (noteId: string) => invoke<NoteSummary[]>("list_backlinks", { noteId }),
+  getMentionStatusBulk: (ids: string[]) =>
+    invoke<MentionTargetStatus[]>("get_mention_status_bulk", { ids }),
 
   // settings
   getSetting: (key: string) => invoke<string | null>("get_setting", { key }),

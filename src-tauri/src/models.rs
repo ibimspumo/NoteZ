@@ -45,6 +45,16 @@ pub struct Snapshot {
     pub manual_label: Option<String>,
 }
 
+/// Live status of a mention target. The frontend uses this to paint broken
+/// (`missing`) and trashed (`trashed`) mention pills differently from live
+/// ones (`alive`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MentionTargetStatus {
+    pub id: String,
+    /// One of `"alive"`, `"trashed"`, `"missing"`.
+    pub status: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateNoteInput {
     pub id: String,

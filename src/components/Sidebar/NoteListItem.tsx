@@ -14,7 +14,10 @@ type Props = {
    *  give the row a subtler "in use elsewhere" affordance so the user can see
    *  which notes are already on screen. */
   openElsewhere?: boolean;
-  onSelect: () => void;
+  /** Called when the row is clicked. The opts let the caller distinguish a
+   *  plain click (replace active tab) from a modified click - ⌘/Ctrl-click
+   *  asks for "open in a new tab in the active pane" (browser convention). */
+  onSelect: (opts?: { newTab?: boolean }) => void;
   onTogglePin: () => void;
   onDelete: () => void;
 };
@@ -94,10 +97,25 @@ export const NoteListItem: Component<Props> = (props) => {
       draggable={true}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      onClick={props.onSelect}
+      onClick={(e) => {
+        // ⌘/Ctrl-click: open in a new tab in the active pane (browser
+        // convention). Plain click: replace the active tab's note.
+        const newTab = e.metaKey || e.ctrlKey;
+        props.onSelect(newTab ? { newTab: true } : undefined);
+      }}
+      onAuxClick={(e) => {
+        // Middle-click: open in a new tab. Same convention as web browsers
+        // and most editor sidebars.
+        if (e.button === 1) {
+          e.preventDefault();
+          props.onSelect({ newTab: true });
+        }
+      }}
       onContextMenu={(e) => {
         e.preventDefault();
-        showRowMenu(e, props.onTogglePin, props.onDelete, props.note.is_pinned);
+        showRowMenu(e, props.onTogglePin, props.onDelete, props.note.is_pinned, () =>
+          props.onSelect({ newTab: true }),
+        );
       }}
     >
       <div class="nz-note-row">
@@ -123,6 +141,7 @@ function showRowMenu(
   onTogglePin: () => void,
   onDelete: () => void,
   isPinned: boolean,
+  onOpenInNewTab: () => void,
 ) {
   // Lightweight inline menu; no external lib.
   const existing = document.getElementById("nz-row-menu");
@@ -133,13 +152,15 @@ function showRowMenu(
   menu.style.left = `${e.clientX}px`;
   menu.style.top = `${e.clientY}px`;
   menu.innerHTML = `
+    <button data-action="newtab">Open in new tab</button>
     <button data-action="pin">${isPinned ? "Unpin" : "Pin"}</button>
     <button data-action="delete" class="danger">Move to Trash</button>
   `;
   menu.addEventListener("click", (ev) => {
     const target = ev.target as HTMLElement;
     const action = target.getAttribute("data-action");
-    if (action === "pin") onTogglePin();
+    if (action === "newtab") onOpenInNewTab();
+    else if (action === "pin") onTogglePin();
     else if (action === "delete") onDelete();
     menu.remove();
   });

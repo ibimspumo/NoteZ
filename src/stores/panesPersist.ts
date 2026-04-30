@@ -1,6 +1,11 @@
 import { createEffect, createRoot } from "solid-js";
 import { unwrap } from "solid-js/store";
-import { type LayoutNode, type PaneId, reconcileWithExistingNotes } from "../lib/paneTree";
+import {
+  type LayoutNode,
+  type PaneId,
+  migrateLegacyLayout,
+  reconcileWithExistingNotes,
+} from "../lib/paneTree";
 import { api } from "../lib/tauri";
 import { activePaneId, panesState, replaceLayout } from "./panes";
 
@@ -15,15 +20,18 @@ type Persisted = {
 /**
  * Read the saved layout from the settings table. Returns null if nothing has
  * been saved or the stored blob can't be parsed - in either case we fall
- * through to the default single-pane layout.
+ * through to the default single-pane layout. The migration step accepts both
+ * the old `{ kind: "pane", noteId }` shape and the new
+ * `{ kind: "pane", tabs, activeTabIdx }` shape.
  */
 export async function loadLayout(): Promise<Persisted | null> {
   try {
     const raw = await api.getSetting(SETTING_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Persisted;
+    const parsed = JSON.parse(raw) as { root?: unknown; activePaneId?: string };
     if (!parsed.root || !parsed.activePaneId) return null;
-    return parsed;
+    const migrated = migrateLegacyLayout(parsed.root);
+    return { root: migrated, activePaneId: parsed.activePaneId };
   } catch (e) {
     console.warn("loadLayout: failed to parse saved layout, ignoring", e);
     return null;
@@ -32,15 +40,11 @@ export async function loadLayout(): Promise<Persisted | null> {
 
 /**
  * Apply a previously-saved layout. Reconciles against the currently-loaded
- * notes - any pane whose noteId no longer exists has its noteId nulled (the
- * pane stays so the user's split topology is preserved; the next user
- * interaction fills it via the empty-pane picker).
- *
- * The set of "currently-loaded notes" is taken from the notes store's loaded
- * prefix. For users with > PAGE_SIZE notes a stored noteId might exist on
- * disk but not in the loaded prefix yet - so we don't null at restore. The
- * defensive try/catch in EditorPane handles the rare case of a hard-deleted
- * note still being referenced.
+ * notes - any tab whose noteId no longer exists has its noteId nulled (the
+ * tab stays so the user's tab topology is preserved; the empty picker takes
+ * over for that tab). The defensive try/catch in the per-tab editor handles
+ * the rare case of a hard-deleted note still being referenced when the load
+ * actually attempts it.
  */
 export function restoreLayoutFromSettings(p: Persisted) {
   replaceLayout(p.root, p.activePaneId);
@@ -74,10 +78,10 @@ function flushPersist() {
  *
  *  We compute the full JSON inside the effect so Solid tracks every nested
  *  property as a dependency. With `reconcile`, deep mutations (e.g. dragging
- *  a divider, which only touches `sizes` inside one split node) don't fire
- *  the top-level `root` accessor; reading the full payload here makes those
- *  updates reach the persist scheduler. The 8-pane cap keeps the per-update
- *  work bounded. */
+ *  a divider, which only touches `sizes` inside one split node, or switching
+ *  the active tab in a pane) don't fire the top-level `root` accessor;
+ *  reading the full payload here makes those updates reach the persist
+ *  scheduler. */
 export function scheduleLayoutPersist() {
   if (persistInstalled) return;
   persistInstalled = true;
@@ -86,7 +90,6 @@ export function scheduleLayoutPersist() {
   // be torn down with MainView.
   createRoot(() => {
     createEffect(() => {
-      console.log("[persist] effect firing, firstTickConsumed=", firstTickConsumed);
       const payload: Persisted = {
         root: unwrap(panesState.root),
         activePaneId: activePaneId(),
@@ -99,23 +102,25 @@ export function scheduleLayoutPersist() {
       const json = JSON.stringify(payload);
       if (!firstTickConsumed) {
         firstTickConsumed = true;
-        console.log("[persist] first tick consumed, skipping persist");
         return;
       }
       pendingJson = json;
       if (persistTimer != null) clearTimeout(persistTimer);
       persistTimer = window.setTimeout(flushPersist, PERSIST_DEBOUNCE_MS);
-      console.log("[persist] scheduled persist");
     });
   });
 }
 
 /** Touch every property of the layout tree to register a Solid dependency
- *  on each. Cost is O(panes + splits), which is bounded by MAX_PANES. */
+ *  on each. Cost is O(panes + splits + tabs), bounded by MAX_PANES * tabs. */
 function readDeep(node: LayoutNode): void {
   if (node.kind === "pane") {
     void node.id;
-    void node.noteId;
+    void node.activeTabIdx;
+    for (const t of node.tabs) {
+      void t.id;
+      void t.noteId;
+    }
     return;
   }
   void node.id;

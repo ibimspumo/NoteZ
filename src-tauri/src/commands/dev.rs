@@ -641,6 +641,9 @@ enum Span {
     M(String, String), // (note_id, title)
 }
 
+// Some block + helper variants aren't used by the current demo set but stay
+// in the DSL so editing the content doesn't require re-introducing them.
+#[allow(dead_code)]
 enum DemoBlock {
     H2(String),
     H3(String),
@@ -657,6 +660,7 @@ fn t(s: &str) -> Span {
 fn bs(s: &str) -> Span {
     Span::B(s.to_string())
 }
+#[allow(dead_code)]
 fn is_(s: &str) -> Span {
     Span::I(s.to_string())
 }
@@ -670,6 +674,7 @@ fn mr(ids: &[String], idx: usize, title: &str) -> Span {
 fn h2(s: &str) -> DemoBlock {
     DemoBlock::H2(s.to_string())
 }
+#[allow(dead_code)]
 fn h3(s: &str) -> DemoBlock {
     DemoBlock::H3(s.to_string())
 }
@@ -855,637 +860,862 @@ fn check_item(value: usize, checked: bool, children: Vec<Value>) -> Value {
 }
 
 // Index map for cross-mentions. Order here = sidebar order.
-// Some indices aren't currently mentioned by any other note - kept for
-// symmetry so future edits to the demo set can cross-link them without
-// hunting for the right number.
+// Self-referential: every note is *about* NoteZ - the manifesto, the
+// roadmap, comparisons with other apps, the bug list, etc. Funnier (and
+// more honest) for marketing screenshots than the previous agency theme.
+//
+// `#[allow(dead_code)]` on every entry because not every index is mentioned
+// by another note today, but we keep the full set so editing the demo
+// content doesn't require hunting for new constants.
 #[allow(dead_code)]
-const N_APEX: usize = 0;
+const N_MANIFESTO: usize = 0;
 #[allow(dead_code)]
-const N_STANDUP: usize = 1;
+const N_TODAY: usize = 1;
 #[allow(dead_code)]
-const N_ONBOARD: usize = 2;
+const N_ROADMAP: usize = 2;
 #[allow(dead_code)]
-const N_VOICE: usize = 3;
+const N_LEFT_NOTION: usize = 3;
 #[allow(dead_code)]
-const N_SOCIAL: usize = 4;
+const N_BENCH: usize = 4;
 #[allow(dead_code)]
-const N_MIRA: usize = 5;
+const N_SIDEBAR: usize = 5;
 #[allow(dead_code)]
-const N_PERF: usize = 6;
+const N_MILLION: usize = 6;
 #[allow(dead_code)]
-const N_LUMEN: usize = 7;
+const N_REQUESTS: usize = 7;
 #[allow(dead_code)]
-const N_SEO: usize = 8;
+const N_BUGS: usize = 8;
 #[allow(dead_code)]
-const N_EMAIL: usize = 9;
+const N_LEXICAL: usize = 9;
 #[allow(dead_code)]
-const N_SHOOT: usize = 10;
+const N_MAC: usize = 10;
 #[allow(dead_code)]
-const N_BUDGET: usize = 11;
+const N_SHORTCUTS: usize = 11;
 #[allow(dead_code)]
-const N_OKR: usize = 12;
+const N_SNAPS: usize = 12;
 #[allow(dead_code)]
-const N_CRISIS: usize = 13;
+const N_SCREEN: usize = 13;
 #[allow(dead_code)]
-const N_NEWS: usize = 14;
+const N_RELEASE: usize = 14;
 #[allow(dead_code)]
-const N_NORTH: usize = 15;
+const N_AI: usize = 15;
 #[allow(dead_code)]
-const N_WEBINAR: usize = 16;
+const N_PRICE: usize = 16;
 #[allow(dead_code)]
-const N_YEAR: usize = 17;
+const N_README: usize = 17;
 #[allow(dead_code)]
-const N_PILLARS: usize = 18;
+const N_ONBOARD: usize = 18;
 #[allow(dead_code)]
-const N_RETRO: usize = 19;
+const N_CAPTURE: usize = 19;
 
 fn build_demo_notes(ids: &[String]) -> Vec<DemoNote> {
     vec![
         // 0 - pinned
         make_demo(
-            "Q3 Brand Refresh - Apex Athletics",
+            "NoteZ - what we're building",
             true,
             vec![
-                h2("Goals"),
+                pi("Pin this. Read it before saying yes to anything new."),
+                h2("The promise"),
                 bul(vec![
-                    vec![t("Reposition Apex as the premium runner's brand.")],
-                    vec![t("Cut creative production costs "), bs("18%"), t(" with a unified asset system.")],
-                    vec![t("Launch hero campaign by "), bs("September 12"), t(".")],
+                    vec![bs("Local-first."), t(" Your notes never leave your machine.")],
+                    vec![
+                        bs("Fast at 1,000,000 notes."),
+                        t(" Not just at 100. See "),
+                        mr(ids, N_MILLION, "1,000,000 notes - the budget"),
+                        t("."),
+                    ],
+                    vec![bs("Beautiful enough"), t(" to use as your daily driver.")],
+                    vec![
+                        bs("Mac-first."),
+                        t(" Real keyboard shortcuts. Native vibrancy. The reasons in "),
+                        mr(ids, N_MAC, "Why Mac-first (for now)"),
+                        t("."),
+                    ],
                 ]),
-                h2("Workstreams"),
-                num_(vec![
-                    vec![bs("Visual identity"), t(" - new wordmark, palette, motion language.")],
-                    vec![bs("Photography"), t(" - athlete-led, on-location, no studio fallbacks.")],
-                    vec![bs("Site rebuild"), t(" - migrate the storefront to a headless CMS.")],
+                h2("What we'll never do"),
+                bul(vec![
+                    vec![t("No accounts. No login screen. No \"sync your data to the cloud\" nag.")],
+                    vec![t("No telemetry. We don't watch how you write.")],
+                    vec![
+                        t("No AI summaries you didn't ask for - decision logged in "),
+                        mr(ids, N_AI, "AI - what we said yes to, what we said no to"),
+                        t("."),
+                    ],
+                    vec![t("No background updates that change the app overnight.")],
                 ]),
-                h2("Cross-references"),
+                h2("What's next"),
                 p(vec![
-                    t("Tone direction lives in "),
-                    mr(ids, N_VOICE, "Brand Voice & Tone Guide"),
-                    t(". Budget is tracked in "),
-                    mr(ids, N_BUDGET, "Q2 Budget Reconciliation"),
-                    t(". Shoot day plan: "),
-                    mr(ids, N_SHOOT, "Photoshoot Shotlist - Summer"),
+                    t("Roadmap lives in "),
+                    mr(ids, N_ROADMAP, "Roadmap - next 3 releases"),
+                    t(". Daily focus is "),
+                    mr(ids, N_TODAY, "Today"),
                     t("."),
                 ]),
-                qb("Premium isn't a price point. It's a feeling of inevitability."),
+                qb("If a feature can't survive the 1M-note test, it's not a feature - it's a demo."),
             ],
         ),
         // 1 - pinned
         make_demo(
-            "Weekly Standup - Monday",
+            "Today",
             true,
             vec![
-                h2("Last week"),
+                pi("Tuesday. Working on the v0.7 push."),
+                h2("Ship today"),
                 chk(vec![
-                    (true, vec![t("Shipped Apex moodboard v3")]),
-                    (true, vec![t("Recorded Lumen pitch dry-run")]),
-                    (false, vec![t("Approve June social calendar")]),
-                    (false, vec![t("Send invoice batch to finance")]),
+                    (true, vec![t("Fix sidebar flicker on first paint")]),
+                    (true, vec![t("Bump version to 0.6.4")]),
+                    (
+                        false,
+                        vec![
+                            t("Land snapshot diff viewer behind a flag - "),
+                            mr(ids, N_SNAPS, "Snapshots - the feature that surprised us"),
+                        ],
+                    ),
+                    (
+                        false,
+                        vec![
+                            t("Rewrite first-launch copy - "),
+                            mr(ids, N_ONBOARD, "Onboarding - the first 60 seconds"),
+                        ],
+                    ),
                 ]),
-                h2("This week"),
+                h2("Inbox"),
                 chk(vec![
-                    (false, vec![t("Lock photoshoot crew for July 8")]),
-                    (false, vec![t("Brief "), mr(ids, N_MIRA, "Influencer Brief - Mira Tanaka"), t(" on TikTok cutdowns")]),
-                    (false, vec![t("Walk through "), mr(ids, N_SEO, "SEO Audit - Riverstone Co."), t(" with Riverstone")]),
-                    (false, vec![t("Finalize "), mr(ids, N_LUMEN, "Pitch Notes - Lumen Labs")]),
+                    (
+                        false,
+                        vec![
+                            t("Triage three new bug reports - "),
+                            mr(ids, N_BUGS, "Bugs - week of April 28"),
+                        ],
+                    ),
+                    (
+                        false,
+                        vec![
+                            t("Draft a reply to the \"why no Windows?\" email - lean on "),
+                            mr(ids, N_MAC, "Why Mac-first (for now)"),
+                        ],
+                    ),
+                    (
+                        false,
+                        vec![
+                            t("Approve the new screenshot set - checklist in "),
+                            mr(ids, N_SCREEN, "Marketing screenshot checklist"),
+                        ],
+                    ),
                 ]),
-                h2("Blockers"),
-                p(vec![
-                    t("Northwind teardown is blocked on legal review - notes in "),
-                    mr(ids, N_NORTH, "Competitor Teardown - Northwind"),
-                    t("."),
+                h2("Don't touch today"),
+                bul(vec![
+                    vec![
+                        bs("AI surface area"),
+                        t(" - decision is logged in "),
+                        mr(ids, N_AI, "AI - what we said yes to, what we said no to"),
+                        t("."),
+                    ],
+                    vec![
+                        bs("Pricing page"),
+                        t(" - "),
+                        mr(ids, N_PRICE, "Pricing - the question we keep dodging"),
+                        t(" still open."),
+                    ],
                 ]),
             ],
         ),
         // 2
         make_demo(
-            "Client Onboarding Checklist",
+            "Roadmap - next 3 releases",
             false,
             vec![
-                pi("Run through every step before kickoff. Skipping any of these is how scope creep starts."),
-                h2("Pre-kickoff"),
+                pt("Coarse-grained. We don't promise dates - we promise shape."),
+                h2("v0.7 - April"),
                 chk(vec![
-                    (true, vec![t("Signed SOW received and filed")]),
-                    (true, vec![t("Slack channel created and pinned")]),
-                    (true, vec![t("Shared drive provisioned with the standard folder set")]),
-                    (false, vec![t("Stakeholder map confirmed with client")]),
-                    (false, vec![t("Decision-maker identified for sign-offs")]),
+                    (
+                        true,
+                        vec![
+                            t("Sidebar redesign + virtualized list - "),
+                            mr(ids, N_SIDEBAR, "Sidebar redesign - what we learned"),
+                        ],
+                    ),
+                    (
+                        false,
+                        vec![
+                            t("Snapshot diff viewer (read-only) - "),
+                            mr(ids, N_SNAPS, "Snapshots - the feature that surprised us"),
+                        ],
+                    ),
+                    (false, vec![cs("Cmd+."), t(" - toggle the command bar from anywhere")]),
+                    (false, vec![t("Per-note color tags (max 5)")]),
                 ]),
-                h2("Kickoff"),
+                h2("v0.8 - May"),
                 chk(vec![
-                    (false, vec![t("Schedule 90-minute kickoff (creative + strategy + account)")]),
-                    (false, vec![t("Send pre-read 48 hours in advance")]),
-                    (false, vec![t("Capture success criteria in writing, in the room")]),
+                    (false, vec![t("Backlinks panel (data is already captured, just no UI)")]),
+                    (false, vec![t("Folders / nesting - one level deep, no more")]),
+                    (false, vec![t("Markdown export per note + bulk")]),
                 ]),
-                h2("First two weeks"),
-                num_(vec![
-                    vec![t("Brand audit deck due day 10.")],
-                    vec![t("Tone-of-voice workshop day 12 - reference "), mr(ids, N_VOICE, "Brand Voice & Tone Guide"), t(".")],
-                    vec![t("First creative review day 14.")],
+                h2("v0.9 - June"),
+                chk(vec![
+                    (false, vec![t("Web clipper (Mac extension)")]),
+                    (false, vec![t("Daily notes (templated)")]),
+                    (false, vec![t("First pass at sync - encrypted, opt-in, our infra is the boring part")]),
                 ]),
-                qb("If it isn't on the checklist, it isn't onboarding. Add it or skip it."),
+                h2("Definitely not in 2026"),
+                bul(vec![
+                    vec![
+                        t("Mobile apps - reasons in "),
+                        mr(ids, N_MAC, "Why Mac-first (for now)"),
+                        t("."),
+                    ],
+                    vec![t("Built-in AI editor.")],
+                    vec![t("Real-time collaboration.")],
+                ]),
             ],
         ),
         // 3
         make_demo(
-            "Brand Voice & Tone Guide",
+            "Why we left Notion",
             false,
             vec![
-                h2("How we sound"),
-                pt("Confident, never boastful. We earn the room before we own it."),
+                pi("We were Notion users for 4 years. We tried hard. Here's the honest list."),
+                h2("What broke us"),
+                num_(vec![
+                    vec![t("Cold start was 3 - 6 seconds. Every single time.")],
+                    vec![t("Searching across 8k pages took longer than reading three of them.")],
+                    vec![
+                        bs("Loading state on every navigation."),
+                        t(" You never feel like the app is yours - you feel like a tab."),
+                    ],
+                    vec![t("Offline mode was a polite lie.")],
+                    vec![t("Every page felt like a database row pretending to be a note.")],
+                ]),
+                h2("What it did well"),
                 bul(vec![
-                    vec![bs("Direct"), t(" - short sentences, active voice, real verbs.")],
-                    vec![bs("Warm"), t(" - use second person. Talk to one human, not an audience.")],
-                    vec![bs("Specific"), t(" - numbers beat adjectives. \"Cut launch time 40%\" beats \"much faster.\"")],
+                    vec![t("Mention search was excellent.")],
+                    vec![t("Templates were actually useful.")],
+                    vec![t("Inline databases - genuinely powerful for the right brain.")],
                 ]),
-                h3("Words we reach for"),
-                p(vec![
-                    t("Prefer "),
-                    cs("launch"),
-                    t(", "),
-                    cs("ship"),
-                    t(", "),
-                    cs("reach"),
-                    t(", "),
-                    cs("sharpen"),
-                    t("."),
+                h2("What we kept"),
+                bul(vec![
+                    vec![
+                        t("Slash menus for block insertion - we'll get there ("),
+                        mr(ids, N_ROADMAP, "Roadmap - next 3 releases"),
+                        t(")."),
+                    ],
+                    vec![t("@-mentions feel right when they work this fast.")],
+                    vec![t("Every block addressable, even if we don't expose it yet.")],
                 ]),
-                h3("Words we avoid"),
-                p(vec![
-                    t("Hard pass on "),
-                    cs("leverage"),
-                    t(", "),
-                    cs("synergy"),
-                    t(", "),
-                    cs("ecosystem"),
-                    t(", "),
-                    cs("circle back"),
-                    t("."),
-                ]),
-                qb("If you wouldn't say it out loud to a friend, don't write it for the brand."),
+                qb("We didn't leave Notion because it was bad. We left because it stopped being for note-takers."),
             ],
         ),
         // 4
         make_demo(
-            "Social Calendar - June",
+            "Apps we benchmarked against",
             false,
             vec![
-                h2("Anchor posts"),
-                num_(vec![
-                    vec![bs("Mon 6/2"), t(" - Carousel: \"How Apex chose its new wordmark\"")],
-                    vec![bs("Wed 6/4"), t(" - Reel: behind-the-scenes from Tuesday's shoot")],
-                    vec![bs("Fri 6/6"), t(" - Static: founder quote + portrait")],
-                    vec![bs("Mon 6/9"), t(" - Long-form: case study teaser for "), mr(ids, N_LUMEN, "Pitch Notes - Lumen Labs")],
-                ]),
-                h2("Influencer drops"),
-                p(vec![
-                    t("Mira's three-part series goes live the week of 6/16. Brief in "),
-                    mr(ids, N_MIRA, "Influencer Brief - Mira Tanaka"),
-                    t("."),
-                ]),
-                h2("Reactive slots"),
+                pt("Honest read on every app we open during research. Updated as we test."),
+                h2("Bear"),
                 bul(vec![
-                    vec![t("Hold Tuesday and Thursday afternoons for trend hijacks.")],
-                    vec![t("Comms team approval window: 2pm - 5pm same-day.")],
+                    vec![bs("Wins:"), t(" typography is unmatched. Tag system is brilliant.")],
+                    vec![bs("Loses:"), t(" pricing splits features awkwardly. Search is fine, not great.")],
+                    vec![bs("What we steal:"), t(" the typography hierarchy. Shamelessly.")],
                 ]),
-                h3("Risk flags"),
-                pt("Avoid Friday sends in June - Q2 data shows ~30% lower engagement vs Tuesday."),
+                h2("Apple Notes"),
+                bul(vec![
+                    vec![bs("Wins:"), t(" free, fast, ubiquitous. Quick capture is killer.")],
+                    vec![bs("Loses:"), t(" structure caps out at folders. Markdown is hostile.")],
+                    vec![
+                        bs("What we steal:"),
+                        t(" the share-sheet flow into "),
+                        mr(ids, N_CAPTURE, "Quick capture - the unsung hero"),
+                        t("."),
+                    ],
+                ]),
+                h2("Obsidian"),
+                bul(vec![
+                    vec![bs("Wins:"), t(" graph view. Plugin ecosystem. Local-first we agree with.")],
+                    vec![bs("Loses:"), t(" the empty state makes new users bounce.")],
+                    vec![bs("What we steal:"), t(" backlinks. Already capturing the data.")],
+                ]),
+                h2("Reflect"),
+                bul(vec![
+                    vec![bs("Wins:"), t(" AI integration is the cleanest we've seen.")],
+                    vec![bs("Loses:"), t(" subscription is steep. Sync is the whole product.")],
+                    vec![
+                        bs("What we steal:"),
+                        t(" the daily-note metaphor (eventually - "),
+                        mr(ids, N_ROADMAP, "Roadmap - next 3 releases"),
+                        t(")."),
+                    ],
+                ]),
+                h2("Bike"),
+                bul(vec![
+                    vec![bs("Wins:"), t(" outliner that respects the keyboard.")],
+                    vec![bs("Loses:"), t(" deliberately niche, which is also a strength.")],
+                ]),
             ],
         ),
         // 5
         make_demo(
-            "Influencer Brief - Mira Tanaka",
+            "Sidebar redesign - what we learned",
             false,
             vec![
-                pt("Three-part TikTok series, posted week of June 16. Focus on the shift from her old running shoes to the new Apex Glide."),
-                h2("Deliverables"),
+                pi("Shipped in v0.6. Took two attempts. Here's what we got wrong the first time."),
+                h2("What we got wrong"),
                 num_(vec![
-                    vec![t("Unboxing (45 - 60s)")],
-                    vec![t("First 5km review (60 - 90s)")],
-                    vec![t("Style + training day vlog (~90s)")],
+                    vec![t("First version re-rendered every row on every keystroke. Fine at 100 notes; somebody opened it with 50k.")],
+                    vec![t("Pinned notes were re-fetched as part of pagination. Should have been a separate call.")],
+                    vec![t("Time labels updated only on hover. Looked broken.")],
                 ]),
-                h2("Must include"),
+                h2("What we got right"),
+                num_(vec![
+                    vec![
+                        t("Virtualization from day one. Without it, none of this was tractable - see "),
+                        mr(ids, N_MILLION, "1,000,000 notes - the budget"),
+                        t("."),
+                    ],
+                    vec![t("Row heights measured once and cached in a Fenwick tree. Re-flow is O(log n).")],
+                    vec![t("Live time labels - tick at 1Hz, batched, off the main thread (we don't have one - it's Solid).")],
+                ]),
+                h2("Open follow-ups"),
                 chk(vec![
-                    (true, vec![t("Brand handle in caption and on-screen")]),
-                    (true, vec![t("Disclosure tag in first 3 seconds")]),
-                    (false, vec![t("Hashtag set: "), cs("#ApexGlide"), t(" "), cs("#BuiltToRun")]),
-                    (false, vec![t("CTA: \"link in bio for early access\"")]),
+                    (true, vec![t("Drag-to-reorder pinned notes")]),
+                    (false, vec![t("Section headers (Today, Yesterday, Earlier)")]),
+                    (false, vec![t("Right-click on group header to collapse")]),
                 ]),
-                h2("Tone"),
-                p(vec![
-                    t("Read like Mira talking to a friend, not Mira reading our deck. Reference "),
-                    mr(ids, N_VOICE, "Brand Voice & Tone Guide"),
-                    t(" if a phrase feels off."),
-                ]),
-                qb("If the first three seconds aren't honest, the rest doesn't matter."),
             ],
         ),
         // 6
         make_demo(
-            "Performance Report - April",
+            "1,000,000 notes - the budget",
             false,
             vec![
-                h2("Headline"),
+                pi("Non-negotiable: the app stays snappy with a million notes. If it doesn't, we redesign before we ship."),
+                h2("Rules we follow"),
+                num_(vec![
+                    vec![t("No "), cs("SELECT"), t(" without a "), cs("LIMIT"), t(".")],
+                    vec![t("No O(n) work on the render path.")],
+                    vec![t("No "), cs("querySelectorAll"), t(" against the sidebar.")],
+                    vec![t("Cursor-based pagination, sliding window, capped in-memory prefix.")],
+                ]),
+                h2("How we test"),
+                chk(vec![
+                    (true, vec![t("Dev panel can seed 100k notes in <60s")]),
+                    (true, vec![t("Sidebar scroll is jank-free at 1M")]),
+                    (false, vec![t("Search hits stay under 200ms p95 at 1M")]),
+                    (false, vec![t("Cold start under 600ms at 1M")]),
+                ]),
+                h2("Why we care"),
                 p(vec![
-                    bs("CPA down 22% MoM. Reach up 14% on a flat budget."),
-                    t(" Best month of the quarter."),
+                    t("If a feature can't survive this test, it's a demo. The "),
+                    mr(ids, N_ROADMAP, "Roadmap - next 3 releases"),
+                    t(" gets filtered through this rule first, design second."),
                 ]),
-                h2("By channel"),
-                bul(vec![
-                    vec![bs("Paid social"), t(" - CPM down 11%, ROAS 4.1x")],
-                    vec![bs("Search"), t(" - branded queries up 38% (likely halo from "), mr(ids, N_MIRA, "Influencer Brief - Mira Tanaka"), t(")")],
-                    vec![bs("Email"), t(" - open rate 41.6%, click 6.2%. Sequence in "), mr(ids, N_EMAIL, "Welcome Email Sequence"), t(".")],
-                ]),
-                h2("What worked"),
-                num_(vec![
-                    vec![t("Hooks under 2 seconds outperformed every long-form variant.")],
-                    vec![t("Static + UGC hybrid beat polished video on cost.")],
-                    vec![t("Subject lines in the 35 - 45 character range had the best open rate.")],
-                ]),
-                h2("What didn't"),
-                num_(vec![
-                    vec![t("Carousel ads underperformed - pausing for May.")],
-                    vec![t("Friday sends underperformed by ~30% vs Tuesday.")],
-                ]),
-                pt("Full deck filed in shared drive."),
+                qb("The user with 14 notes is happy either way. The user with 14,000 quietly leaves if you ignore them."),
             ],
         ),
         // 7
         make_demo(
-            "Pitch Notes - Lumen Labs",
+            "Things users keep asking for",
             false,
             vec![
-                pi("First call: Thursday 2pm. They've already talked to two other agencies."),
-                h2("What they want"),
-                bul(vec![
-                    vec![t("Repositioning around \"science-backed sleep\".")],
-                    vec![t("New PDP system that converts on mobile.")],
-                    vec![t("Six-month content engine they can run in-house after.")],
-                ]),
-                h2("What they really want"),
-                qb("We need to stop sounding like a mattress company."),
-                h2("Our angle"),
-                num_(vec![
-                    vec![t("Lead with category insight, not capabilities.")],
-                    vec![t("Bring a 30-second cut of the Apex hero - proves we ship: "), mr(ids, N_APEX, "Q3 Brand Refresh - Apex Athletics"), t(".")],
-                    vec![t("End with a 90-day plan, priced.")],
-                ]),
-                h2("Risks"),
+                pi("Living list. Recount monthly. The top of this list shapes the next release."),
+                h2("Almost certainly yes"),
                 chk(vec![
-                    (false, vec![t("Their CMO leaves in Q4 - decision could stall")]),
-                    (false, vec![t("Procurement requires two more agencies on the shortlist")]),
-                    (false, vec![t("Crisis comms on day one if their recall expands - see "), mr(ids, N_CRISIS, "Crisis Comms Playbook")]),
+                    (false, vec![t("Tags (and a tag sidebar)")]),
+                    (false, vec![t("Folders - one level, that's it")]),
+                    (false, vec![t("Markdown export")]),
+                    (false, vec![t("Web clipper")]),
+                ]),
+                h2("Maybe"),
+                chk(vec![
+                    (false, vec![t("Daily notes")]),
+                    (false, vec![t("Inline images via paste")]),
+                    (false, vec![t("Code blocks with syntax highlighting")]),
+                    (false, vec![t("iOS / iPad app")]),
+                ]),
+                h2("Probably not"),
+                chk(vec![
+                    (false, vec![t("Real-time collaboration")]),
+                    (
+                        false,
+                        vec![
+                            t("Inline AI rewrite - see "),
+                            mr(ids, N_AI, "AI - what we said yes to, what we said no to"),
+                        ],
+                    ),
+                    (false, vec![t("Wikilinks via "), cs("[[ ]]"), t(" - we have @-mentions")]),
+                ]),
+                h2("Hard no"),
+                bul(vec![
+                    vec![t("An account system.")],
+                    vec![t("A web version that needs a server we run.")],
+                    vec![t("Auto-update without a download button.")],
                 ]),
             ],
         ),
         // 8
         make_demo(
-            "SEO Audit - Riverstone Co.",
+            "Bugs - week of April 28",
             false,
             vec![
-                h2("Top issues"),
-                num_(vec![
-                    vec![t("Title tags missing on "), bs("41%"), t(" of product pages.")],
-                    vec![bs("Crawl budget wasted on faceted URLs"), t(" - 12k near-duplicate URLs in index.")],
-                    vec![t("No internal linking from blog posts to PDPs.")],
-                    vec![t("Core Web Vitals fail on mobile (LCP 4.2s).")],
-                ]),
-                h2("Quick wins this sprint"),
+                pi("Triaged Monday. Anything not fixed by Friday slips to next week's list."),
+                h2("Open"),
                 chk(vec![
-                    (false, vec![t("Add canonical tags to faceted URLs")]),
-                    (false, vec![t("Compress hero images (avg 1.4MB - target <250kB)")]),
-                    (false, vec![t("Rewrite the 18 highest-traffic title tags")]),
+                    (false, vec![bs("P1"), t(" - sidebar flickers on first paint after cold start")]),
+                    (false, vec![bs("P2"), t(" - mention popover misses the caret on long lines")]),
+                    (false, vec![bs("P2"), t(" - command bar steals focus from the editor on close")]),
+                    (false, vec![bs("P3"), t(" - quote block has no top margin after a list")]),
                 ]),
-                h2("Q3 roadmap"),
+                h2("Fixed this week"),
+                chk(vec![
+                    (true, vec![t("Snapshots panel scrollbar overlapped the close button")]),
+                    (true, vec![t("Trash count was stale after Empty Trash")]),
+                    (true, vec![t("@-mention insertion left a stray space when the popover closed early")]),
+                ]),
+                h2("Won't fix"),
                 bul(vec![
-                    vec![t("Topical authority hub for \"natural stone care\".")],
-                    vec![t("Programmatic location pages (38 metros).")],
-                    vec![t("Internal link graph rebuild.")],
-                ]),
-                p(vec![
-                    t("Findings deck in shared drive. Action plan synced with content team in "),
-                    mr(ids, N_NEWS, "Newsletter Backlog"),
-                    t("."),
+                    vec![
+                        t("macOS 12 and below - we're on the Sonoma+ vibrancy API now (see "),
+                        mr(ids, N_MAC, "Why Mac-first (for now)"),
+                        t(")."),
+                    ],
                 ]),
             ],
         ),
         // 9
         make_demo(
-            "Welcome Email Sequence",
+            "Lexical - the bet that paid off",
             false,
             vec![
-                pt("Five emails over ten days. Goal: first purchase by day 14."),
-                h2("Sequence"),
+                pt("Written down so we remember why we picked it when the next shiny thing shows up."),
+                h2("Why Lexical"),
                 num_(vec![
-                    vec![bs("Email 1 (Day 0)"), t(" - Welcome and brand story. Single CTA.")],
-                    vec![bs("Email 2 (Day 2)"), t(" - Best-sellers. Social proof above the fold.")],
-                    vec![bs("Email 3 (Day 5)"), t(" - Founder note. No product.")],
-                    vec![bs("Email 4 (Day 7)"), t(" - Free shipping nudge with a 72h timer.")],
-                    vec![bs("Email 5 (Day 10)"), t(" - \"Still here?\" - light, low-pressure.")],
+                    vec![t("The state model is JSON we own. No HTML guessing.")],
+                    vec![t("Vanilla mode. We don't pay React's tax for using a React-flavored editor.")],
+                    vec![
+                        t("Custom node types are first-class - "),
+                        cs("MentionNode"),
+                        t(", "),
+                        cs("ImageNode"),
+                        t(", future tag nodes."),
+                    ],
+                    vec![t("Reconciler is fast at thousands of nodes. We've measured.")],
                 ]),
-                h2("Tone"),
-                p(vec![
-                    t("Read like "),
-                    mr(ids, N_VOICE, "Brand Voice & Tone Guide"),
-                    t(". Short paragraphs. One thought per line."),
-                ]),
-                h2("Subject lines (drafted)"),
+                h2("Where it bit us"),
                 bul(vec![
-                    vec![cs("Welcome to Apex - one thing first")],
-                    vec![cs("The shoes everyone keeps reordering")],
-                    vec![cs("Why we started")],
-                    vec![cs("Free shipping ends Friday")],
-                    vec![cs("Still thinking it over?")],
+                    vec![bs("Markdown shortcuts"), t(" - had to build our own list-aware copy handler.")],
+                    vec![bs("Selection paths"), t(" - the API is correct but cryptic. We wrap it.")],
+                    vec![
+                        bs("Custom nodes need importJSON / exportJSON"),
+                        t(" - skip one and saves silently lose data."),
+                    ],
+                ]),
+                h2("What we'd do differently"),
+                bul(vec![
+                    vec![t("Wrap every Lexical API in our own thin layer earlier.")],
+                    vec![t("Write the JSON test suite before the visual one.")],
                 ]),
             ],
         ),
         // 10
         make_demo(
-            "Photoshoot Shotlist - Summer",
+            "Why Mac-first (for now)",
             false,
             vec![
-                pi("July 8 - 10. Joshua Tree. Crew of 11. Sunrise calls every day."),
-                h2("Day 1 - Athletes"),
-                chk(vec![
-                    (false, vec![t("Sprint sequence (front, back, three-quarter)")]),
-                    (false, vec![t("Lace-up close-up - hands only")]),
-                    (false, vec![t("Mid-stride - low angle, motion blur")]),
-                    (false, vec![t("Hero portrait - golden hour")]),
+                pi("We get this email a lot. Here's the honest answer."),
+                h2("What Mac gets us"),
+                bul(vec![
+                    vec![t("Vibrancy and traffic-light controls that look right by default.")],
+                    vec![t("A predictable keyboard - "), cs("Cmd"), t(" is "), cs("Cmd"), t(", everywhere.")],
+                    vec![t("Global shortcuts that work without setup theater.")],
+                    vec![t("A user base that pays for software.")],
                 ]),
-                h2("Day 2 - Lifestyle"),
-                chk(vec![
-                    (false, vec![t("Truck-bed flat-lay (shoes, water, map)")]),
-                    (false, vec![t("Walking-away wide shot, dust kicked up")]),
-                    (false, vec![t("Group laugh, not posed")]),
+                h2("What goes wrong cross-platform"),
+                bul(vec![
+                    vec![t("Tauri runs on Windows. The app runs. It looks alien.")],
+                    vec![t("Vibrancy doesn't translate. We'd need a whole second visual language.")],
+                    vec![
+                        t("Quick capture ("),
+                        mr(ids, N_CAPTURE, "Quick capture - the unsung hero"),
+                        t(") expects an OS-level chord that doesn't exist consistently elsewhere."),
+                    ],
                 ]),
-                h2("Day 3 - Product"),
-                chk(vec![
-                    (false, vec![t("All 6 colorways, white sweep")]),
-                    (false, vec![t("Detail macros: stitching, sole, logo")]),
-                    (false, vec![t("Buffer shots for ecom")]),
-                ]),
-                p(vec![
-                    t("Final selects feed "),
-                    mr(ids, N_SOCIAL, "Social Calendar - June"),
-                    t(" and the website rebuild in "),
-                    mr(ids, N_APEX, "Q3 Brand Refresh - Apex Athletics"),
-                    t("."),
+                h2("When that changes"),
+                num_(vec![
+                    vec![t("After the Mac app feels finished. Not before.")],
+                    vec![
+                        t("After we have a clear story for sync - see "),
+                        mr(ids, N_ROADMAP, "Roadmap - next 3 releases"),
+                        t("."),
+                    ],
+                    vec![t("Probably 2027. Maybe never. We'd rather be loved on one platform than tolerated on three.")],
                 ]),
             ],
         ),
         // 11
         make_demo(
-            "Q2 Budget Reconciliation",
+            "Keyboard shortcut wish list",
             false,
             vec![
-                h2("Summary"),
-                p(vec![
-                    bs("$312k of $340k spent. Under budget by 8.2%."),
-                ]),
-                h2("By account"),
+                h2("Have it"),
                 bul(vec![
-                    vec![mr(ids, N_APEX, "Q3 Brand Refresh - Apex Athletics"), t(" - $148k (target $150k)")],
-                    vec![mr(ids, N_SEO, "SEO Audit - Riverstone Co."), t(" - $86k (target $90k)")],
-                    vec![mr(ids, N_NORTH, "Competitor Teardown - Northwind"), t(" - $52k (target $55k)")],
-                    vec![mr(ids, N_LUMEN, "Pitch Notes - Lumen Labs"), t(" - $0 (pitching)")],
+                    vec![cs("Cmd+N"), t(" - new note")],
+                    vec![cs("Cmd+K"), t(" - command bar")],
+                    vec![cs("Cmd+F"), t(" - search inside the current note")],
+                    vec![cs("Cmd+Shift+F"), t(" - search across all notes")],
+                    vec![cs("Cmd+B / I / U"), t(" - the obvious")],
                 ]),
-                h2("Variance flags"),
-                num_(vec![
-                    vec![t("Photography "), bs("+$8k"), t(" over - Joshua Tree day-rate increase.")],
-                    vec![t("Paid media "), bs("-$22k"), t(" under - June flight pushed to July.")],
-                    vec![t("Software flat - no surprises.")],
+                h2("Want it"),
+                chk(vec![
+                    (
+                        false,
+                        vec![
+                            cs("Cmd+."),
+                            t(" - toggle command bar from anywhere (queued for v0.7 - "),
+                            mr(ids, N_ROADMAP, "Roadmap - next 3 releases"),
+                            t(")"),
+                        ],
+                    ),
+                    (false, vec![cs("Cmd+Alt+1..6"), t(" - jump to pinned note by index")]),
+                    (false, vec![cs("Cmd+Enter"), t(" - mark a checklist item from anywhere on the line")]),
+                    (false, vec![cs("Cmd+P"), t(" - quick switcher (different from the command bar)")]),
                 ]),
-                pt("Detailed CSV in finance shared drive."),
+                h2("Won't do"),
+                bul(vec![
+                    vec![t("Vim mode.")],
+                    vec![t("Customizable everything. Five global, the rest are real keys.")],
+                ]),
+                p(vec![
+                    t("Discussed in last week's "),
+                    mr(ids, N_SIDEBAR, "Sidebar redesign - what we learned"),
+                    t(" retro."),
+                ]),
             ],
         ),
         // 12
         make_demo(
-            "H1 OKRs - 2026",
+            "Snapshots - the feature that surprised us",
             false,
             vec![
-                h2("Objective 1: Become the agency clients reference unprompted"),
+                pi("Built it as a safety net. Users found it and started treating it as version history. We're leaning in."),
+                h2("What it does today"),
                 bul(vec![
-                    vec![bs("KR1"), t(" - 4 inbound leads per month from referrals.")],
-                    vec![bs("KR2"), t(" - NPS at or above 60 across active accounts.")],
-                    vec![bs("KR3"), t(" - 2 case studies published per quarter.")],
+                    vec![t("Auto-snapshot every 5 minutes of editing per note.")],
+                    vec![t("Manual snapshot via "), cs("Cmd+S"), t(".")],
+                    vec![t("Last 50 auto-snapshots kept per note. Manual snapshots never expire.")],
                 ]),
-                h2("Objective 2: Make great work without burning the team"),
-                bul(vec![
-                    vec![bs("KR1"), t(" - Average billable hours at or under 36 per week per IC.")],
-                    vec![bs("KR2"), t(" - 100% of projects use the shared production system.")],
-                    vec![bs("KR3"), t(" - Zero weekend deploys.")],
+                h2("What's missing"),
+                chk(vec![
+                    (false, vec![t("Diff view between any two snapshots")]),
+                    (false, vec![t("\"Star\" a snapshot to keep it forever")]),
+                    (false, vec![t("Snapshot from selection - keep just the section you wrote")]),
+                    (false, vec![t("Restore-and-keep (current creates a new snapshot first - confirm UI is unclear)")]),
                 ]),
-                h2("Objective 3: Lock in revenue we can plan around"),
-                bul(vec![
-                    vec![bs("KR1"), t(" - 70% of Q3 revenue from retainers.")],
-                    vec![bs("KR2"), t(" - 3 new retainers signed by end of June.")],
-                    vec![bs("KR3"), t(" - Average contract length up from 4 to 7 months.")],
+                h2("What people said"),
+                qb("I rewrote a 2,000-word note, hated it, and got back to the original in two clicks. This is the only feature I'd pay for."),
+                p(vec![
+                    t("Filed under "),
+                    mr(ids, N_REQUESTS, "Things users keep asking for"),
+                    t(" for the next survey."),
                 ]),
-                qb("OKRs aren't a wishlist. If we miss two of three, we picked wrong."),
             ],
         ),
         // 13
         make_demo(
-            "Crisis Comms Playbook",
+            "Marketing screenshot checklist",
             false,
             vec![
-                pt("Use this when something goes sideways - product recall, exec issue, viral negative post."),
-                h2("First hour"),
-                num_(vec![
-                    vec![t("Acknowledge internally in the client Slack within 15 minutes.")],
-                    vec![t("Pull facts before forming a position - never the other way around.")],
-                    vec![t("Identify the single spokesperson.")],
-                ]),
-                h2("First day"),
+                pi("Set the app up exactly like this before opening QuickTime. Resize the window to 1920x1200."),
+                h2("Setup"),
                 chk(vec![
-                    (false, vec![t("Issue holding statement (3 - 4 sentences, no speculation)")]),
-                    (false, vec![t("Pause all scheduled paid and organic posts")]),
-                    (false, vec![t("Brief account team and legal on a single thread")]),
+                    (true, vec![t("Use the demo content seed ("), cs("Cmd+Shift+D"), t(" - Seed 20 demo notes)")]),
+                    (
+                        true,
+                        vec![
+                            t("Pinned: "),
+                            mr(ids, N_MANIFESTO, "NoteZ - what we're building"),
+                            t(" + "),
+                            mr(ids, N_TODAY, "Today"),
+                        ],
+                    ),
+                    (false, vec![t("Sidebar collapsed to ~280px")]),
+                    (false, vec![t("Window centered, not maximized - we want the vibrancy")]),
+                    (false, vec![t("Hide the dev panel button on the toolbar")]),
                 ]),
-                h2("Don'ts"),
+                h2("Shots to capture"),
+                num_(vec![
+                    vec![
+                        t("Hero - editor view of "),
+                        mr(ids, N_MANIFESTO, "NoteZ - what we're building"),
+                    ],
+                    vec![t("Sidebar focus - the pinned/unpinned split")],
+                    vec![
+                        t("Command bar open with \"todo\" typed (auto-shows "),
+                        mr(ids, N_TODAY, "Today"),
+                        t(")"),
+                    ],
+                    vec![t("@-mention popover open mid-sentence")],
+                    vec![
+                        t("Snapshot list with 12+ entries (open "),
+                        mr(ids, N_SNAPS, "Snapshots - the feature that surprised us"),
+                        t(")"),
+                    ],
+                    vec![t("Quick capture window over a desktop screenshot")],
+                ]),
+                h2("Don't include"),
                 bul(vec![
-                    vec![bs("Don't"), t(" apologize for things you don't yet understand.")],
-                    vec![bs("Don't"), t(" ghost the press - \"we're investigating\" is a real answer.")],
-                    vec![bs("Don't"), t(" let the founder tweet.")],
+                    vec![t("The dev tag in the corner.")],
+                    vec![t("Any note with placeholder lorem ipsum text.")],
+                    vec![t("Traffic lights on hover (red is too loud in marketing shots).")],
                 ]),
-                qb("The story you tell in the first 24 hours is the story you live with for six months."),
             ],
         ),
         // 14
         make_demo(
-            "Newsletter Backlog",
+            "Release checklist - v0.7.0",
             false,
             vec![
-                pt("Running list of issue ideas. Prune monthly. Anything older than 90 days gets killed or rewritten."),
-                h2("Ready to draft"),
+                pi("Patch bumps don't ship a build. Minor bumps do. Don't tag without going through this list."),
+                h2("Pre-tag"),
                 chk(vec![
-                    (false, vec![t("How Apex chose its wordmark - long-form, ~1500 words. Source: "), mr(ids, N_APEX, "Q3 Brand Refresh - Apex Athletics")]),
-                    (false, vec![t("What we learned ripping Riverstone's site apart - source: "), mr(ids, N_SEO, "SEO Audit - Riverstone Co.")]),
-                    (false, vec![t("Three subject-line patterns we'll use forever - source: "), mr(ids, N_EMAIL, "Welcome Email Sequence")]),
+                    (
+                        false,
+                        vec![
+                            t("All bugs in "),
+                            mr(ids, N_BUGS, "Bugs - week of April 28"),
+                            t(" resolved or moved to the next release"),
+                        ],
+                    ),
+                    (
+                        false,
+                        vec![
+                            t("Roadmap items for v0.7 in "),
+                            mr(ids, N_ROADMAP, "Roadmap - next 3 releases"),
+                            t(" are checked"),
+                        ],
+                    ),
+                    (false, vec![t("Five version files match (package.json, tauri.conf.json, Cargo.toml, README, badge)")]),
+                    (
+                        false,
+                        vec![
+                            t("README still describes the app correctly - re-read it cold ("),
+                            mr(ids, N_README, "README - things to fix"),
+                            t(")"),
+                        ],
+                    ),
+                    (false, vec![t("CHANGELOG entry written")]),
                 ]),
-                h2("Needs an angle"),
-                bul(vec![
-                    vec![t("Why we stopped pitching with case studies.")],
-                    vec![t("The deck slide we always cut at the last minute.")],
-                    vec![t("On hiring our first producer.")],
+                h2("Tag and ship"),
+                num_(vec![
+                    vec![cs("git commit -am \"chore: v0.7.0 - <summary>\"")],
+                    vec![cs("git tag v0.7.0 && git push origin main --tags")],
+                    vec![t("GitHub Action picks up the tag and builds the .dmg.")],
+                    vec![t("Verify the release notes include the "), cs("xattr -cr"), t(" line.")],
+                    vec![t("Update the website download link.")],
                 ]),
-                h2("Killed"),
-                bul(vec![
-                    vec![is_("AI in advertising (too crowded)")],
-                    vec![is_("Year-in-review (saving for December)")],
+                h2("Post-ship"),
+                chk(vec![
+                    (false, vec![t("Smoke-test the .dmg from a clean download")]),
+                    (
+                        false,
+                        vec![
+                            t("Post a release note + 60s screen capture (use "),
+                            mr(ids, N_SCREEN, "Marketing screenshot checklist"),
+                            t(")"),
+                        ],
+                    ),
+                    (false, vec![t("Email the people who reported the bugs we fixed")]),
                 ]),
             ],
         ),
         // 15
         make_demo(
-            "Competitor Teardown - Northwind",
+            "AI - what we said yes to, what we said no to",
             false,
             vec![
-                pi("Honest read on what they do better than us, what they don't, and what to steal."),
-                h2("What they do well"),
-                num_(vec![
-                    vec![t("Site speed - PDP loads in 1.1s on mobile.")],
-                    vec![t("Email - their welcome series is the cleanest in the category.")],
-                    vec![t("Hiring - they publish process docs publicly. Magnetic for senior talent.")],
+                pi("Recorded so we don't relitigate this every quarter."),
+                h2("Yes"),
+                bul(vec![
+                    vec![t("Title generation from a note's body - opt-in, single OpenRouter key, your bill.")],
+                    vec![t("Find similar notes - local embedding, eventually.")],
+                    vec![t("Search-as-question, but only as an upgrade path - keyword search must always work.")],
                 ]),
-                h2("What they don't"),
-                num_(vec![
-                    vec![t("Strategy work feels generic - same deck for every client.")],
-                    vec![t("Photography is stock-y, even on hero pages.")],
-                    vec![t("No point of view in their thought leadership.")],
+                h2("No"),
+                bul(vec![
+                    vec![t("Inline \"rewrite this paragraph\" - we're not Grammarly.")],
+                    vec![t("Auto-summaries that appear without you asking.")],
+                    vec![t("Chat with your notes panel. Other apps do this. They're not us.")],
+                    vec![t("Any AI that runs without an explicit user action.")],
                 ]),
-                h2("Steal-with-pride list"),
-                chk(vec![
-                    (true, vec![t("Their PDP load-speed budget")]),
-                    (true, vec![t("Public hiring docs (adapt for our team)")]),
-                    (false, vec![t("Their Slack-first project status format")]),
-                ]),
+                h2("Why"),
+                qb("If we can't ship the app without an LLM running, we've built a chatbot with a sidebar. We're building notes."),
                 p(vec![
-                    t("Cross-reference benchmark numbers in "),
-                    mr(ids, N_PERF, "Performance Report - April"),
-                    t("."),
+                    t("Decision logged. Linked from "),
+                    mr(ids, N_MANIFESTO, "NoteZ - what we're building"),
+                    t(" under \"What we'll never do\"."),
                 ]),
             ],
         ),
         // 16
         make_demo(
-            "Webinar Production Plan",
+            "Pricing - the question we keep dodging",
             false,
             vec![
-                pt("60-minute webinar, late June. Topic: \"Building a brand engine without 40 freelancers.\""),
-                h2("Roles"),
+                pi("Three options on the table. Picking one before v1.0."),
+                h2("Option A: Free, MIT, forever"),
                 bul(vec![
-                    vec![bs("Host"), t(" - creative director")],
-                    vec![bs("Co-host"), t(" - strategy lead")],
-                    vec![bs("Producer"), t(" - runs chat, switches scenes, kills silence")],
+                    vec![bs("Pro:"), t(" no business-model overhead, no surprise churn.")],
+                    vec![bs("Con:"), t(" no funding for a producer, a designer, or a Windows port.")],
                 ]),
-                h2("Run of show"),
-                num_(vec![
-                    vec![t("0:00 - Welcome + housekeeping (2 min)")],
-                    vec![t("0:02 - Why this topic, why now (5 min)")],
-                    vec![t("0:07 - Three case stories (25 min) - Apex, Riverstone, Lumen")],
-                    vec![t("0:32 - Live audit of an attendee's brand (15 min)")],
-                    vec![t("0:47 - Q&A (10 min)")],
-                    vec![t("0:57 - CTA + close (3 min)")],
+                h2("Option B: One-time purchase, $39 - $49"),
+                bul(vec![
+                    vec![bs("Pro:"), t(" Mac-native pricing. Users like owning software.")],
+                    vec![bs("Con:"), t(" we have to ship a paid-update story (e.g. major version bumps).")],
                 ]),
-                h2("Pre-flight"),
+                h2("Option C: Subscription with a generous free tier"),
+                bul(vec![
+                    vec![bs("Pro:"), t(" predictable revenue.")],
+                    vec![
+                        bs("Con:"),
+                        t(" Notion-shaped. Most days that feels wrong (see "),
+                        mr(ids, N_LEFT_NOTION, "Why we left Notion"),
+                        t(")."),
+                    ],
+                ]),
+                h2("Decision criteria"),
                 chk(vec![
-                    (false, vec![t("Test audio on the actual hardware 24h before")]),
-                    (false, vec![t("Two backup slides per section")]),
-                    (false, vec![t("Pre-seed three Q&A questions in chat")]),
-                ]),
-                p(vec![
-                    t("Promo plan inside "),
-                    mr(ids, N_SOCIAL, "Social Calendar - June"),
-                    t(" and "),
-                    mr(ids, N_EMAIL, "Welcome Email Sequence"),
-                    t("."),
+                    (false, vec![t("Sustains one full-time builder for 24 months")]),
+                    (false, vec![t("Doesn't compromise the local-first promise")]),
+                    (
+                        false,
+                        vec![
+                            t("Survives the 1M-note user (see "),
+                            mr(ids, N_MILLION, "1,000,000 notes - the budget"),
+                            t(")"),
+                        ],
+                    ),
                 ]),
             ],
         ),
         // 17
         make_demo(
-            "Year-End Wrap-Up Ideas",
+            "README - things to fix",
             false,
             vec![
-                pt("Holding pen for the December creative push. Pick 2 - 3 by October."),
-                h2("Format options"),
-                num_(vec![
-                    vec![t("Long-form essay - \"The work we're proudest of, and why\".")],
-                    vec![t("Photo book - print run for the top 50 clients.")],
-                    vec![t("Short film - 90 seconds, behind-the-scenes from the year.")],
-                    vec![t("Annual report parody - real numbers, dry humor.")],
+                pi("Read the README cold once a month. List what feels stale here."),
+                h2("Stale right now"),
+                chk(vec![
+                    (
+                        false,
+                        vec![
+                            t("Screenshot is from v0.5 - retake using "),
+                            mr(ids, N_SCREEN, "Marketing screenshot checklist"),
+                        ],
+                    ),
+                    (false, vec![t("Install section still says \"requires macOS 13\". We support 12.5+.")]),
+                    (
+                        false,
+                        vec![
+                            t("Roadmap section is shorter than reality - sync with "),
+                            mr(ids, N_ROADMAP, "Roadmap - next 3 releases"),
+                        ],
+                    ),
+                    (false, vec![t("Three em-dashes left in. We don't use those.")]),
                 ]),
-                h2("Constraints"),
+                h2("Tone problems"),
                 bul(vec![
-                    vec![t("No new client work in the December push.")],
-                    vec![t("Budget cap: "), bs("$25k all-in"), t(".")],
-                    vec![t("Must ship by Dec 12 - team is off after the 19th.")],
+                    vec![t("Opens with features. Should open with one sentence about who it's for.")],
+                    vec![t("Says \"the future of note-taking\" once. Cut it.")],
                 ]),
-                p(vec![
-                    t("Cross-post into "),
-                    mr(ids, N_PILLARS, "Content Pillars 2026"),
-                    t(" so we don't double-up on January content."),
+                h2("Done this quarter"),
+                chk(vec![
+                    (true, vec![t("Updated install copy to match release notes")]),
+                    (true, vec![t("Added the badge with the current version")]),
+                    (true, vec![t("Linked to the GitHub releases page from the install button")]),
                 ]),
-                qb("End-of-year work is the agency's resume. Treat it like one."),
             ],
         ),
         // 18
         make_demo(
-            "Content Pillars 2026",
+            "Onboarding - the first 60 seconds",
             false,
             vec![
-                h2("Pillar 1 - Craft"),
-                pt("How we make the work. Process posts, before/after, redlines."),
-                bul(vec![
-                    vec![t("Tear-downs of our own past projects.")],
-                    vec![t("Workshops on-camera - no scripts, real edits.")],
+                pt("Our onboarding is invisible. That's a feature - and a problem."),
+                h2("What happens now"),
+                num_(vec![
+                    vec![t("User opens the app. Empty editor. Cursor in place.")],
+                    vec![t("No tour. No \"welcome\" note. Nothing.")],
+                    vec![t("User figures it out. Or they don't.")],
                 ]),
-                h2("Pillar 2 - Point of view"),
-                pt("What we believe about the industry. Counter-narrative is the goal."),
+                h2("Why we like that"),
                 bul(vec![
-                    vec![t("Essays from the leadership team.")],
-                    vec![t("Reactions to industry news, within 48 hours.")],
+                    vec![t("It respects the user's intelligence.")],
+                    vec![
+                        t("It loads in under 600ms because there's nothing to load (see "),
+                        mr(ids, N_MILLION, "1,000,000 notes - the budget"),
+                        t(")."),
+                    ],
+                    vec![t("It's the opposite of Notion's empty-state hellscape.")],
                 ]),
-                h2("Pillar 3 - People"),
-                pt("The team, the clients, the rooms we work in."),
+                h2("Why it's a problem"),
                 bul(vec![
-                    vec![t("New-hire intros.")],
-                    vec![t("Client features - in-depth, not testimonials.")],
+                    vec![
+                        t("First-time users don't discover "),
+                        mr(ids, N_CAPTURE, "Quick capture - the unsung hero"),
+                        t("."),
+                    ],
+                    vec![t("Mention syntax is invisible. People type @ and nothing happens for 200ms.")],
+                    vec![
+                        t("Snapshots ("),
+                        mr(ids, N_SNAPS, "Snapshots - the feature that surprised us"),
+                        t(") are completely hidden. Best feature, zero discovery."),
+                    ],
                 ]),
-                p(vec![
-                    t("All publishing flows through "),
-                    mr(ids, N_NEWS, "Newsletter Backlog"),
-                    t(" before scheduling."),
+                h2("Fix proposal"),
+                chk(vec![
+                    (false, vec![t("First note auto-created with three lines: a heading, a checklist item, an @-mention example")]),
+                    (false, vec![t("If the user deletes it, we don't bring it back. Adults.")]),
+                    (false, vec![t("On second launch, surface a \"tips\" command in the command bar - opt-in only")]),
                 ]),
             ],
         ),
         // 19
         make_demo(
-            "Team Retro - March",
+            "Quick capture - the unsung hero",
             false,
             vec![
-                h2("What went well"),
-                bul(vec![
-                    vec![t("Apex pitch landed on the first round - "), mr(ids, N_APEX, "Q3 Brand Refresh - Apex Athletics"), t(".")],
-                    vec![t("Two new retainers signed - both inbound.")],
-                    vec![t("Production system handled three concurrent shoots without churn.")],
+                p(vec![
+                    cs("Cmd+Shift+Space"),
+                    t(" from anywhere. Mini textarea. "),
+                    cs("Cmd+Enter"),
+                    t(" saves. "),
+                    cs("Esc"),
+                    t(" dismisses. That's the whole feature."),
                 ]),
-                h2("What didn't"),
+                h2("Why people love it"),
                 bul(vec![
-                    vec![t("Riverstone scope creep - "), bs("28% over original SOW"), t(". Notes in "), mr(ids, N_SEO, "SEO Audit - Riverstone Co."), t(".")],
-                    vec![t("Two missed Friday deadlines on social - process gap, not capacity.")],
-                    vec![t("Onboarding for the new producer was rushed.")],
+                    vec![t("Opens in under 100ms because the window stays alive in the background.")],
+                    vec![t("Doesn't steal focus from your current app for longer than it needs to.")],
+                    vec![t("Notes go straight into the inbox - no folder picker, no tag prompt.")],
                 ]),
-                h2("Actions for April"),
+                h2("What's broken"),
                 chk(vec![
-                    (false, vec![t("Add scope-change template to "), mr(ids, N_ONBOARD, "Client Onboarding Checklist")]),
-                    (false, vec![t("Lock social ship-day to Thursday")]),
-                    (false, vec![t("Run new-hire ramp at 2 weeks minimum")]),
+                    (false, vec![t("Window can land off-screen on multi-monitor setups")]),
+                    (false, vec![cs("Cmd+W"), t(" should dismiss; currently does nothing")]),
+                    (false, vec![t("Pasted images get dropped (need to wire "), cs("ImageNode"), t(" in here too)")]),
                 ]),
-                qb("Retros without owners are just a feelings circle. Every action gets a name."),
+                h2("What we won't add"),
+                bul(vec![
+                    vec![t("A dropdown to pick the destination.")],
+                    vec![t("Markdown formatting - it's a textarea on purpose.")],
+                    vec![
+                        t("AI title generation on save - different argument, see "),
+                        mr(ids, N_AI, "AI - what we said yes to, what we said no to"),
+                        t("."),
+                    ],
+                ]),
+                pt("If you could only keep one feature in the app, the team would vote for this one."),
             ],
         ),
     ]
 }
+

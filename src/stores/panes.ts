@@ -7,10 +7,15 @@ import {
   type PaneId,
   type Side,
   type SplitId,
+  type Tab,
+  type TabId,
+  activeNoteId as activeNoteIdOf,
+  activeTab as activeTabOf,
   collectLeaves,
   findPane,
-  findPaneByNoteId,
+  findTabByNoteId,
   newPane,
+  newTab,
   normalize,
   paneCount,
   reconcileWithExistingNotes,
@@ -20,14 +25,27 @@ import {
 import type { Note } from "../lib/types";
 import type { SavingState } from "../views/useSavePipeline";
 
-export type { LayoutNode, LeafPane, SplitNode, PaneId, Side, SplitId } from "../lib/paneTree";
+export type {
+  LayoutNode,
+  LeafPane,
+  SplitNode,
+  PaneId,
+  Side,
+  SplitId,
+  Tab,
+  TabId,
+} from "../lib/paneTree";
 
 /**
  * Imperative API a parent uses to coordinate cross-pane work that doesn't
  * fit naturally as props (flushing in-flight saves before navigation,
  * applying external updates that bypass the save pipeline, etc.). Lives in
- * the panes store so consumers can pull the active pane's API without
- * EditorPane needing to push it back up the tree on every mount.
+ * the panes store so consumers can pull the active tab's API without
+ * the per-tab content needing to push it back up the tree on every mount.
+ *
+ * Registered per-tab (not per-pane): each tab owns its own Lexical instance
+ * and save pipeline. The active tab in the active pane is what global
+ * consumers like the toolbar, save indicator, and snapshot dialog see.
  */
 export type EditorPaneApi = {
   flushSave: () => Promise<void>;
@@ -39,9 +57,10 @@ export type EditorPaneApi = {
   savingState: () => SavingState;
 };
 
-/** Soft cap. Beyond this, splits no-op with a toast. The Lexical-instance and
- *  save-pipeline cost per pane is real (~200KB JS state, plus an FTS5 trip
- *  per save) so 8 is a generous-but-defensible ceiling for a desktop app. */
+/** Soft cap on panes. Beyond this, splits no-op with a toast. The cost per
+ *  pane is the structural overhead (split tree, reactive memos, drop
+ *  overlays); the editor instances themselves are now per-tab so the cap
+ *  scales with concurrent splits rather than open notes. */
 export const MAX_PANES = 8;
 
 type PanesState = {
@@ -58,29 +77,35 @@ const [state, setState] = createStore<PanesState>({
 export const panesState = state;
 export const activePaneId = () => state.activePaneId;
 
-export const panes = createMemo(() => {
-  console.log("[panes] memo:panes recomputing");
-  return collectLeaves(state.root);
+export const panes = createMemo(() => collectLeaves(state.root));
+export const totalPaneCount = createMemo(() => paneCount(state.root));
+
+/** Active tab of the active pane (or null if the pane couldn't be found,
+ *  which shouldn't happen but is defensive). */
+export const activeTab = createMemo<Tab | null>(() => {
+  const pane = findPane(state.root, state.activePaneId);
+  return pane ? activeTabOf(pane) : null;
 });
-export const totalPaneCount = createMemo(() => {
-  console.log("[panes] memo:totalPaneCount recomputing");
-  return paneCount(state.root);
+
+export const activeTabId = createMemo<TabId | null>(() => {
+  const t = activeTab();
+  return t ? t.id : null;
 });
 
 export const activePaneNoteId = createMemo(() => {
-  console.log("[panes] memo:activePaneNoteId recomputing");
-  const found = findPane(state.root, state.activePaneId);
-  return found?.noteId ?? null;
+  const pane = findPane(state.root, state.activePaneId);
+  return pane ? activeNoteIdOf(pane) : null;
 });
 
-/** Set of all noteIds currently open across all panes. The sidebar uses this
- *  to give a subtle "open in another pane" affordance to non-active rows.
- *  Returns a Set so membership tests stay O(1) per row. */
+/** Set of all noteIds currently open across all tabs across all panes. The
+ *  sidebar uses this for the "open in another pane" affordance. Returns a
+ *  Set so membership tests stay O(1) per row. */
 export const openNoteIds = createMemo(() => {
-  console.log("[panes] memo:openNoteIds recomputing");
   const set = new Set<string>();
   for (const p of collectLeaves(state.root)) {
-    if (p.noteId) set.add(p.noteId);
+    for (const t of p.tabs) {
+      if (t.noteId) set.add(t.noteId);
+    }
   }
   return set;
 });
@@ -98,40 +123,27 @@ export function setActivePaneId(id: PaneId) {
  * unwraps values before storing, so a plain tree round-trips cleanly. The
  * tree ops preserve identity for unchanged subtrees, so a resize-drag (which
  * only mutates one split's `sizes`) keeps every other pane's reference - and
- * therefore every other `EditorPane`'s Lexical instance - stable. Without
- * that, every drag step would tear down and rebuild every editor.
+ * therefore every other tab's Lexical instance - stable. Without that, every
+ * drag step would tear down and rebuild every editor.
  */
 function commitRoot(nextRoot: LayoutNode) {
   // CRITICAL: use the object-form `setState({ root: ... })` rather than
   // the path-form `setState("root", ...)`. The path form goes through
   // Solid's `mergeStoreNode` which merges new properties INTO the
   // existing underlying object at that path. With our tree, that breaks
-  // when the new tree shares references with the old underlying:
-  //
-  //   old underlying:  oldPane = {kind:"pane", id:"p1", noteId:"x"}
-  //   new tree:        {kind:"split", children:[oldPane, newPane], ...}
-  //
-  // The merge mutates oldPane's properties to match the split, including
-  // setting oldPane.children = [oldPane, newPane] - a self-reference.
-  // Any read of `state.root.children[0].children[0]...` then recurses
-  // until the stack overflows.
-  //
-  // The object-form does a direct property replacement at the panesState
-  // level: `panesState.root = newTree`. The old pane object is never
-  // mutated, just relocated in the tree.
+  // when the new tree shares references with the old underlying.
   setState({ root: nextRoot });
 }
 
-/** In-place noteId mutation via `produce`. Critical: changing only a leaf's
- *  noteId is NOT a structural change, so we mutate through the store proxy
- *  rather than rebuilding the tree. If we replaced the leaf object (as
- *  `replacePaneNote` does), the pane-tree `<For>` - which keys by reference -
- *  would dispose the old `EditorPane` and mount a fresh one on every note
- *  switch. That tears down the Lexical instance and flashes the
- *  `EmptyPanePicker` for one frame before the new note loads. Mutating the
- *  field keeps every pane component (and its editor) alive across switches;
- *  Solid's proxy still notifies subscribers reading `props.noteId`. */
-function setPaneNoteIdInPlace(paneId: PaneId, noteId: string | null): boolean {
+/** Walk the tree and run `mutator` on the matching leaf pane in-place via
+ *  `produce`. Returns true if a mutation happened. Used for changes that don't
+ *  rearrange topology (active tab idx, tab noteId, tab order within a pane) -
+ *  these don't need a tree rebuild and identity-preserving in-place mutation
+ *  keeps every other pane's Lexical instance stable. */
+function mutatePane(
+  paneId: PaneId,
+  mutator: (p: { tabs: Tab[]; activeTabIdx: number }) => boolean,
+) {
   let changed = false;
   setState(
     "root",
@@ -139,10 +151,7 @@ function setPaneNoteIdInPlace(paneId: PaneId, noteId: string | null): boolean {
       const visit = (n: LayoutNode): boolean => {
         if (n.kind === "pane") {
           if (n.id !== paneId) return false;
-          if (n.noteId !== noteId) {
-            n.noteId = noteId;
-            changed = true;
-          }
+          if (mutator(n)) changed = true;
           return true;
         }
         for (const c of n.children) {
@@ -156,77 +165,246 @@ function setPaneNoteIdInPlace(paneId: PaneId, noteId: string | null): boolean {
   return changed;
 }
 
-/** Set the noteId on a specific pane. If the note is already open in another
- *  pane, focus that pane instead and leave the layout alone (same-note guard).
- *  Pass `null` to clear a pane (e.g. when its note was deleted). */
+/** Switch to a specific tab within a pane (by index). Also focuses the pane. */
+export function setActiveTabIdx(paneId: PaneId, idx: number) {
+  const pane = findPane(unwrap(state.root), paneId);
+  if (!pane) return;
+  if (idx < 0 || idx >= pane.tabs.length) return;
+  batch(() => {
+    if (pane.activeTabIdx !== idx) {
+      mutatePane(paneId, (p) => {
+        p.activeTabIdx = idx;
+        return true;
+      });
+    }
+    if (state.activePaneId !== paneId) setState("activePaneId", paneId);
+  });
+}
+
+/** Switch to a tab by its id within a pane. */
+export function setActiveTabId(paneId: PaneId, tabId: TabId) {
+  const pane = findPane(unwrap(state.root), paneId);
+  if (!pane) return;
+  const idx = pane.tabs.findIndex((t) => t.id === tabId);
+  if (idx >= 0) setActiveTabIdx(paneId, idx);
+}
+
+/**
+ * Open a note in the active tab of the given pane. If the note is already
+ * open anywhere (in another pane, or in another tab of this pane), the
+ * existing tab is focused instead - the global same-note guard keeps each
+ * note in exactly one tab so the save pipelines can't race on the same id.
+ *
+ * Pass `null` to clear the active tab (e.g. when the underlying note was
+ * deleted).
+ */
 export function openNoteInPane(
   paneId: PaneId,
   noteId: string | null,
-): { reusedPaneId: PaneId | null } {
+): { reusedTabId: TabId | null; reusedPaneId: PaneId | null } {
   if (noteId === null) {
-    setPaneNoteIdInPlace(paneId, null);
+    mutatePane(paneId, (p) => {
+      const t = p.tabs[p.activeTabIdx];
+      if (t.noteId === null) return false;
+      t.noteId = null;
+      return true;
+    });
     setState("activePaneId", paneId);
-    return { reusedPaneId: null };
+    return { reusedTabId: null, reusedPaneId: null };
   }
-  const existing = findPaneByNoteId(unwrap(state.root), noteId);
-  if (existing && existing.id !== paneId) {
-    setState("activePaneId", existing.id);
-    return { reusedPaneId: existing.id };
+  const existing = findTabByNoteId(unwrap(state.root), noteId);
+  if (existing) {
+    const targetTabId = existing.pane.tabs[existing.tabIdx].id;
+    setActiveTabIdx(existing.pane.id, existing.tabIdx);
+    return { reusedTabId: targetTabId, reusedPaneId: existing.pane.id };
   }
-  setPaneNoteIdInPlace(paneId, noteId);
+  mutatePane(paneId, (p) => {
+    const t = p.tabs[p.activeTabIdx];
+    if (t.noteId === noteId) return false;
+    t.noteId = noteId;
+    return true;
+  });
   setState("activePaneId", paneId);
-  return { reusedPaneId: null };
+  return { reusedTabId: null, reusedPaneId: null };
+}
+
+/** Convenience: open a note in the active pane (semantics of
+ *  `openNoteInPane(activePaneId, noteId)`). Used by the sidebar and command bar. */
+export function openNoteInActivePane(noteId: string | null): {
+  reusedTabId: TabId | null;
+  reusedPaneId: PaneId | null;
+} {
+  return openNoteInPane(state.activePaneId, noteId);
+}
+
+/**
+ * Add a new tab to a pane and focus it. Same-note guard: if the noteId is
+ * already open anywhere, focus that tab instead. Pass `noteId: null` for an
+ * empty new tab (Cmd+T case).
+ *
+ * If the active tab of `paneId` is empty (noteId === null) and we'd be
+ * opening a real note, we *replace* the empty tab rather than adding a new
+ * one. Browsers do the same: opening a link in a blank "New Tab" doesn't
+ * leave a phantom empty tab behind.
+ */
+export function openNoteInNewTab(
+  paneId: PaneId,
+  noteId: string | null,
+): { newTabId: TabId | null; reusedTabId: TabId | null; reusedPaneId: PaneId | null } {
+  if (noteId !== null) {
+    const existing = findTabByNoteId(unwrap(state.root), noteId);
+    if (existing) {
+      const targetTabId = existing.pane.tabs[existing.tabIdx].id;
+      setActiveTabIdx(existing.pane.id, existing.tabIdx);
+      return { newTabId: null, reusedTabId: targetTabId, reusedPaneId: existing.pane.id };
+    }
+  }
+  const pane = findPane(unwrap(state.root), paneId);
+  if (!pane) return { newTabId: null, reusedTabId: null, reusedPaneId: null };
+  // Replace-the-empty-tab heuristic.
+  const activeT = pane.tabs[pane.activeTabIdx];
+  if (noteId !== null && activeT && activeT.noteId === null) {
+    const tabId = activeT.id;
+    mutatePane(paneId, (p) => {
+      p.tabs[p.activeTabIdx].noteId = noteId;
+      return true;
+    });
+    setState("activePaneId", paneId);
+    return { newTabId: tabId, reusedTabId: null, reusedPaneId: null };
+  }
+  const tab = newTab(noteId);
+  mutatePane(paneId, (p) => {
+    p.tabs.splice(p.activeTabIdx + 1, 0, tab);
+    p.activeTabIdx = p.activeTabIdx + 1;
+    return true;
+  });
+  setState("activePaneId", paneId);
+  return { newTabId: tab.id, reusedTabId: null, reusedPaneId: null };
+}
+
+/** Convenience: add an empty (noteId=null) tab to the active pane and focus it.
+ *  Used by Cmd+T. */
+export function openEmptyTabInActivePane(): TabId | null {
+  return openNoteInNewTab(state.activePaneId, null).newTabId;
+}
+
+/**
+ * Close a tab by id in a pane.
+ *
+ * If this was the last tab in the pane:
+ * - and the pane is the only pane in the layout → clear to a single empty
+ *   tab (the layout must always have at least one pane with one tab)
+ * - otherwise → remove the entire pane from the tree
+ *
+ * If this was the active tab and there are other tabs → focus the next tab
+ * (right of the closed one, or the new last tab if we closed the rightmost).
+ */
+export function closeTab(paneId: PaneId, tabId: TabId) {
+  const pane = findPane(unwrap(state.root), paneId);
+  if (!pane) return;
+  const idx = pane.tabs.findIndex((t) => t.id === tabId);
+  if (idx < 0) return;
+
+  // Last tab in pane → either clear to empty or remove the pane.
+  if (pane.tabs.length === 1) {
+    const total = totalPaneCount();
+    if (total <= 1) {
+      // Single-pane: replace the tab's contents with a fresh empty tab so the
+      // empty picker shows up.
+      mutatePane(paneId, (p) => {
+        p.tabs = [newTab(null)];
+        p.activeTabIdx = 0;
+        return true;
+      });
+      return;
+    }
+    closePane(paneId);
+    return;
+  }
+
+  // Multi-tab: splice the tab out.
+  mutatePane(paneId, (p) => {
+    p.tabs.splice(idx, 1);
+    if (p.activeTabIdx === idx) {
+      // Active tab was closed; pick the next one (or the new last if we were
+      // already at the end).
+      p.activeTabIdx = Math.min(idx, p.tabs.length - 1);
+    } else if (p.activeTabIdx > idx) {
+      // Active was to the right of the closed tab; shift left to keep pointing
+      // at the same tab.
+      p.activeTabIdx -= 1;
+    }
+    return true;
+  });
+}
+
+/** Close the active tab of a pane. Mirrors `closeTab(paneId, activeTabId)`. */
+export function closeActiveTab(paneId: PaneId) {
+  const pane = findPane(unwrap(state.root), paneId);
+  if (!pane) return;
+  const t = pane.tabs[pane.activeTabIdx];
+  if (t) closeTab(paneId, t.id);
+}
+
+/** Reorder a tab within its pane (drag-to-reorder). Indices are post-removal:
+ *  `moveTab(p, 0, 2)` moves the first tab to position 2 in the resulting array. */
+export function moveTab(paneId: PaneId, fromIdx: number, toIdx: number) {
+  if (fromIdx === toIdx) return;
+  mutatePane(paneId, (p) => {
+    if (fromIdx < 0 || fromIdx >= p.tabs.length) return false;
+    const clamped = Math.max(0, Math.min(p.tabs.length - 1, toIdx));
+    if (fromIdx === clamped) return false;
+    const activeTabId = p.tabs[p.activeTabIdx].id;
+    const [moved] = p.tabs.splice(fromIdx, 1);
+    p.tabs.splice(clamped, 0, moved);
+    p.activeTabIdx = p.tabs.findIndex((t) => t.id === activeTabId);
+    return true;
+  });
 }
 
 /** Same-note-aware split. Returns the new pane's id, or null if the cap is
  *  reached or the note is already open elsewhere (in which case the existing
- *  pane is focused instead). */
+ *  tab is focused instead). */
 export function splitPane(
   targetPaneId: PaneId,
   side: Side,
   noteId: string | null,
 ): { newPaneId: PaneId | null; reusedPaneId: PaneId | null } {
-  console.log("[panes] splitPane: called", { targetPaneId, side, noteId });
   if (totalPaneCount() >= MAX_PANES) {
-    console.log("[panes] splitPane: cap reached");
     return { newPaneId: null, reusedPaneId: null };
   }
   const root = unwrap(state.root);
-  console.log("[panes] splitPane: root before", JSON.stringify(root));
   if (noteId) {
-    const existing = findPaneByNoteId(root, noteId);
+    const existing = findTabByNoteId(root, noteId);
     if (existing) {
-      console.log("[panes] splitPane: same-note guard, focusing", existing.id);
-      setState("activePaneId", existing.id);
-      return { newPaneId: null, reusedPaneId: existing.id };
+      setActiveTabIdx(existing.pane.id, existing.tabIdx);
+      return { newPaneId: null, reusedPaneId: existing.pane.id };
     }
   }
   const inserted = newPane(noteId);
   const next = splitTreeAt(root, targetPaneId, side, inserted);
-  console.log("[panes] splitPane: tree after splitTreeAt", JSON.stringify(next));
   if (next === root) {
-    console.log("[panes] splitPane: tree unchanged, no-op");
     return { newPaneId: null, reusedPaneId: null };
   }
   const normalized = normalize(next);
-  console.log("[panes] splitPane: about to commit", JSON.stringify(normalized));
   batch(() => {
-    console.log("[panes] splitPane: inside batch, calling commitRoot");
     commitRoot(normalized);
-    console.log("[panes] splitPane: commitRoot done, setting activePaneId");
     setState("activePaneId", inserted.id);
-    console.log("[panes] splitPane: setState activePaneId done");
   });
-  console.log("[panes] splitPane: batch returned, success");
   return { newPaneId: inserted.id, reusedPaneId: null };
 }
 
+/** Remove an entire pane from the tree (all its tabs disappear). On the last
+ *  remaining pane: clear all tabs to a single empty tab instead of deleting. */
 export function closePane(paneId: PaneId) {
   const total = totalPaneCount();
   const root = unwrap(state.root);
   if (total <= 1) {
-    // Last pane: clear it instead of removing - the tree must always have one.
-    setPaneNoteIdInPlace(paneId, null);
+    mutatePane(paneId, (p) => {
+      p.tabs = [newTab(null)];
+      p.activeTabIdx = 0;
+      return true;
+    });
     return;
   }
   const removed = removePane(root, paneId);
@@ -241,23 +419,11 @@ export function closePane(paneId: PaneId) {
   });
 }
 
-/** Convenience: open a note in whichever pane is currently active. */
-export function openNoteInActivePane(noteId: string | null): { reusedPaneId: PaneId | null } {
-  return openNoteInPane(state.activePaneId, noteId);
-}
-
 /**
  * Adjust a split's boundary in place, preserving every other object's identity
- * in the tree. Critical: the previous implementation rebuilt the tree
- * immutably via `resizeBoundary`, which forced every ancestor up to the root
- * to take a new reference. With Solid's `<For>` keying child slots by item
- * identity, that disposed and re-created the subtree containing the splitter
- * element the user was actively dragging - `setPointerCapture` was bound to
- * an element that no longer existed, the next pointermove had no target, and
- * the drag silently aborted on the first reactive tick (instant "release"
- * after grab). Mutating `sizes` through `produce` keeps every node and the
- * `children` arrays referentially stable, so the only thing Solid notifies
- * is the cell-style consumer reading `sizes[i]`.
+ * in the tree. Mutates `sizes` through `produce` so children arrays stay
+ * referentially stable - the only thing Solid notifies is the cell-style
+ * consumer reading `sizes[i]`.
  */
 export function setBoundary(splitId: SplitId, boundaryIdx: number, leftFraction: number) {
   setState(
@@ -306,59 +472,62 @@ export function replaceLayout(root: LayoutNode, activeId?: PaneId) {
   });
 }
 
-/** Drop noteId references that no longer exist (purged notes). */
+/** Drop noteId references that no longer exist (purged notes). Tabs survive
+ *  but their noteId becomes null - so the empty picker takes over. */
 export function reconcileLayoutWithNotes(validIds: Set<string>) {
   const root = unwrap(state.root);
   const next = reconcileWithExistingNotes(root, validIds);
   if (next !== root) commitRoot(next);
 }
 
-/** Find the pane currently showing a given noteId, if any. */
+/** Find the pane currently showing a given noteId (in any tab), if any. */
 export function paneForNote(noteId: string): PaneId | null {
-  const f = findPaneByNoteId(unwrap(state.root), noteId);
-  return f?.id ?? null;
+  const f = findTabByNoteId(unwrap(state.root), noteId);
+  return f?.pane.id ?? null;
 }
 
 /* ---------- Editor / API registries ---------- */
 
-// Per-pane editor handles and imperative APIs. We use plain Maps + a version
-// signal rather than a Solid store because the values are non-serializable
-// (LexicalEditor instance, function-bag API) and we only ever read them by
-// active-pane id - no fine-grained subscription per pane needed.
-const editors = new Map<PaneId, LexicalEditor>();
-const apis = new Map<PaneId, EditorPaneApi>();
+// Per-tab editor handles and imperative APIs. Keyed by tabId because each tab
+// owns its own Lexical instance and save pipeline. We use plain Maps + a
+// version signal rather than a Solid store because the values are
+// non-serializable (LexicalEditor instance, function-bag API).
+const editors = new Map<TabId, LexicalEditor>();
+const apis = new Map<TabId, EditorPaneApi>();
 const [registryVersion, bumpRegistry] = createSignal(0);
 
-export function registerPaneEditor(paneId: PaneId, editor: LexicalEditor | null) {
-  if (editor) editors.set(paneId, editor);
-  else editors.delete(paneId);
+export function registerTabEditor(tabId: TabId, editor: LexicalEditor | null) {
+  if (editor) editors.set(tabId, editor);
+  else editors.delete(tabId);
   bumpRegistry((v) => v + 1);
 }
 
-export function registerPaneApi(paneId: PaneId, api: EditorPaneApi | null) {
-  if (api) apis.set(paneId, api);
-  else apis.delete(paneId);
+export function registerTabApi(tabId: TabId, api: EditorPaneApi | null) {
+  if (api) apis.set(tabId, api);
+  else apis.delete(tabId);
   bumpRegistry((v) => v + 1);
 }
 
 export const activeEditor = createMemo<LexicalEditor | null>(() => {
   registryVersion();
-  return editors.get(state.activePaneId) ?? null;
+  const id = activeTabId();
+  return id ? (editors.get(id) ?? null) : null;
 });
 
 export const activeApi = createMemo<EditorPaneApi | null>(() => {
   registryVersion();
-  return apis.get(state.activePaneId) ?? null;
+  const id = activeTabId();
+  return id ? (apis.get(id) ?? null) : null;
 });
 
-export function getPaneApi(paneId: PaneId): EditorPaneApi | null {
+export function getTabApi(tabId: TabId): EditorPaneApi | null {
   registryVersion();
-  return apis.get(paneId) ?? null;
+  return apis.get(tabId) ?? null;
 }
 
-/** Iterate all live pane APIs - used to flush every pane's pending save
- *  (e.g. when emptying trash or other bulk ops). */
-export function allPaneApis(): EditorPaneApi[] {
+/** Iterate all live tab APIs across all panes. Used to flush every editor's
+ *  pending save (e.g. when emptying trash or other bulk ops). */
+export function allTabApis(): EditorPaneApi[] {
   registryVersion();
   return [...apis.values()];
 }
@@ -371,10 +540,8 @@ export function allPaneApis(): EditorPaneApi[] {
 const [draggedNoteId, setDraggedNoteId] = createSignal<string | null>(null);
 export const dragNoteId = draggedNoteId;
 export function startNoteDrag(noteId: string) {
-  console.log("[dnd] startNoteDrag", noteId);
   setDraggedNoteId(noteId);
 }
 export function endNoteDrag() {
-  console.log("[dnd] endNoteDrag");
   setDraggedNoteId(null);
 }

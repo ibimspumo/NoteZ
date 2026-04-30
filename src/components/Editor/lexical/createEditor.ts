@@ -8,7 +8,11 @@ import { mergeRegister } from "@lexical/utils";
 import {
   $createParagraphNode,
   $getRoot,
+  COMMAND_PRIORITY_EDITOR,
+  INDENT_CONTENT_COMMAND,
+  KEY_TAB_COMMAND,
   type LexicalEditor,
+  OUTDENT_CONTENT_COMMAND,
   createEditor as lexicalCreateEditor,
 } from "lexical";
 import { registerEditorRefs } from "./editorRefs";
@@ -69,6 +73,20 @@ export function createNoteZEditor(rootEl: HTMLElement): EditorHandles {
     // Mutation-based tracking of mention/image refs - replaces the old
     // O(node-map) scan in collectMentionTargets / collectAssetIds.
     registerEditorRefs(editor),
+    // Tab indents (or nests list items via registerList); Shift+Tab outdents.
+    // Runs at EDITOR priority so the mention popover's LOW-priority Tab
+    // handler still wins when the popover is open.
+    editor.registerCommand(
+      KEY_TAB_COMMAND,
+      (event) => {
+        event.preventDefault();
+        return editor.dispatchCommand(
+          event.shiftKey ? OUTDENT_CONTENT_COMMAND : INDENT_CONTENT_COMMAND,
+          undefined,
+        );
+      },
+      COMMAND_PRIORITY_EDITOR,
+    ),
   );
 
   // Lexical's default text/plain serializer concatenates getTextContent()
@@ -115,7 +133,9 @@ function serializeWithListMarkers(root: HTMLElement): string {
   const out: string[] = [];
   const endsWithNewline = () => out.length > 0 && out[out.length - 1].endsWith("\n");
 
-  const walk = (node: Node, listDepth: number) => {
+  // Independent depth counters for ul / ol so each list type cycles its
+  // markers (• ◦ ▪ for ul; 1. a. i. for ol) matching the CSS visual.
+  const walk = (node: Node, ulDepth: number, olDepth: number) => {
     if (node.nodeType === Node.TEXT_NODE) {
       out.push(node.textContent ?? "");
       return;
@@ -126,27 +146,31 @@ function serializeWithListMarkers(root: HTMLElement): string {
     const tag = el.tagName.toLowerCase();
 
     if (tag === "ul" || tag === "ol") {
+      const isOl = tag === "ol";
+      const childUlDepth = isOl ? ulDepth : ulDepth + 1;
+      const childOlDepth = isOl ? olDepth + 1 : olDepth;
       let index = 0;
       for (const child of Array.from(el.children)) {
         if (child.tagName.toLowerCase() !== "li") continue;
         // Lexical wraps nested lists in an empty <li class="nz-li-nested">
         // - skip its marker and descend into the inner list.
         if (child.classList.contains("nz-li-nested")) {
-          walk(child, listDepth + 1);
+          walk(child, childUlDepth, childOlDepth);
           continue;
         }
         index++;
         if (out.length > 0 && !endsWithNewline()) out.push("\n");
-        const indent = "  ".repeat(listDepth);
-        const marker = tag === "ol" ? `${index}. ` : "• ";
+        const totalDepth = ulDepth + olDepth;
+        const indent = "  ".repeat(totalDepth);
+        const marker = isOl ? `${orderedMarker(index, olDepth)}. ` : `${unorderedMarker(ulDepth)} `;
         out.push(indent + marker);
-        walk(child, listDepth + 1);
+        walk(child, childUlDepth, childOlDepth);
       }
       return;
     }
 
     if (tag === "li") {
-      for (const child of Array.from(el.childNodes)) walk(child, listDepth);
+      for (const child of Array.from(el.childNodes)) walk(child, ulDepth, olDepth);
       return;
     }
 
@@ -157,16 +181,93 @@ function serializeWithListMarkers(root: HTMLElement): string {
 
     if (tag === "p" || tag === "div" || tag === "blockquote" || /^h[1-6]$/.test(tag)) {
       if (out.length > 0 && !endsWithNewline()) out.push("\n");
-      for (const child of Array.from(el.childNodes)) walk(child, listDepth);
+      // Preserve paragraph indent (set via Tab on non-list blocks). Lexical
+      // renders __indent as inline padding-inline-start; mirror it as a
+      // tab prefix so the structure survives plain-text paste.
+      const indentLevel = readParagraphIndent(el);
+      if (indentLevel > 0) out.push("\t".repeat(indentLevel));
+      for (const child of Array.from(el.childNodes)) walk(child, ulDepth, olDepth);
       if (!endsWithNewline()) out.push("\n");
       return;
     }
 
-    for (const child of Array.from(el.childNodes)) walk(child, listDepth);
+    for (const child of Array.from(el.childNodes)) walk(child, ulDepth, olDepth);
   };
 
-  walk(root, 0);
+  walk(root, 0, 0);
   return out.join("").replace(/\n+$/, "");
+}
+
+function orderedMarker(index: number, depth: number): string {
+  // Cycle: depth 0 → 1, 2, 3; depth 1 → a, b, c; depth 2 → i, ii, iii; repeat.
+  const style = depth % 3;
+  if (style === 1) return toAlpha(index);
+  if (style === 2) return toRoman(index);
+  return String(index);
+}
+
+function unorderedMarker(depth: number): string {
+  // Cycle: • ◦ ▪
+  const style = depth % 3;
+  if (style === 1) return "◦";
+  if (style === 2) return "▪";
+  return "•";
+}
+
+function toAlpha(n: number): string {
+  // 1 → a, 26 → z, 27 → aa, …
+  let s = "";
+  let x = n;
+  while (x > 0) {
+    const rem = (x - 1) % 26;
+    s = String.fromCharCode(97 + rem) + s;
+    x = Math.floor((x - 1) / 26);
+  }
+  return s || "a";
+}
+
+function toRoman(n: number): string {
+  if (n <= 0) return String(n);
+  const pairs: [number, string][] = [
+    [1000, "m"],
+    [900, "cm"],
+    [500, "d"],
+    [400, "cd"],
+    [100, "c"],
+    [90, "xc"],
+    [50, "l"],
+    [40, "xl"],
+    [10, "x"],
+    [9, "ix"],
+    [5, "v"],
+    [4, "iv"],
+    [1, "i"],
+  ];
+  let x = n;
+  let s = "";
+  for (const [v, sym] of pairs) {
+    while (x >= v) {
+      s += sym;
+      x -= v;
+    }
+  }
+  return s;
+}
+
+function readParagraphIndent(el: HTMLElement): number {
+  // Lexical exposes __indent both as inline padding and as a data attribute
+  // on serialized output. Probe both, fall back to 0.
+  const data = el.getAttribute("data-indent");
+  if (data) {
+    const n = Number.parseInt(data, 10);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  const padding = el.style.paddingInlineStart || el.style.paddingLeft;
+  if (padding && padding.endsWith("px")) {
+    const px = Number.parseFloat(padding);
+    if (Number.isFinite(px) && px > 0) return Math.round(px / 40);
+  }
+  return 0;
 }
 
 export function getPlainText(editor: LexicalEditor): string {
