@@ -1,4 +1,12 @@
-import { type Component, For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
+import {
+  type Component,
+  For,
+  Show,
+  createEffect,
+  createSignal,
+  onCleanup,
+  onMount,
+} from "solid-js";
 import { Portal } from "solid-js/web";
 import { api } from "../../lib/tauri";
 import type { SearchHit } from "../../lib/types";
