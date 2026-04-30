@@ -391,15 +391,15 @@ const UpdatesSection: Component = () => {
   return (
     <section class="nz-settings-section">
       <header class="nz-settings-section-header">
-        <h3>Updates</h3>
+        <h3>Auto Update</h3>
         <p class="nz-settings-section-hint">
           NoteZ checks GitHub once an hour for new releases - that's the only background network
-          call it makes. When auto-download is on, the new version is fetched and unpacked silently
+          call it makes. When auto-update is on, the new version is fetched and unpacked silently
           in the background; the sidebar pill flips to "Restart to apply" once it's ready, and
           quitting NoteZ at any point lands you on the new version next launch.
         </p>
       </header>
-      <div class="nz-settings-pill-row" role="radiogroup" aria-label="Auto-download updates">
+      <div class="nz-settings-pill-row" role="radiogroup" aria-label="Auto update">
         <button
           type="button"
           role="radio"
