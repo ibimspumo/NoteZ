@@ -13,6 +13,8 @@
     "core:webview:allow-create-webview-window",
     "global-shortcut:default",
     "clipboard-manager:default",
-    "os:default"
+    "os:default",
+    "updater:default",
+    "process:default"
   ]
 }

@@ -53,6 +53,7 @@ import {
   sidebarCollapsed,
   toggleSidebar,
 } from "../stores/ui";
+import { startUpdateChecker } from "../stores/update";
 import { SettingsView } from "./SettingsView";
 import { useShortcuts } from "./useShortcuts";
 
@@ -246,6 +247,10 @@ export const MainView: Component = () => {
     await ensureSelection();
     // Subsequent layout mutations debounce-persist to the settings table.
     scheduleLayoutPersist();
+    // Kick off the hourly GitHub poll for new releases. No-op in dev.
+    // Surfaces an "update available" pill in the sidebar footer when a
+    // newer signed release exists.
+    startUpdateChecker();
   });
 
   useShortcuts([

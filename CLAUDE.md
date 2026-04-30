@@ -133,9 +133,9 @@ Trigger an update when changes touch any of:
   rebound. The README's shortcut table is a contract; stale shortcuts in
   the README are worse than no table.
 - **Architecture claims** - if the README says "local-only" / "no
-  telemetry" / "no auto-update" / "Mac-first", and a change would weaken
-  any of those, the README must be updated *before* shipping or the
-  change reverted.
+  telemetry" / "no forced updates" / "Mac-first", and a change would
+  weaken any of those, the README must be updated *before* shipping or
+  the change reverted.
 - **Version badge** - already covered under Versioning (the badge line
   bumps with the rest of the five files), but flag it here so it's not
   forgotten.
@@ -271,7 +271,12 @@ the `v` prefix), otherwise `tauri-action` fails the build.
   for FTS5 + ranking).
 - **No localStorage for note content.** Persistence is SQLite via Rust commands.
 - **No `npm`.** Use `pnpm` (lockfile is pnpm-lock.yaml).
-- **No telemetry, no auto-update calls.** App must work fully offline forever.
+- **No telemetry.** App works fully offline. The only background network
+  call is an hourly GET against the GitHub Releases `latest.json` manifest
+  for the in-app updater (see `src/stores/update.ts`). No body, no
+  identifier, no usage data - just "is there a newer version?". The
+  download + install only happens when the user clicks the sidebar-footer
+  pill; the check itself never installs anything.
 
 ## Out of scope (Phase 1)
 

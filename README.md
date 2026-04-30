@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.8.6-1f883d?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-0.8.7-1f883d?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/platform-macOS-1f883d?style=flat-square" alt="macOS" />
   <img src="https://img.shields.io/badge/Apple_Silicon-native-1f883d?style=flat-square" alt="Apple Silicon" />
   <img src="https://img.shields.io/badge/storage-local_only-1f883d?style=flat-square" alt="local-only" />
@@ -64,9 +64,10 @@ Everything lives in **one SQLite file** on your Mac:
 Back it up however you like. Drop the folder in iCloud Drive or Dropbox to
 sync between Macs. Move it to an external drive. Open it with any SQLite
 tool to look inside. There is no NoteZ server. There is no account to
-make. There is no internet connection required, ever - the optional AI
-title feature is the only network call in the entire app, it's off by
-default, and the key sits in your macOS Keychain.
+make. The only network calls NoteZ ever makes are an hourly check against
+GitHub Releases for new versions (no body, no telemetry - just a GET that
+asks "is there something newer?") and the optional AI title feature,
+which is off by default with the key in your macOS Keychain.
 
 ### No Markdown in your face
 
@@ -193,6 +194,20 @@ If you skip step 2, you'll see *"NoteZ is damaged and can't be opened"* or
 macOS, not the app. The `xattr` command is safe - it just removes the
 quarantine attribute that Safari/Finder added to the download.
 
+### Updating
+
+Once installed, NoteZ checks GitHub Releases once an hour for newer
+versions. When one is available, a small green **v0.x.y ↓** pill appears
+in the sidebar footer next to the version number. Click it to download
+and install the update in place; NoteZ relaunches into the new version
+when it's done. The `xattr` step is only needed for the *first* install -
+in-app updates skip Gatekeeper because the bundle never goes through
+Safari or Finder.
+
+The check is the only background network call NoteZ makes. No payload is
+sent, no identifier, no telemetry. Disconnecting from the internet just
+means the pill never appears; the app keeps working.
+
 ---
 
 ## Promises
@@ -200,7 +215,7 @@ quarantine attribute that Safari/Finder added to the download.
 - **No accounts.** Ever.
 - **No cloud.** Your notes never touch a server we control.
 - **No telemetry.** We don't watch how you write, when you write, or whether you write at all.
-- **No auto-update.** The app you installed is the app you keep until you choose to update.
+- **No forced updates.** Updates are checked once an hour against GitHub Releases and only install when *you* click the pill. The check sends no data.
 - **No AI surprises.** The one optional AI feature is opt-in, key-local, and clearly labeled.
 - **No lock-in.** It's a SQLite file. You own it.
 

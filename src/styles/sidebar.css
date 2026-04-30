@@ -417,6 +417,32 @@
   background: var(--nz-bg-hover);
 }
 
+/* Update-available state. The pill turns into the GitHub-green accent so a
+ * passing glance reads "something to do here" without a dialog or banner.
+ * During download the same pill counts up the percentage in place; while
+ * installing it shows a brief copy before the app relaunches. */
+.nz-version-button-update {
+  color: #1f883d;
+  background: rgba(31, 136, 61, 0.12);
+  font-weight: 600;
+}
+
+.nz-version-button-update:hover {
+  color: #1f883d;
+  background: rgba(31, 136, 61, 0.2);
+}
+
+.nz-version-button-update[data-stage="downloading"],
+.nz-version-button-update[data-stage="installing"] {
+  cursor: progress;
+  opacity: 0.85;
+}
+
+.nz-version-button-update[data-stage="error"] {
+  color: var(--nz-danger, #d04444);
+  background: rgba(208, 68, 68, 0.12);
+}
+
 /* ─── Folders ───────────────────────────────────────────────────────────
  * Sits above the Pinned region. Collapsed = single filter row + chevron;
  * expanded reveals the virtual roots ("All Notes", "Inbox") and the user's

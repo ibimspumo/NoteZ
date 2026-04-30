@@ -18,6 +18,12 @@ import {
   settingsOpen,
   sidebarCollapsed,
 } from "../../stores/ui";
+import {
+  downloadAndInstall,
+  updateAvailable,
+  updateProgress,
+  updateStage,
+} from "../../stores/update";
 import { AboutDialog } from "../AboutDialog";
 import { MeasuredVirtualList } from "../MeasuredVirtualList";
 import { TrashDialog } from "../TrashDialog";
@@ -227,14 +233,50 @@ export const Sidebar: Component<Props> = (props) => {
         >
           <SettingsGearIcon width="14" height="14" />
         </button>
-        <button
-          class="nz-version-button"
-          aria-label={`About NoteZ - version ${APP_VERSION}`}
-          title="About NoteZ"
-          onClick={() => setAboutOpen(true)}
+        <Show
+          when={updateAvailable() && updateStage() !== "idle" && updateStage() !== "checking"}
+          fallback={
+            <button
+              class="nz-version-button"
+              aria-label={`About NoteZ - version ${APP_VERSION}`}
+              title="About NoteZ"
+              onClick={() => setAboutOpen(true)}
+            >
+              v{APP_VERSION}
+            </button>
+          }
         >
-          v{APP_VERSION}
-        </button>
+          <button
+            class="nz-version-button nz-version-button-update"
+            data-stage={updateStage()}
+            aria-label={`Update auf v${updateAvailable()?.version} verfügbar - jetzt installieren`}
+            title={
+              updateStage() === "downloading"
+                ? `Lade v${updateAvailable()?.version}…`
+                : updateStage() === "installing"
+                  ? "Installiere und starte neu…"
+                  : `Update auf v${updateAvailable()?.version} - klick zum Installieren`
+            }
+            disabled={updateStage() === "downloading" || updateStage() === "installing"}
+            onClick={() => {
+              void downloadAndInstall();
+            }}
+          >
+            <Show
+              when={updateStage() === "downloading"}
+              fallback={
+                <Show
+                  when={updateStage() === "installing"}
+                  fallback={<>v{updateAvailable()?.version} ↓</>}
+                >
+                  Installiere…
+                </Show>
+              }
+            >
+              {updateProgress() ?? 0}%
+            </Show>
+          </button>
+        </Show>
       </div>
 
       <AboutDialog open={aboutOpen()} onClose={() => setAboutOpen(false)} />
