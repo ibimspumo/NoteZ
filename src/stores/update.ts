@@ -35,6 +35,7 @@ export type UpdateStage =
   | "checking"
   | "available"
   | "downloading"
+  | "ready"
   | "installing"
   | "error";
 
@@ -62,10 +63,11 @@ async function pollOnce(manual = false): Promise<void> {
     if (manual) toast.info("Update check already in progress…");
     return;
   }
-  // If the user is mid-download or already saw an update, don't clobber that
-  // state with a fresh check. The available Update object would be replaced
-  // and the in-progress download would be orphaned.
-  if (stage() === "downloading" || stage() === "installing") return;
+  // If the user is mid-download, has a downloaded update waiting for the
+  // restart click, or is already in the middle of installing, don't clobber
+  // that state with a fresh check. A re-poll could bring back a different
+  // Update object and orphan the bundle that was just written to disk.
+  if (stage() === "downloading" || stage() === "ready" || stage() === "installing") return;
   inFlight = true;
   try {
     setStage("checking");
@@ -118,12 +120,16 @@ export async function checkForUpdatesNow(): Promise<void> {
   await pollOnce(true);
 }
 
-/** Click handler for the version pill when an update is available. Drives
- *  the full download → install → relaunch flow with progress reporting. */
-export async function downloadAndInstall(): Promise<void> {
+/** First half of the install flow: download the new bundle to disk while
+ *  the user keeps working. Progress is reported through the `progress`
+ *  signal so the sidebar pill can render its growing fill. On completion
+ *  we transition to `ready` and wait for the user's explicit "Restart to
+ *  install" click - we never relaunch automatically, because the user
+ *  almost always has a thought in flight when this fires. */
+export async function startDownload(): Promise<void> {
   const update = available();
   if (!update) return;
-  if (stage() === "downloading" || stage() === "installing") return;
+  if (stage() !== "available" && stage() !== "error") return;
 
   setStage("downloading");
   setProgress(0);
@@ -132,7 +138,7 @@ export async function downloadAndInstall(): Promise<void> {
   let downloadedBytes = 0;
 
   try {
-    await update.downloadAndInstall((event) => {
+    await update.download((event) => {
       switch (event.event) {
         case "Started":
           totalBytes = event.data.contentLength ?? 0;
@@ -142,8 +148,8 @@ export async function downloadAndInstall(): Promise<void> {
         case "Progress":
           downloadedBytes += event.data.chunkLength;
           if (totalBytes > 0) {
-            // Cap at 99 % until "Finished" fires - "100 %" with the app still
-            // verifying the bundle on disk feels misleading.
+            // Cap at 99 % until "Finished" fires - "100 %" with the bundle
+            // still being unpacked feels misleading.
             const pct = Math.min(99, Math.floor((downloadedBytes / totalBytes) * 100));
             setProgress(pct);
           }
@@ -153,20 +159,44 @@ export async function downloadAndInstall(): Promise<void> {
           break;
       }
     });
+    setStage("ready");
+  } catch (e) {
+    console.error("update download failed:", e);
+    setStage("error");
+    setProgress(null);
+    toast.error("Download failed. Try again or download the new version manually from GitHub.");
+    setTimeout(() => {
+      if (stage() === "error") setStage("available");
+    }, 4000);
+  }
+}
 
-    setStage("installing");
-    // The new bundle is in place; relaunch swaps to it. Tauri's relaunch
-    // exits the current process and spawns the freshly-installed binary.
+/** Second half: install the downloaded bundle and relaunch into it. The
+ *  install step is fast on macOS (it's a directory swap), so we don't bother
+ *  with a separate progress signal - "Installing…" appears briefly between
+ *  the click and the process exiting. `relaunch` doesn't return on success;
+ *  if we ever come back from it, something went wrong. */
+export async function installAndRestart(): Promise<void> {
+  const update = available();
+  if (!update) return;
+  if (stage() !== "ready") return;
+
+  setStage("installing");
+
+  try {
+    await update.install();
     await relaunch();
+    // If we got here, relaunch silently failed - flag it so the user can
+    // close + reopen NoteZ manually rather than sitting on a phantom
+    // "Installing…" pill forever.
+    setStage("error");
+    toast.error("Update installed but relaunch did not fire. Quit and reopen NoteZ to finish.");
   } catch (e) {
     console.error("update install failed:", e);
     setStage("error");
-    setProgress(null);
-    toast.error("Update failed. Try again later or download the new version manually from GitHub.");
-    // Drop back to "available" after a beat so the user can retry without
-    // refreshing the app. The Update object is still valid.
+    toast.error("Install failed. Try again or download the new version manually from GitHub.");
     setTimeout(() => {
-      if (stage() === "error") setStage("available");
+      if (stage() === "error") setStage("ready");
     }, 4000);
   }
 }

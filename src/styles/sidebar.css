@@ -455,6 +455,29 @@
   cursor: progress;
 }
 
+/* Bundle is on disk, just waiting for the user to pull the trigger.
+ * Solid fill (no progress overlay) and a slow attention pulse so the
+ * "click me to finish" call-to-action reads at a glance, but not so
+ * aggressive that it competes with the actual notes content. */
+.nz-version-button-update[data-stage="ready"] {
+  background: rgba(31, 136, 61, 0.22);
+  animation: nz-update-ready-pulse 2.4s ease-in-out infinite;
+}
+
+.nz-version-button-update[data-stage="ready"]::before {
+  display: none;
+}
+
+@keyframes nz-update-ready-pulse {
+  0%,
+  100% {
+    background: rgba(31, 136, 61, 0.22);
+  }
+  50% {
+    background: rgba(31, 136, 61, 0.36);
+  }
+}
+
 .nz-version-button-update[data-stage="error"] {
   color: var(--nz-danger, #d04444);
   background: rgba(208, 68, 68, 0.12);

@@ -20,7 +20,8 @@ import {
 } from "../../stores/ui";
 import {
   checkForUpdatesNow,
-  downloadAndInstall,
+  installAndRestart,
+  startDownload,
   updateAvailable,
   updateProgress,
   updateStage,
@@ -265,17 +266,29 @@ export const Sidebar: Component<Props> = (props) => {
                 class="nz-version-button nz-version-button-update"
                 data-stage={updateStage()}
                 style={{ "--nz-update-progress": `${updateProgress() ?? 0}%` }}
-                aria-label={`Update to v${updateAvailable()?.version} available - click to install`}
+                aria-label={
+                  updateStage() === "ready"
+                    ? `Update to v${updateAvailable()?.version} downloaded - click to restart and install`
+                    : updateStage() === "downloading"
+                      ? `Downloading update to v${updateAvailable()?.version}, ${updateProgress() ?? 0}%`
+                      : `Update to v${updateAvailable()?.version} available - click to download`
+                }
                 title={
                   updateStage() === "downloading"
-                    ? `Downloading v${updateAvailable()?.version}… ${updateProgress() ?? 0}%`
+                    ? `Downloading v${updateAvailable()?.version}… you can keep working.`
                     : updateStage() === "installing"
-                      ? "Installing and relaunching…"
-                      : `Update to v${updateAvailable()?.version} - click to install`
+                      ? "Installing and relaunching NoteZ…"
+                      : updateStage() === "ready"
+                        ? `v${updateAvailable()?.version} is ready. Clicking will close NoteZ and reopen it on the new version.`
+                        : `Update to v${updateAvailable()?.version} - click to download in the background`
                 }
                 disabled={updateStage() === "downloading" || updateStage() === "installing"}
                 onClick={() => {
-                  void downloadAndInstall();
+                  if (updateStage() === "ready") {
+                    void installAndRestart();
+                  } else if (updateStage() === "available" || updateStage() === "error") {
+                    void startDownload();
+                  }
                 }}
               >
                 <Show
@@ -283,13 +296,17 @@ export const Sidebar: Component<Props> = (props) => {
                   fallback={
                     <Show
                       when={updateStage() === "installing"}
-                      fallback={<>v{updateAvailable()?.version} ↓</>}
+                      fallback={
+                        <Show when={updateStage() === "ready"} fallback={<>Update available</>}>
+                          Restart to install
+                        </Show>
+                      }
                     >
                       Installing…
                     </Show>
                   }
                 >
-                  v{updateAvailable()?.version} · {updateProgress() ?? 0}%
+                  Downloading {updateProgress() ?? 0}%
                 </Show>
               </button>
             </Show>
