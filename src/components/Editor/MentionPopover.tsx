@@ -16,6 +16,9 @@ type Props = {
 export const MentionPopover: Component<Props> = (props) => {
   const [results, setResults] = createSignal<SearchHit[]>([]);
   const [activeIdx, setActiveIdx] = createSignal(0);
+  const [placement, setPlacement] = createSignal<"below" | "above">("below");
+  const [popoverHeight, setPopoverHeight] = createSignal(0);
+  let popoverRef: HTMLDivElement | undefined;
   // Solid evaluates the component body once on mount. Calling the parent's
   // register* setters here used to install a closure that captured the
   // signal accessors of THIS instance - if the popover unmounted and
@@ -79,16 +82,57 @@ export const MentionPopover: Component<Props> = (props) => {
 
   const positionStyle = () => {
     const r = props.match.rect;
-    if (!r) return { left: "0px", top: "0px" };
+    if (!r) return { left: "0px", top: "0px", visibility: "hidden" as const };
+    if (placement() === "above") {
+      const h = popoverHeight();
+      if (h === 0) {
+        return {
+          left: `${r.left}px`,
+          top: `${r.bottom + 4}px`,
+          visibility: "hidden" as const,
+        };
+      }
+      return {
+        left: `${r.left}px`,
+        top: `${r.top - h - 4}px`,
+      };
+    }
     return {
       left: `${r.left}px`,
       top: `${r.bottom + 4}px`,
     };
   };
 
+  // Re-measure the popover whenever its content or the caret position
+  // changes, then flip above the caret if there isn't enough room below.
+  // The first frame can render before the measurement settles, so the
+  // initial style hides the popover via visibility:hidden until we know
+  // its height - avoids a one-frame flash at the wrong location.
+  createEffect(() => {
+    results();
+    props.match.rect;
+    if (!popoverRef) return;
+    queueMicrotask(() => {
+      if (!popoverRef) return;
+      const h = popoverRef.offsetHeight;
+      if (h === 0) return;
+      setPopoverHeight(h);
+      const r = props.match.rect;
+      if (!r) return;
+      const margin = 8;
+      const spaceBelow = window.innerHeight - r.bottom - margin;
+      const spaceAbove = r.top - margin;
+      if (h > spaceBelow && spaceAbove > spaceBelow) {
+        setPlacement("above");
+      } else {
+        setPlacement("below");
+      }
+    });
+  });
+
   return (
     <Portal>
-      <div class="nz-mention-popover" style={positionStyle()}>
+      <div class="nz-mention-popover" ref={popoverRef} style={positionStyle()}>
         <div class="nz-mention-header">
           <span class="nz-mention-prefix">@</span>
           <span class="nz-mention-query">{props.match.query || "search notes…"}</span>
