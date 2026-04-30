@@ -15,6 +15,7 @@ import {
   aiHasKey,
   aiModel,
   aiTitleEnabled,
+  autoDownloadUpdates,
   commandBarShortcut,
   eventToAccelerator,
   formatAccelerator,
@@ -23,6 +24,7 @@ import {
   setActiveTheme,
   setAiModelChoice,
   setAiTitleEnabled,
+  setAutoDownloadUpdates,
   setCommandBarShortcut,
   setOpenrouterApiKey,
   setQuickCaptureShortcut,
@@ -93,6 +95,9 @@ export const SettingsView: Component = () => {
           <div class="nz-settings-divider" />
 
           <AISection />
+          <div class="nz-settings-divider" />
+
+          <UpdatesSection />
           <div class="nz-settings-divider" />
 
           <ThemeSection />
@@ -365,6 +370,56 @@ const ThemeSection: Component = () => {
             </button>
           )}
         </For>
+      </div>
+      <Show when={error()}>
+        <p class="nz-settings-error">{error()}</p>
+      </Show>
+    </section>
+  );
+};
+
+const UpdatesSection: Component = () => {
+  const [error, setError] = createSignal<string | null>(null);
+  const apply = async (next: boolean) => {
+    setError(null);
+    try {
+      await setAutoDownloadUpdates(next);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+  return (
+    <section class="nz-settings-section">
+      <header class="nz-settings-section-header">
+        <h3>Updates</h3>
+        <p class="nz-settings-section-hint">
+          NoteZ checks GitHub once an hour for new releases - that's the only background network
+          call it makes. When auto-download is on, the new version is fetched and unpacked silently
+          in the background; the sidebar pill flips to "Restart to apply" once it's ready, and
+          quitting NoteZ at any point lands you on the new version next launch.
+        </p>
+      </header>
+      <div class="nz-settings-pill-row" role="radiogroup" aria-label="Auto-download updates">
+        <button
+          type="button"
+          role="radio"
+          aria-checked={!autoDownloadUpdates()}
+          class="nz-settings-pill"
+          classList={{ active: !autoDownloadUpdates() }}
+          onClick={() => void apply(false)}
+        >
+          Off
+        </button>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={autoDownloadUpdates()}
+          class="nz-settings-pill"
+          classList={{ active: autoDownloadUpdates() }}
+          onClick={() => void apply(true)}
+        >
+          On
+        </button>
       </div>
       <Show when={error()}>
         <p class="nz-settings-error">{error()}</p>

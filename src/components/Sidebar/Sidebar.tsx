@@ -268,7 +268,7 @@ export const Sidebar: Component<Props> = (props) => {
                 style={{ "--nz-update-progress": `${updateProgress() ?? 0}%` }}
                 aria-label={
                   updateStage() === "ready"
-                    ? `Update to v${updateAvailable()?.version} downloaded - click to restart and install`
+                    ? `v${updateAvailable()?.version} installed - click to restart now, or quit normally to apply later`
                     : updateStage() === "downloading"
                       ? `Downloading update to v${updateAvailable()?.version}, ${updateProgress() ?? 0}%`
                       : `Update to v${updateAvailable()?.version} available - click to download`
@@ -277,9 +277,9 @@ export const Sidebar: Component<Props> = (props) => {
                   updateStage() === "downloading"
                     ? `Downloading v${updateAvailable()?.version}… you can keep working.`
                     : updateStage() === "installing"
-                      ? "Installing and relaunching NoteZ…"
+                      ? "Applying update…"
                       : updateStage() === "ready"
-                        ? `v${updateAvailable()?.version} is ready. Clicking will close NoteZ and reopen it on the new version.`
+                        ? `v${updateAvailable()?.version} is on disk. Click to restart now, or just quit normally - the new version starts on next launch.`
                         : `Update to v${updateAvailable()?.version} - click to download in the background`
                 }
                 disabled={updateStage() === "downloading" || updateStage() === "installing"}
@@ -298,11 +298,11 @@ export const Sidebar: Component<Props> = (props) => {
                       when={updateStage() === "installing"}
                       fallback={
                         <Show when={updateStage() === "ready"} fallback={<>Update available</>}>
-                          Restart to install
+                          Restart to apply
                         </Show>
                       }
                     >
-                      Installing…
+                      Applying…
                     </Show>
                   }
                 >

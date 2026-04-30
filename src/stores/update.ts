@@ -28,6 +28,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { type Update, check } from "@tauri-apps/plugin-updater";
 import { createSignal } from "solid-js";
 import { APP_VERSION } from "../lib/version";
+import { autoDownloadUpdates } from "./settings";
 import { toast } from "./toasts";
 
 export type UpdateStage =
@@ -77,6 +78,13 @@ async function pollOnce(manual = false): Promise<void> {
       setStage("available");
       // No toast on the "available" path - the green pill in the sidebar
       // is the surfacing UI, and a toast on top would be redundant noise.
+      // If the user opted in to auto-download, kick the download off
+      // immediately so the bundle is on-disk by the time they next look at
+      // the sidebar. Manual checks bypass this so the user keeps control
+      // when they explicitly asked for the check.
+      if (!manual && autoDownloadUpdates()) {
+        void startDownload();
+      }
     } else {
       setAvailable(null);
       // Only flip back to idle if we hadn't already surfaced an update from
@@ -120,12 +128,20 @@ export async function checkForUpdatesNow(): Promise<void> {
   await pollOnce(true);
 }
 
-/** First half of the install flow: download the new bundle to disk while
- *  the user keeps working. Progress is reported through the `progress`
- *  signal so the sidebar pill can render its growing fill. On completion
- *  we transition to `ready` and wait for the user's explicit "Restart to
- *  install" click - we never relaunch automatically, because the user
- *  almost always has a thought in flight when this fires. */
+/** Download the new bundle and immediately install it onto the on-disk
+ *  `.app`. macOS keeps the running process alive even after its bundle
+ *  has been swapped out (the executable is mapped into memory), so this
+ *  is safe to do in the background while the user keeps writing. After
+ *  install succeeds the new version is on disk - the user just needs to
+ *  quit and reopen NoteZ at any point to land on it. The "Restart to
+ *  apply" pill is a convenience, not a requirement: a normal ⌘Q +
+ *  reopen yields the new version too.
+ *
+ *  Failure modes:
+ *   - Download fails (network, signature mismatch, 404): toast + auto-revert
+ *     to "available" so the user can retry.
+ *   - Install fails (disk full, perms): toast + back to "available" too,
+ *     since at that point the bundle has been unpacked but not swapped. */
 export async function startDownload(): Promise<void> {
   const update = available();
   if (!update) return;
@@ -159,42 +175,48 @@ export async function startDownload(): Promise<void> {
           break;
       }
     });
+
+    // Bundle is on disk in a temp location; flip into "installing" so the
+    // pill shows the brief swap state. On macOS this typically completes
+    // in well under a second.
+    setStage("installing");
+    await update.install();
+    // From here on, quitting NoteZ via any path (⌘Q, dock close, OS
+    // shutdown) will start the new version on next launch. The pill
+    // becomes a convenience to do that immediately instead of later.
     setStage("ready");
   } catch (e) {
-    console.error("update download failed:", e);
+    console.error("update download/install failed:", e);
     setStage("error");
     setProgress(null);
-    toast.error("Download failed. Try again or download the new version manually from GitHub.");
+    toast.error("Update failed. Try again or download the new version manually from GitHub.");
     setTimeout(() => {
       if (stage() === "error") setStage("available");
     }, 4000);
   }
 }
 
-/** Second half: install the downloaded bundle and relaunch into it. The
- *  install step is fast on macOS (it's a directory swap), so we don't bother
- *  with a separate progress signal - "Installing…" appears briefly between
- *  the click and the process exiting. `relaunch` doesn't return on success;
- *  if we ever come back from it, something went wrong. */
+/** The downloaded bundle is already swapped into place; this just exits the
+ *  current process so macOS picks up the new binary on next launch. The
+ *  user could also just ⌘Q and reopen - same outcome. */
 export async function installAndRestart(): Promise<void> {
-  const update = available();
-  if (!update) return;
   if (stage() !== "ready") return;
 
-  setStage("installing");
-
   try {
-    await update.install();
     await relaunch();
     // If we got here, relaunch silently failed - flag it so the user can
     // close + reopen NoteZ manually rather than sitting on a phantom
-    // "Installing…" pill forever.
+    // pill forever.
     setStage("error");
-    toast.error("Update installed but relaunch did not fire. Quit and reopen NoteZ to finish.");
+    toast.error(
+      "Could not relaunch automatically. Quit NoteZ and reopen to land on the new version.",
+    );
   } catch (e) {
-    console.error("update install failed:", e);
+    console.error("relaunch failed:", e);
     setStage("error");
-    toast.error("Install failed. Try again or download the new version manually from GitHub.");
+    toast.error(
+      "Could not relaunch automatically. Quit NoteZ and reopen to land on the new version.",
+    );
     setTimeout(() => {
       if (stage() === "error") setStage("ready");
     }, 4000);

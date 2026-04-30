@@ -19,6 +19,7 @@ const KEY_THEME_ID = "theme_id";
  * everything else -> theme_id `default`. Read-only - never written from new code. */
 const KEY_COLOR_MODE_LEGACY = "color_mode";
 const KEY_SIDEBAR_PREVIEW_LINES = "sidebar_preview_lines";
+const KEY_AUTO_DOWNLOAD_UPDATES = "auto_download_updates";
 
 const DEFAULT_TRASH_RETENTION = DEFAULT_TRASH_RETENTION_DAYS;
 const DEFAULT_SIDEBAR_PREVIEW_LINES: SidebarPreviewLines =
@@ -35,6 +36,7 @@ const [commandBarShortcut, setCommandBarShortcutSig] = createSignal<string>("");
 const [aiTitleEnabled, setAiTitleEnabledSig] = createSignal(false);
 const [aiHasKey, setAiHasKeySig] = createSignal(false);
 const [aiModel, setAiModelSig] = createSignal<string>("google/gemini-3-flash-preview");
+const [autoDownloadUpdates, setAutoDownloadUpdatesSig] = createSignal(false);
 const [loaded, setLoaded] = createSignal(false);
 
 export {
@@ -46,6 +48,7 @@ export {
   aiTitleEnabled,
   aiHasKey,
   aiModel,
+  autoDownloadUpdates,
   loaded as settingsLoaded,
 };
 
@@ -130,6 +133,11 @@ async function loadSettingsImpl() {
   const lines = parseSidebarPreviewLines(linesRaw);
   setSidebarPreviewLinesSig(lines);
 
+  // Default OFF: the hourly check is the only background work that should
+  // happen without explicit consent. Auto-downloading bytes is a real
+  // bandwidth + disk action so it stays opt-in.
+  setAutoDownloadUpdatesSig(map.get(KEY_AUTO_DOWNLOAD_UPDATES) === "1");
+
   setQuickCaptureShortcutSig(shortcuts.quick_capture);
   setCommandBarShortcutSig(shortcuts.command_bar);
 
@@ -177,6 +185,11 @@ export async function setActiveTheme(id: string) {
 export async function setSidebarPreviewLines(lines: SidebarPreviewLines) {
   await api.setSetting(KEY_SIDEBAR_PREVIEW_LINES, String(lines));
   setSidebarPreviewLinesSig(lines);
+}
+
+export async function setAutoDownloadUpdates(enabled: boolean) {
+  await api.setSetting(KEY_AUTO_DOWNLOAD_UPDATES, enabled ? "1" : "0");
+  setAutoDownloadUpdatesSig(enabled);
 }
 
 function parseSidebarPreviewLines(raw: string | undefined): SidebarPreviewLines {

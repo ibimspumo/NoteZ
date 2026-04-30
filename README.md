@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.8.9-1f883d?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-0.8.10-1f883d?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/platform-macOS-1f883d?style=flat-square" alt="macOS" />
   <img src="https://img.shields.io/badge/Apple_Silicon-native-1f883d?style=flat-square" alt="Apple Silicon" />
   <img src="https://img.shields.io/badge/storage-local_only-1f883d?style=flat-square" alt="local-only" />
@@ -197,16 +197,25 @@ quarantine attribute that Safari/Finder added to the download.
 ### Updating
 
 Once installed, NoteZ checks GitHub Releases once an hour for newer
-versions. When one is available, a small green **v0.x.y ↓** pill appears
-in the sidebar footer next to the version number. Click it to download
-and install the update in place; NoteZ relaunches into the new version
-when it's done. The `xattr` step is only needed for the *first* install -
-in-app updates skip Gatekeeper because the bundle never goes through
-Safari or Finder.
+versions. When one is available, a small green **Update available** pill
+appears in the sidebar footer. Click it to download the new version in
+the background while you keep writing - the pill turns into its own
+progress bar, then flips to **Restart to apply** when the bundle is on
+disk. Click that to relaunch immediately, or just quit NoteZ normally
+and the new version starts on the next launch.
 
-The check is the only background network call NoteZ makes. No payload is
-sent, no identifier, no telemetry. Disconnecting from the internet just
-means the pill never appears; the app keeps working.
+In Settings → Updates you can flip auto-download to **On**: the hourly
+check then fetches and unpacks the new version silently, so the only
+manual step is the eventual restart (or just keep using NoteZ until you
+quit it for any reason). Off by default; the choice is yours.
+
+The `xattr` step is only needed for the *first* install - in-app
+updates skip Gatekeeper because the bundle never goes through Safari or
+Finder.
+
+The hourly check is the only background network call NoteZ makes. No
+payload is sent, no identifier, no telemetry. Disconnecting from the
+internet just means the pill never appears; the app keeps working.
 
 ---
 
@@ -215,7 +224,7 @@ means the pill never appears; the app keeps working.
 - **No accounts.** Ever.
 - **No cloud.** Your notes never touch a server we control.
 - **No telemetry.** We don't watch how you write, when you write, or whether you write at all.
-- **No forced updates.** Updates are checked once an hour against GitHub Releases and only install when *you* click the pill. The check sends no data.
+- **No forced updates.** Updates are checked once an hour against GitHub Releases. Downloading and applying happens on your terms - either by clicking the sidebar pill, or by opting in to background download in Settings. The check sends no data.
 - **No AI surprises.** The one optional AI feature is opt-in, key-local, and clearly labeled.
 - **No lock-in.** It's a SQLite file. You own it.
 
