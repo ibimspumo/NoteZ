@@ -83,7 +83,7 @@ pub fn set_cursor(db: State<Db>, note_id: String, value: String) -> Result<()> {
     // comparator and is bounded by however many rows exceed retention -
     // typically zero in steady state.
     let prev = CURSOR_SET_CALLS_SINCE_PRUNE.fetch_add(1, Ordering::Relaxed);
-    if prev % CURSOR_PRUNE_INTERVAL_CALLS == 0 {
+    if prev.is_multiple_of(CURSOR_PRUNE_INTERVAL_CALLS) {
         let _ = conn.execute(
             "DELETE FROM cursors
              WHERE julianday(updated_at) < julianday('now', ?1)",
