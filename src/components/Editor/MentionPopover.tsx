@@ -8,6 +8,7 @@ import {
   onMount,
 } from "solid-js";
 import { Portal } from "solid-js/web";
+import { renderHighlightedSnippet } from "../../lib/snippetHighlight";
 import { api } from "../../lib/tauri";
 import type { SearchHit } from "../../lib/types";
 import type { MentionMatch } from "./lexical/mentionPlugin";
@@ -165,7 +166,7 @@ export const MentionPopover: Component<Props> = (props) => {
                     {hit.title || <em class="nz-untitled">Untitled</em>}
                   </span>
                   <Show when={hit.snippet}>
-                    <span class="nz-mention-snippet" innerHTML={highlight(hit.snippet)} />
+                    <span class="nz-mention-snippet">{renderHighlightedSnippet(hit.snippet)}</span>
                   </Show>
                 </li>
               )}
@@ -176,11 +177,3 @@ export const MentionPopover: Component<Props> = (props) => {
     </Portal>
   );
 };
-
-function highlight(snippet: string): string {
-  return escapeHtml(snippet).replaceAll("&lt;&lt;", "<mark>").replaceAll("&gt;&gt;", "</mark>");
-}
-
-function escapeHtml(text: string): string {
-  return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-}

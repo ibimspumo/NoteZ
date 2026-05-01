@@ -322,6 +322,14 @@ export function closeTab(paneId: PaneId, tabId: TabId) {
   if (closingTab) {
     const api = apis.get(closingTab.id);
     if (api?.hasPendingSave()) {
+      // Fire-and-forget flush. The snapshot provider in the save pipeline
+      // is invoked synchronously inside startSave (only the worker
+      // stringify and the IPC are async), so by the time we return here
+      // and unmount the editor, the snapshot data has already been
+      // captured into the closure - the in-flight save lands correctly
+      // even after the editor is gone. We don't `await` because closeTab
+      // is called from sync paths (⌘W, header X-button) and should not
+      // be promoted to async.
       void api.flushSave().catch((e) => console.warn("closeTab: flushSave failed", e));
     }
   }

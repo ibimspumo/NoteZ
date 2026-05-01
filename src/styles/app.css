@@ -1,14 +1,135 @@
+/* The 6px outer padding + 6px inter-column gap give every floating card
+   (sidebar, pane) the same breathing room from window edges and from each
+   other - one number, one source of truth, no asymmetric "1px-border + Npx-
+   padding" math anywhere in the layout.
+
+   Background contract: TWO variables, TWO paint locations.
+   - `.nz-app` paints `--nz-bg-app` (the canvas behind everything).
+   - `.nz-sidebar` / `.nz-pane` / `.nz-settings-view` paint `--nz-bg-card`
+     (the lifted card surface, slightly different so cards lift above
+     the canvas without a hard step).
+   Nothing else paints a translucent fill - stacking another layer would
+   compound the alpha and produce a darker patch under that element.
+   To retint canvas vs cards independently, edit the two variables in the
+   active theme JSON. */
 .nz-app {
   display: grid;
-  grid-template-columns: 248px minmax(0, 1fr);
+  /* Three columns: sidebar | splitter | main. The default sidebar width
+     (248px) is overridden inline by MainView with the user's persisted
+     width signal; the splitter column is exactly --nz-space-6 wide so
+     the visible gap stays identical to a pane-to-pane gap.
+
+     The grid template + padding transition together so collapsing /
+     expanding the sidebar slides the columns smoothly instead of
+     snapping. The toggle button itself is `position: fixed` (see
+     `.nz-window-toggle` below) so it does NOT participate in the
+     transition - that's what kept the old "double-rebuild flicker" away
+     when we re-enabled animation here. */
+  grid-template-columns: 248px var(--nz-space-6) minmax(0, 1fr);
+  gap: 0;
+  padding: var(--nz-space-6);
   height: 100vh;
   width: 100vw;
   background: var(--nz-bg-app);
-  transition: grid-template-columns 220ms var(--nz-ease);
+  transition: grid-template-columns var(--nz-dur-medium) var(--nz-ease), padding
+    var(--nz-dur-medium) var(--nz-ease);
 }
 
-.nz-app.sidebar-collapsed {
-  grid-template-columns: 0px minmax(0, 1fr);
+/* Sidebar collapsed: keep the same 6px padding on every edge so the main
+   pane sits with symmetric breathing room (no flush-to-edge on the left)
+   and matches the spacing the right edge already has. Grid columns are
+   driven inline from MainView based on the same signal. */
+
+/* Drag handle between sidebar and main column. Same visual rhythm as the
+   `.nz-pane-splitter` (invisible track + accent line on hover/drag) so the
+   user reads "this is a resize handle" with one mental model across the
+   app. The 6px wide column lives inside the grid itself; an absolutely-
+   positioned ::after widens the pointer hit area to ~14px without
+   perturbing layout. */
+.nz-sidebar-splitter {
+  position: relative;
+  z-index: 2;
+  cursor: col-resize;
+  background: transparent;
+}
+
+.nz-sidebar-splitter::before {
+  content: "";
+  position: absolute;
+  inset: var(--nz-space-2);
+  border-radius: var(--nz-radius-pill);
+  background: transparent;
+  transition: background var(--nz-dur-fast) var(--nz-ease);
+  pointer-events: none;
+}
+
+.nz-sidebar-splitter::after {
+  content: "";
+  position: absolute;
+  inset: 0 -4px;
+  z-index: 1;
+}
+
+.nz-sidebar-splitter:hover::before,
+body.nz-resizing .nz-sidebar-splitter::before {
+  background: var(--nz-accent);
+}
+
+/* When the sidebar is collapsed, the grid column is already 0px so the
+   splitter is invisible. Keep it in flow (NOT `display: none`) - removing
+   it from the grid shifts every later child up one column and the main
+   column ends up at 0px wide, blanking the whole window. The component
+   itself ignores `pointerdown` while collapsed, and the ::after hit zone
+   is suppressed below so the cursor doesn't suggest a draggable edge. */
+.nz-app.sidebar-collapsed .nz-sidebar-splitter {
+  pointer-events: none;
+  cursor: default;
+}
+
+.nz-app.sidebar-collapsed .nz-sidebar-splitter::after {
+  inset: 0;
+}
+
+/* Sidebar show/hide toggle. Anchored to the window, NOT to the layout, so
+   it stays at one fixed coordinate regardless of whether the sidebar is
+   open or collapsed - no left-then-right shuffle when toggling. Sits to
+   the right of the macOS traffic-light cluster (`x: 17` + ~63px cluster
+   width = ~80px), with vertical alignment matched to the cluster's
+   y-center via `top: 9px` + 28px-tall button (center y=23). */
+.nz-window-toggle {
+  position: fixed;
+  top: 10px;
+  left: 86px;
+  z-index: 50;
+  width: var(--nz-space-28);
+  height: var(--nz-space-28);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--nz-radius-sm);
+  color: var(--nz-text-muted);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 0;
+  transition: background var(--nz-dur-fast) var(--nz-ease), color var(--nz-dur-fast) var(--nz-ease),
+    transform var(--nz-dur-instant) var(--nz-ease);
+}
+
+.nz-window-toggle:hover {
+  background: var(--nz-bg-hover);
+  color: var(--nz-text-strong);
+}
+
+.nz-window-toggle:active {
+  transform: scale(0.92);
+}
+
+.nz-window-toggle:focus-visible {
+  outline: 2px solid var(--nz-focus-ring);
+  outline-offset: 1px;
 }
 
 .nz-main {
@@ -18,33 +139,36 @@
   min-height: 0;
   height: 100%;
   overflow: hidden;
-  background: var(--nz-bg-main);
-  border-left: 1px solid var(--nz-divider);
+  /* Transparent — the canvas color is painted exactly once on `.nz-app`.
+     Any additional translucent fill here would stack on top of the app
+     bg and produce a darker patch under the panes. */
+  background: transparent;
   position: relative;
-  transition: border-color 220ms var(--nz-ease);
-}
-
-.nz-app.sidebar-collapsed .nz-main {
-  border-left-color: transparent;
 }
 
 .nz-main-header {
+  /* 44px == macOS standard control row height; intentionally not on the
+     spacing scale because it tracks system-level toolbar conventions.
+     No border-bottom: the 6px host padding below + the pane card's own
+     1px top border are the only edges the eye should pick up between
+     the toolbar and the content. */
   height: 44px;
   flex: 0 0 44px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 10px 0 8px;
-  border-bottom: 1px solid var(--nz-divider);
+  gap: var(--nz-space-6);
+  padding: 0 var(--nz-space-10) 0 var(--nz-space-8);
   background: transparent;
 }
 
 /* When sidebar is collapsed the main column owns the top-left, so we have to
-   push controls past the macOS traffic-light cluster (~78px wide). */
+   push controls past the macOS traffic-light cluster (~78px wide). The
+   spacer width transitions in lockstep with the grid columns above so the
+   toolbar glides into place rather than snapping. */
 .nz-traffic-light-spacer {
   flex: 0 0 0px;
   height: 100%;
-  transition: flex-basis 220ms var(--nz-ease);
+  transition: flex-basis var(--nz-dur-medium) var(--nz-ease);
 }
 
 .nz-app.sidebar-collapsed .nz-traffic-light-spacer {
@@ -53,7 +177,13 @@
 
 /* The toolbar slot grows to fill the space between the sidebar toggle on the
    left and the saving indicator + search button on the right. The toolbar
-   itself centers its groups within this slot. */
+   itself centers its groups within this slot.
+
+   `container-type: inline-size` registers this slot as a query container
+   named `nz-toolbar`; editor.css drops low/medium-priority toolbar groups
+   when this container shrinks past the breakpoints. We query the slot, not
+   the window, so a narrow main pane (e.g. with a wide sidebar) collapses
+   the toolbar even if the window is wide. */
 .nz-main-header-toolbar {
   flex: 1 1 auto;
   min-width: 0;
@@ -61,40 +191,20 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-}
-
-.nz-icon-btn {
-  width: 26px;
-  height: 26px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--nz-radius-sm);
-  color: var(--nz-text-muted);
-  transition: background 140ms var(--nz-ease), color 140ms var(--nz-ease), transform 80ms
-    var(--nz-ease);
-}
-
-.nz-icon-btn:hover {
-  background: var(--nz-bg-hover);
-  color: var(--nz-text-strong);
-}
-
-.nz-icon-btn:active {
-  transform: scale(0.92);
+  container: nz-toolbar / inline-size;
 }
 
 .nz-saving-indicator {
-  font-size: 11px;
+  font-size: var(--nz-text-xs);
   color: var(--nz-text-faint);
   letter-spacing: 0.01em;
   font-variant-numeric: tabular-nums;
-  min-width: 48px;
+  min-width: var(--nz-space-48);
   text-align: right;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  transition: opacity 220ms var(--nz-ease);
+  gap: var(--nz-space-4);
+  transition: opacity var(--nz-dur-medium) var(--nz-ease);
 }
 
 .nz-saving-indicator[data-state="idle"] {
@@ -104,8 +214,8 @@
 
 .nz-saving-indicator::before {
   content: "";
-  width: 5px;
-  height: 5px;
+  width: var(--nz-space-6);
+  height: var(--nz-space-6);
   border-radius: 50%;
   background: var(--nz-text-faint);
   display: inline-block;
@@ -128,43 +238,6 @@
   background: var(--nz-danger);
 }
 
-.nz-pill-btn {
-  padding: 9px 18px;
-  border-radius: 999px;
-  background: var(--nz-bg-row);
-  color: var(--nz-text-strong);
-  border: 1px solid var(--nz-divider);
-  font-weight: 500;
-  font-size: 13px;
-  letter-spacing: -0.005em;
-  transition: background 140ms var(--nz-ease), transform 100ms var(--nz-ease), border-color 140ms
-    var(--nz-ease);
-}
-
-.nz-pill-btn:hover {
-  background: var(--nz-bg-hover);
-  border-color: var(--nz-divider-strong);
-}
-
-.nz-pill-btn:active {
-  transform: scale(0.97);
-}
-
-.nz-pill-btn.primary {
-  background: var(--nz-accent);
-  color: #062e1d;
-  border-color: var(--nz-accent-hot);
-  font-weight: 600;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-  transition: box-shadow 220ms var(--nz-ease), background 140ms var(--nz-ease), transform 100ms
-    var(--nz-ease);
-}
-
-.nz-pill-btn.primary:hover {
-  background: var(--nz-accent-hot);
-  box-shadow: 0 4px 14px var(--nz-accent-glow);
-}
-
 .nz-empty-editor {
   flex: 1;
   display: flex;
@@ -180,21 +253,21 @@
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   border: 1px solid var(--nz-divider-strong);
   border-radius: var(--nz-radius-md);
-  padding: 4px;
+  padding: var(--nz-space-4);
   min-width: 168px;
   box-shadow: var(--nz-shadow);
   display: flex;
   flex-direction: column;
-  animation: nz-rise 140ms var(--nz-ease);
+  animation: nz-rise var(--nz-dur) var(--nz-ease);
 }
 
 .nz-row-menu button {
   text-align: left;
-  padding: 7px 11px;
+  padding: var(--nz-space-8) var(--nz-space-12);
   border-radius: var(--nz-radius-sm);
-  font-size: 13px;
+  font-size: var(--nz-text-base);
   color: var(--nz-text);
-  transition: background 100ms var(--nz-ease);
+  transition: background var(--nz-dur-fast) var(--nz-ease);
 }
 
 .nz-row-menu button:hover {
@@ -212,21 +285,21 @@
 .nz-row-menu-sep {
   height: 1px;
   background: var(--nz-divider);
-  margin: 4px 0;
+  margin: var(--nz-space-4) 0;
 }
 
 .nz-row-menu-section-label {
-  font-size: 10px;
+  font-size: var(--nz-text-xxs);
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--nz-text-whisper);
-  padding: 6px 11px 2px;
+  padding: var(--nz-space-6) var(--nz-space-12) var(--nz-space-2);
 }
 
 .nz-row-menu button.move-to {
-  padding-left: calc(11px + 12px * var(--folder-depth, 0));
-  font-size: 12.5px;
+  padding-left: calc(var(--nz-space-12) + var(--nz-space-12) * var(--folder-depth, 0));
+  font-size: var(--nz-text-md);
   color: var(--nz-text);
 }
 

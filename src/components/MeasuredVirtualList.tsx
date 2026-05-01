@@ -133,27 +133,38 @@ export const MeasuredVirtualList: Component<Props> = (props) => {
   }
 
   // ─── (Re)build for count or estimate-version changes ─────────────────────
-  // Two triggers, both amortized-rare:
-  //   - count changed (load-more, refresh): preserve existing heights and
+  // Triggers:
+  //   - count changed (load-more, refresh): preserve existing heights AND
   //     measurements for the overlap; estimate the appended tail.
-  //   - estimateVersion bumped: previous measurements are stale (e.g. the
-  //     sidebar density setting changed every row's layout). Reset all
-  //     heights from `estimateHeight(i)` and clear the measured flags;
-  //     the ResizeObserver will re-confirm visible rows shortly after.
-  // Both branches keep the hot paths (per-measurement, per-scroll) at
-  // O(log n) - we only eat the O(n) cost on these external triggers.
+  //   - estimateVersion bumped: external signal that estimates are stale
+  //     (e.g. sidebar density setting flipped). We do NOT throw away the
+  //     `measured` flags or the height array - those are still trustworthy
+  //     until the ResizeObserver corrects them on the visible window. Just
+  //     bump the revision so consumers re-evaluate. The heights of off-
+  //     screen rows may be slightly off until the user scrolls there, which
+  //     matches the scroll-anchoring contract elsewhere in this list.
+  //   - first call (lastCount === 0): full estimate fill.
+  // Hot paths (per-measurement, per-scroll) stay O(log n) - we only eat the
+  // O(n) cost on the count-grew tail and on the very first fill.
   createEffect(() => {
     const n = props.count;
     const ev = props.estimateVersion ?? 0;
     if (n === lastCount && ev === lastEstimateVersion) return;
 
-    const versionChanged = ev !== lastEstimateVersion;
-    const fullRebuild = versionChanged || lastCount === 0;
-
-    const newHeights = new Float64Array(n);
-    const newMeasured = new Uint8Array(n);
-
-    if (!fullRebuild) {
+    if (lastCount === 0) {
+      // First-time fill.
+      const newHeights = new Float64Array(n);
+      const newMeasured = new Uint8Array(n);
+      for (let i = 0; i < n; i++) {
+        newHeights[i] = props.estimateHeight(i);
+      }
+      heights = newHeights;
+      measured = newMeasured;
+      buildFromHeights();
+    } else if (n !== lastCount) {
+      // Count changed (load-more / refresh). Keep overlap, estimate tail.
+      const newHeights = new Float64Array(n);
+      const newMeasured = new Uint8Array(n);
       const overlap = Math.min(n, lastCount);
       for (let i = 0; i < overlap; i++) {
         newHeights[i] = heights[i];
@@ -162,17 +173,14 @@ export const MeasuredVirtualList: Component<Props> = (props) => {
       for (let i = overlap; i < n; i++) {
         newHeights[i] = props.estimateHeight(i);
       }
-    } else {
-      for (let i = 0; i < n; i++) {
-        newHeights[i] = props.estimateHeight(i);
-      }
-      // measured[] left at zero — stale measurements get re-confirmed by
-      // the ResizeObserver as the user re-encounters each row.
+      heights = newHeights;
+      measured = newMeasured;
+      buildFromHeights();
     }
+    // estimateVersion-only change: no array work. The bumped `revision`
+    // below makes consumers re-evaluate; visible rows are reconfirmed by
+    // the ResizeObserver shortly after, off-screen rows drift gracefully.
 
-    heights = newHeights;
-    measured = newMeasured;
-    buildFromHeights();
     lastCount = n;
     lastEstimateVersion = ev;
     setRevision((r) => r + 1);

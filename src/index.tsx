@@ -6,6 +6,7 @@ import { installExternalLinkGuard } from "./lib/externalLinks";
 import { BUILTIN_THEMES, DEFAULT_THEME_ID } from "./themes";
 import "./styles/global.css";
 import "./styles/theme.css";
+import "./styles/ui.css";
 
 // Apply the default theme synchronously before mount so the first paint has
 // all themable tokens defined. The settings loader may overwrite this with

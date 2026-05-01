@@ -2,6 +2,7 @@ import { type Component, For, Show, createEffect, createSignal, onCleanup } from
 import { formatRelative } from "../lib/format";
 import { api } from "../lib/tauri";
 import type { AiCall, AiCallsCursor, AiStats } from "../lib/types";
+import { Badge, Button, IconButton } from "./ui";
 
 type Props = {
   open: boolean;
@@ -93,15 +94,10 @@ export const AIActivityDialog: Component<Props> = (props) => {
                 AI activity
               </h2>
               <Show when={stats()}>
-                {(s) => <span class="nz-trash-count">{s().total_calls}</span>}
+                {(s) => <Badge variant="neutral">{s().total_calls}</Badge>}
               </Show>
             </div>
-            <button
-              class="nz-trash-close"
-              aria-label="Close"
-              title="Close · esc"
-              onClick={props.onClose}
-            >
+            <IconButton size="sm" aria-label="Close" title="Close · esc" onClick={props.onClose}>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path
                   d="m3.5 3.5 7 7M10.5 3.5l-7 7"
@@ -110,7 +106,7 @@ export const AIActivityDialog: Component<Props> = (props) => {
                   stroke-linecap="round"
                 />
               </svg>
-            </button>
+            </IconButton>
           </header>
 
           <Show when={stats()}>
@@ -158,9 +154,9 @@ export const AIActivityDialog: Component<Props> = (props) => {
 
           <Show when={items().length > 0}>
             <footer class="nz-trash-footer">
-              <button class="nz-pill-btn danger" onClick={() => void handleClear()}>
+              <Button variant="danger" shape="pill" onClick={() => void handleClear()}>
                 {confirmClear() ? "Click again to confirm" : "Clear history"}
-              </button>
+              </Button>
             </footer>
           </Show>
         </div>

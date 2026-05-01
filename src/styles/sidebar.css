@@ -1,34 +1,58 @@
+/* Sidebar floats as a card on the app canvas, mirroring the chrome of
+   `.nz-pane`. Same hairline border + lg radius + shadow rhythm so the
+   eye reads sidebar and pane(s) as siblings rather than as "rail vs
+   content". */
 .nz-sidebar {
   display: flex;
   flex-direction: column;
-  background: var(--nz-bg-sidebar);
-  border-right: 1px solid var(--nz-divider);
+  /* Cards (sidebar + panes + settings) all paint `--nz-bg-card` so they
+     lift slightly above the `.nz-app` canvas (`--nz-bg-app`). Two
+     variables, two paint locations - update either in the theme JSON to
+     retint canvas vs. cards independently. The values are tuned so the
+     differential reads as "lifted" without becoming a hard step. */
+  background: var(--nz-bg-card);
+  border: 1px solid var(--nz-divider);
+  border-radius: var(--nz-radius-lg);
+  box-shadow: var(--nz-shadow-sm);
   min-width: 0;
   overflow: hidden;
 }
 
 .nz-sidebar.collapsed {
   width: 0;
-  border-right: none;
+  border: 0;
+  box-shadow: none;
 }
 
-/* macOS draggable region above the brand row, sized to clear the
- * traffic-light cluster. */
-.nz-sidebar-titlebar {
-  flex: 0 0 18px;
-}
+/* The header row sits at the very top of the sidebar and shares its
+   horizontal row with the macOS traffic-light cluster - the toggle button
+   on the left lines up against the green traffic-light, the new-note
+   button is anchored at the right edge.
 
+   Vertical alignment is anchored to the traffic-light cluster: top-aligned
+   with a small `padding-top` so the button visual center lands at roughly
+   window y=18-20, where the lights actually render (Tauri's
+   `trafficLightPosition.y` reads as a vertical center on macOS, not the
+   top of the cluster). 44px row height matches `.nz-main-header` so the
+   two top bars read as a single band; 80px left padding reserves the
+   cluster's horizontal footprint. */
 .nz-sidebar-header {
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 4px 12px 8px 80px;
-  height: 32px;
+  align-items: flex-start;
+  gap: var(--nz-space-4);
+  padding: 3px var(--nz-space-8) 0 80px;
+  height: 44px;
+  flex: 0 0 44px;
+}
+
+.nz-sidebar-header-spacer {
+  flex: 1 1 auto;
+  height: 100%;
 }
 
 /* ─── Search trigger (opens command bar) ─── */
 .nz-sidebar-search {
-  padding: 4px 10px 8px;
+  padding: var(--nz-space-4) var(--nz-space-10) var(--nz-space-8);
   flex: 0 0 auto;
 }
 
@@ -36,19 +60,19 @@
   display: flex;
   width: 100%;
   align-items: center;
-  gap: 8px;
-  height: 30px;
-  padding: 0 9px;
+  gap: var(--nz-space-8);
+  height: var(--nz-space-32);
+  padding: 0 var(--nz-space-8);
   border-radius: var(--nz-radius-md);
   background: var(--nz-bg-row);
   border: 1px solid var(--nz-divider);
   color: var(--nz-text-faint);
-  font-size: 12.5px;
+  font-size: var(--nz-text-md);
   font-weight: 500;
   letter-spacing: -0.005em;
   cursor: text;
-  transition: background 100ms var(--nz-ease), border-color 100ms var(--nz-ease), color 100ms
-    var(--nz-ease);
+  transition: background var(--nz-dur-fast) var(--nz-ease), border-color var(--nz-dur-fast)
+    var(--nz-ease), color var(--nz-dur-fast) var(--nz-ease);
 }
 
 .nz-search-trigger:hover {
@@ -70,13 +94,13 @@
 
 .nz-search-trigger-kbd {
   font-family: var(--nz-font-mono);
-  font-size: 10.5px;
+  font-size: var(--nz-text-xxs);
   font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--nz-text-whisper);
   background: transparent;
-  padding: 1px 5px;
-  border-radius: 4px;
+  padding: var(--nz-space-2) var(--nz-space-4);
+  border-radius: var(--nz-radius-xs);
   border: 1px solid var(--nz-divider);
 }
 
@@ -91,14 +115,14 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 0 6px 4px;
+  padding: 0 var(--nz-space-6) var(--nz-space-4);
 }
 
 .nz-pinned-region {
   flex: 0 0 auto;
   max-height: 36%;
   overflow-y: auto;
-  padding-bottom: 4px;
+  padding-bottom: var(--nz-space-4);
 }
 
 .nz-others-region {
@@ -110,7 +134,7 @@
 
 .nz-section-label,
 .nz-bucket-header {
-  font-size: 10px;
+  font-size: var(--nz-text-xxs);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -120,7 +144,7 @@
 }
 
 .nz-section-label {
-  margin: 8px 8px 4px;
+  margin: var(--nz-space-8) var(--nz-space-8) var(--nz-space-4);
 }
 
 /* Header row inside the virtualized list — sits at row offset, so layout
@@ -128,7 +152,7 @@
 .nz-bucket-header {
   display: flex;
   align-items: flex-end;
-  padding: 14px 8px 6px;
+  padding: var(--nz-space-14) var(--nz-space-8) var(--nz-space-6);
   height: 100%;
   box-sizing: border-box;
 }
@@ -167,25 +191,28 @@
 }
 
 .nz-others-mvlist {
-  margin: 0 -2px;
-  padding: 0 2px;
+  margin: 0 calc(var(--nz-space-2) * -1);
+  padding: 0 var(--nz-space-2);
 }
 
 /* ─── Note rows ─── */
 .nz-note-item {
   position: relative;
-  padding: 7px 10px;
+  padding: var(--nz-space-8) var(--nz-space-10);
   border-radius: var(--nz-radius-md);
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  transition: background 90ms var(--nz-ease);
+  gap: var(--nz-space-2);
+  transition: background var(--nz-dur-fast) var(--nz-ease);
   margin: 0;
   box-sizing: border-box;
 }
 
 .nz-note-list .nz-note-item + .nz-note-item {
+  /* 1px hairline between rows: enough to break visual continuity without
+     introducing the gap-rhythm of a list. Snapping to 2px makes the
+     sidebar read as "loose" instead of "dense reference panel". */
   margin-top: 1px;
 }
 
@@ -205,7 +232,8 @@
  * position (e.g. a Yesterday note rolling into Today after an edit). The
  * animation is small and quick so it reads as confirmation rather than
  * decoration. Uses the row's own background so .selected stays correct
- * after the animation finishes. */
+ * after the animation finishes. 600ms is intentionally longer than the
+ * standard transition scale - this is a celebration, not a state change. */
 .nz-note-item.just-moved {
   animation: nz-note-just-moved 600ms var(--nz-ease);
 }
@@ -234,16 +262,18 @@
   }
 }
 
-/* Selected row indicator: stacked dots echoing the brand mark. */
+/* Selected row indicator: a 3px-wide accent stripe peeking from the row's
+ * left edge. 3px is chosen against the brand-mark dot weight, not the
+ * spacing scale. */
 .nz-note-item.selected::before {
   content: "";
   position: absolute;
-  left: -2px;
+  left: calc(var(--nz-space-2) * -1);
   top: 50%;
   transform: translateY(-50%);
   width: 3px;
-  height: 18px;
-  border-radius: 999px;
+  height: var(--nz-space-20);
+  border-radius: var(--nz-radius-pill);
   background: var(--nz-accent);
   box-shadow: 0 0 8px var(--nz-accent-glow);
 }
@@ -251,12 +281,12 @@
 .nz-note-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--nz-space-6);
   min-width: 0;
 }
 
 .nz-note-title {
-  font-size: 13px;
+  font-size: var(--nz-text-base);
   font-weight: 600;
   letter-spacing: -0.005em;
   color: var(--nz-text-strong);
@@ -276,7 +306,7 @@
 }
 
 .nz-note-meta {
-  font-size: 11.5px;
+  font-size: var(--nz-text-sm);
   color: var(--nz-text-faint);
   display: block;
   font-variant-numeric: tabular-nums;
@@ -305,8 +335,8 @@
 .nz-note-time {
   flex-shrink: 0;
   margin-left: auto;
-  padding-left: 8px;
-  font-size: 11px;
+  padding-left: var(--nz-space-8);
+  font-size: var(--nz-text-xs);
   color: var(--nz-text-muted);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
@@ -324,19 +354,19 @@
 }
 
 .nz-empty-state {
-  margin: 28px 14px;
+  margin: var(--nz-space-28) var(--nz-space-14);
   text-align: center;
   color: var(--nz-text-muted);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
-  animation: nz-fade-in 220ms var(--nz-ease);
+  gap: var(--nz-space-14);
+  animation: nz-fade-in var(--nz-dur-medium) var(--nz-ease);
 }
 
 .nz-empty-state p {
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--nz-text-md);
   letter-spacing: -0.005em;
 }
 
@@ -344,19 +374,19 @@
 .nz-trash-row {
   display: flex;
   align-items: center;
-  gap: 9px;
-  width: calc(100% - 12px);
-  margin: 4px 6px 2px;
-  padding: 7px 10px;
+  gap: var(--nz-space-8);
+  width: calc(100% - var(--nz-space-12));
+  margin: var(--nz-space-4) var(--nz-space-6) var(--nz-space-2);
+  padding: var(--nz-space-8) var(--nz-space-10);
   border-radius: var(--nz-radius-md);
   background: transparent;
   border: 0;
   cursor: pointer;
   color: var(--nz-text-muted);
-  font-size: 13px;
+  font-size: var(--nz-text-base);
   font-weight: 500;
   letter-spacing: -0.005em;
-  transition: background 90ms var(--nz-ease), color 90ms var(--nz-ease);
+  transition: background var(--nz-dur-fast) var(--nz-ease), color var(--nz-dur-fast) var(--nz-ease);
 }
 
 .nz-trash-row:hover {
@@ -371,14 +401,14 @@
 
 .nz-trash-row-count {
   font-family: var(--nz-font-mono);
-  font-size: 10.5px;
+  font-size: var(--nz-text-xxs);
   font-weight: 600;
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
   background: var(--nz-bg-row);
   color: var(--nz-text-faint);
-  padding: 1px 7px;
-  border-radius: 999px;
+  padding: var(--nz-space-2) var(--nz-space-8);
+  border-radius: var(--nz-radius-pill);
   border: 1px solid var(--nz-divider);
   line-height: 1.5;
 }
@@ -386,30 +416,25 @@
 /* ─── Footer ─── */
 .nz-sidebar-footer {
   flex: 0 0 auto;
-  padding: 4px 12px 12px;
+  padding: var(--nz-space-4) var(--nz-space-12) var(--nz-space-12);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-}
-
-.nz-settings-button {
-  width: 24px;
-  height: 24px;
+  gap: var(--nz-space-8);
 }
 
 .nz-version-button {
   font-family: var(--nz-font-mono);
-  font-size: 10.5px;
+  font-size: var(--nz-text-xxs);
   font-weight: 500;
   letter-spacing: 0.02em;
   color: var(--nz-text-whisper);
   background: transparent;
   border: 0;
-  padding: 4px 6px;
-  border-radius: 6px;
+  padding: var(--nz-space-4) var(--nz-space-6);
+  border-radius: var(--nz-radius-sm);
   cursor: pointer;
-  transition: color 100ms var(--nz-ease), background 100ms var(--nz-ease);
+  transition: color var(--nz-dur-fast) var(--nz-ease), background var(--nz-dur-fast) var(--nz-ease);
 }
 
 .nz-version-button:hover {
@@ -440,7 +465,7 @@
   inset: 0 auto 0 0;
   width: var(--nz-update-progress);
   background: rgba(31, 136, 61, 0.32);
-  transition: width 120ms var(--nz-ease);
+  transition: width var(--nz-dur-fast) var(--nz-ease);
   z-index: -1;
   pointer-events: none;
 }
@@ -489,15 +514,15 @@
 .nz-version-button-checking {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--nz-space-4);
   cursor: progress;
   color: var(--nz-text-faint);
   background: var(--nz-bg-hover);
 }
 
 .nz-version-spinner {
-  width: 9px;
-  height: 9px;
+  width: var(--nz-space-10);
+  height: var(--nz-space-10);
   border-radius: 50%;
   border: 1.2px solid currentColor;
   border-top-color: transparent;
@@ -521,34 +546,34 @@
   display: flex;
   flex-direction: column;
   border-bottom: 1px solid transparent;
-  margin: 0 0 4px;
+  margin: 0 0 var(--nz-space-4);
 }
 
 .nz-folders.open {
   border-bottom-color: var(--nz-divider);
-  padding-bottom: 6px;
+  padding-bottom: var(--nz-space-6);
 }
 
 .nz-folders-bar {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 6px 2px 8px;
-  min-height: 26px;
+  gap: var(--nz-space-4);
+  padding: var(--nz-space-2) var(--nz-space-6) var(--nz-space-2) var(--nz-space-8);
+  min-height: var(--nz-space-28);
 }
 
 .nz-folders-toggle {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--nz-space-6);
   flex: 1 1 auto;
   min-width: 0;
-  padding: 4px 6px;
+  padding: var(--nz-space-4) var(--nz-space-6);
   border: 0;
   background: transparent;
   color: var(--nz-text-faint);
   font: inherit;
-  font-size: 11.5px;
+  font-size: var(--nz-text-sm);
   font-weight: 500;
   text-align: left;
   border-radius: var(--nz-radius-sm);
@@ -565,10 +590,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 12px;
+  width: var(--nz-space-12);
   color: var(--nz-text-whisper);
   transition: transform var(--nz-dur) var(--nz-ease);
-  flex: 0 0 12px;
+  flex: 0 0 var(--nz-space-12);
 }
 
 .nz-folders-chevron.open {
@@ -583,45 +608,51 @@
   min-width: 0;
 }
 
-.nz-folder-add {
-  flex: 0 0 22px;
-  width: 22px;
-  height: 22px;
-}
-
 .nz-folders-tree {
   display: flex;
   flex-direction: column;
-  padding: 2px 6px 0;
+  padding: var(--nz-space-2) var(--nz-space-6) 0;
+  /* 1px between folder rows: tightest readable rhythm. Anything larger
+     would make the tree feel like a list of cards. */
   gap: 1px;
 }
 
 .nz-folder-row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--nz-space-6);
   width: 100%;
-  min-height: 24px;
-  padding: 3px 6px 3px calc(8px + 12px * var(--folder-depth, 0));
+  min-height: var(--nz-space-28);
+  /* Indent step: 12px per depth level, anchored at 8px base inset. */
+  padding: var(--nz-space-6) var(--nz-space-8) var(--nz-space-6)
+    calc(var(--nz-space-8) + var(--nz-space-12) * var(--folder-depth, 0));
   border: 0;
   background: transparent;
   color: var(--nz-text);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--nz-text-md);
+  font-weight: 500;
   text-align: left;
-  border-radius: var(--nz-radius-sm);
+  border-radius: var(--nz-radius-md);
   cursor: pointer;
   -webkit-app-region: no-drag;
+  transition: background var(--nz-dur-fast) var(--nz-ease), color var(--nz-dur-fast) var(--nz-ease);
 }
 
 .nz-folder-row:hover {
   background: var(--nz-bg-hover);
 }
 
+/* Active state stands on its own background tint - no border/shadow,
+ * since a hairline ring fights with the card-style row radius and reads
+ * as a "second container" inside the row. */
 .nz-folder-row.active {
-  background: var(--nz-accent-soft);
-  color: var(--nz-text);
-  box-shadow: inset 0 0 0 1px var(--nz-accent-glow);
+  background: var(--nz-bg-active);
+  color: var(--nz-text-strong);
+}
+
+.nz-folder-row.active:hover {
+  background: var(--nz-bg-active-strong);
 }
 
 /* Drop affordance during a note or folder drag. Subtler than the active
@@ -648,14 +679,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 12px;
-  height: 14px;
+  width: var(--nz-space-12);
+  height: var(--nz-space-14);
   border: 0;
   background: transparent;
   color: var(--nz-text-whisper);
   cursor: pointer;
   transition: transform var(--nz-dur) var(--nz-ease);
-  flex: 0 0 12px;
+  flex: 0 0 var(--nz-space-12);
   padding: 0;
 }
 
@@ -669,16 +700,16 @@
 }
 
 .nz-folder-row-spacer {
-  flex: 0 0 12px;
+  flex: 0 0 var(--nz-space-12);
 }
 
 .nz-folder-row-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
+  width: var(--nz-space-14);
   color: var(--nz-text-faint);
-  flex: 0 0 14px;
+  flex: 0 0 var(--nz-space-14);
 }
 
 .nz-folder-row.active .nz-folder-row-icon {
@@ -699,21 +730,28 @@
 
 .nz-folder-row-count {
   flex: 0 0 auto;
-  font-size: 10.5px;
-  color: var(--nz-text-whisper);
+  font-size: var(--nz-text-xs);
+  color: var(--nz-text-faint);
   font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding-left: var(--nz-space-6);
+}
+
+.nz-folder-row.active .nz-folder-row-count {
+  color: var(--nz-accent-hot);
 }
 
 .nz-folder-row-input {
   flex: 1 1 auto;
   min-width: 0;
-  padding: 1px 4px;
+  padding: var(--nz-space-2) var(--nz-space-4);
   border: 1px solid var(--nz-accent-glow);
-  background: var(--nz-bg-sidebar);
+  background: var(--nz-bg-row);
   color: var(--nz-text);
   font: inherit;
-  font-size: 12px;
-  border-radius: 4px;
+  font-size: var(--nz-text-md);
+  border-radius: var(--nz-radius-xs);
   outline: none;
 }
 
@@ -733,25 +771,25 @@
   border: 1px solid var(--nz-divider-strong);
   border-radius: var(--nz-radius-lg);
   box-shadow: var(--nz-shadow);
-  padding: 18px 20px 16px;
-  animation: nz-rise 140ms var(--nz-ease);
+  padding: var(--nz-space-16) var(--nz-space-20) var(--nz-space-16);
+  animation: nz-rise var(--nz-dur) var(--nz-ease);
 }
 
 .nz-delete-folder-header {
-  margin-bottom: 8px;
+  margin-bottom: var(--nz-space-8);
 }
 
 .nz-delete-folder-title {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--nz-text-xl);
   font-weight: 600;
   color: var(--nz-text-strong);
   letter-spacing: -0.01em;
 }
 
 .nz-delete-folder-blurb {
-  margin: 0 0 14px;
-  font-size: 13px;
+  margin: 0 0 var(--nz-space-14);
+  font-size: var(--nz-text-base);
   line-height: 1.45;
   color: var(--nz-text-faint);
 }
@@ -764,15 +802,15 @@
 .nz-delete-folder-options {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 14px;
+  gap: var(--nz-space-6);
+  margin-bottom: var(--nz-space-14);
 }
 
 .nz-delete-folder-option {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 10px 12px;
+  gap: var(--nz-space-2);
+  padding: var(--nz-space-10) var(--nz-space-12);
   border: 1px solid var(--nz-divider);
   background: transparent;
   border-radius: var(--nz-radius-md);
@@ -797,7 +835,7 @@
 }
 
 .nz-delete-folder-option-title {
-  font-size: 13.5px;
+  font-size: var(--nz-text-lg);
   font-weight: 500;
   color: var(--nz-text);
 }
@@ -807,48 +845,41 @@
 }
 
 .nz-delete-folder-option-sub {
-  font-size: 11.5px;
+  font-size: var(--nz-text-sm);
   color: var(--nz-text-faint);
 }
 
 .nz-delete-folder-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-}
-
-.nz-delete-folder-footer .nz-pill-btn.primary {
-  background: var(--nz-accent);
-  color: var(--nz-bg);
-}
-
-.nz-delete-folder-footer .nz-pill-btn.primary:hover {
-  background: var(--nz-accent-hot, var(--nz-accent));
-  filter: brightness(1.05);
+  gap: var(--nz-space-8);
 }
 
 /* Inline folder picker shown when "Move to a different folder" is chosen. */
 .nz-folder-picker {
-  margin-top: 10px;
+  margin-top: var(--nz-space-10);
   max-height: 220px;
   overflow-y: auto;
   border-top: 1px solid var(--nz-divider);
-  padding-top: 8px;
+  padding-top: var(--nz-space-8);
   display: flex;
   flex-direction: column;
+  /* 1px between picker rows: same rationale as the folder tree above. */
   gap: 1px;
 }
 
 .nz-folder-picker-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 8px 5px calc(8px + 12px * var(--folder-depth, 0));
+  gap: var(--nz-space-6);
+  /* Indent step matches .nz-folder-row so the picker reads as the tree. */
+  padding: var(--nz-space-4) var(--nz-space-8) var(--nz-space-4)
+    calc(var(--nz-space-8) + var(--nz-space-12) * var(--folder-depth, 0));
   border: 0;
   background: transparent;
   color: var(--nz-text);
   font: inherit;
-  font-size: 12.5px;
+  font-size: var(--nz-text-md);
   text-align: left;
   border-radius: var(--nz-radius-sm);
   cursor: pointer;

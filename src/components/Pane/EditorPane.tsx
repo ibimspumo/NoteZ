@@ -45,7 +45,14 @@ export const EditorPane: Component<Props> = (props) => {
   return (
     <div
       class="nz-pane"
-      classList={{ active: activePaneId() === props.pane.id }}
+      classList={{
+        active: activePaneId() === props.pane.id,
+        // Only mark "this pane needs an active-state ring" when the layout
+        // actually has more than one pane. With a single pane, there's no
+        // ambiguity about where the user is - the accent border is just
+        // visual noise.
+        "multi-pane": props.showChrome,
+      }}
       onMouseDown={handleActivate}
       onFocusIn={handleActivate}
     >

@@ -1,11 +1,14 @@
 /* Pane host: replaces the direct EditorPane child of nz-main. Owns the
-   remaining vertical space below the header. */
+   remaining vertical space below the header. Outer breathing (left,
+   right, bottom) is provided by `.nz-app`'s grid padding + gap, so this
+   only needs the top inset between header and the first pane card. */
 .nz-pane-host {
   flex: 1 1 auto;
   display: flex;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  padding-top: var(--nz-space-6);
 }
 .nz-pane-host > * {
   flex: 1 1 auto;
@@ -40,8 +43,9 @@
   min-height: 0;
 }
 
-/* Individual pane (leaf). Position relative so the drop overlay can
-   absolute-position over it. */
+/* Individual pane (leaf). Floats as a card on the host canvas: 1px
+   hairline border + lg radius + a barely-there shadow. Position relative
+   so the drop overlay can absolute-position over it. */
 .nz-pane {
   position: relative;
   display: flex;
@@ -49,31 +53,42 @@
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
-  background: var(--nz-bg-main);
+  /* All cards paint `--nz-bg-card` so they lift above the `.nz-app`
+     canvas (`--nz-bg-app`) - see the comment on `.nz-sidebar` for the
+     two-variable rationale. */
+  background: var(--nz-bg-card);
+  border: 1px solid var(--nz-divider);
+  border-radius: var(--nz-radius-lg);
+  box-shadow: var(--nz-shadow-sm);
   overflow: hidden;
-  transition: box-shadow 140ms var(--nz-ease);
+  transition: border-color var(--nz-dur) var(--nz-ease), box-shadow var(--nz-dur) var(--nz-ease);
   container: nz-pane / inline-size;
 }
 
-/* Active-pane affordance. Only visible when there's more than one pane -
-   in single-pane mode the inset shadow would just look like a stray border. */
-.nz-pane:has(+ .nz-pane-splitter),
-.nz-pane-splitter ~ .nz-pane {
-  /* placeholder selector intentionally left blank */
+/* Active pane (multi-pane mode only). The accent-glow border lifts the
+   focused card without recoloring its surface, so reading stays calm
+   - the border is the only thing that says "this is the live one".
+   Single-pane layouts skip this entirely: with one pane, there's nothing
+   to disambiguate, and the ring would just be visual noise. */
+.nz-pane.active.multi-pane {
+  border-color: var(--nz-accent-glow);
 }
-.nz-pane.active .nz-pane-header {
-  background: var(--nz-bg-row);
+
+.nz-pane.active.multi-pane .nz-pane-header {
   color: var(--nz-text);
 }
 
 /* Per-pane header. Hidden when there's only one pane (controlled at the
-   tree level, not here). */
+   tree level, not here). 30px matches the tab-strip height exactly so
+   single-tab and multi-tab panes have identical chrome height - no 2px
+   jump in editor-content top-position when the user switches between
+   one and many tabs. */
 .nz-pane-header {
-  flex: 0 0 28px;
+  flex: 0 0 30px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 8px 0 12px;
+  gap: var(--nz-space-6);
+  padding: 0 var(--nz-space-8) 0 var(--nz-space-12);
   border-bottom: 1px solid var(--nz-divider);
   font-size: var(--nz-text-sm);
   color: var(--nz-text-muted);
@@ -97,13 +112,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: var(--nz-space-20);
+  height: var(--nz-space-20);
   border-radius: var(--nz-radius-sm);
-  font-size: 16px;
+  font-size: var(--nz-text-xl);
   line-height: 1;
   color: var(--nz-text-faint);
-  transition: background 100ms var(--nz-ease), color 100ms var(--nz-ease);
+  transition: background var(--nz-dur-fast) var(--nz-ease), color var(--nz-dur-fast) var(--nz-ease);
 }
 .nz-pane-header-close:hover {
   background: var(--nz-bg-hover);
@@ -117,6 +132,8 @@
   --nz-tab-wunsch: 140px;
   --nz-tab-min: 80px;
   --nz-tab-active-min: 120px;
+  /* 30px tab strip height: just enough room for a tab title + close icon
+     without crowding. Tracks browser-tab convention, not the spacing scale. */
   flex: 0 0 30px;
   display: flex;
   align-items: stretch;
@@ -143,26 +160,26 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--nz-space-6);
   /* Wunsch-Breite (140px) cap, gleichmäßig schrumpfen bis min-width (80px),
      dann horizontal scroll. */
   flex: 1 1 var(--nz-tab-wunsch);
   max-width: var(--nz-tab-wunsch);
   min-width: var(--nz-tab-min);
-  padding: 0 8px 0 12px;
+  padding: 0 var(--nz-space-8) 0 var(--nz-space-12);
   font-size: var(--nz-text-sm);
   color: var(--nz-text-muted);
   cursor: pointer;
   border-right: 1px solid var(--nz-divider);
   background: transparent;
-  transition: background 100ms var(--nz-ease), color 100ms var(--nz-ease);
+  transition: background var(--nz-dur-fast) var(--nz-ease), color var(--nz-dur-fast) var(--nz-ease);
 }
 .nz-pane-tab:hover {
   background: var(--nz-bg-hover);
   color: var(--nz-text);
 }
 .nz-pane-tab.active {
-  background: var(--nz-bg-main);
+  background: var(--nz-bg-card);
   color: var(--nz-text-strong);
   /* The active tab keeps a generous min so it stays legible even when the
      strip is heavily compressed. */
@@ -171,7 +188,8 @@
 }
 .nz-pane-tab.active::after {
   /* Subtle accent line at the top of the active tab - reads "this is the one"
-     without needing a heavy color block. */
+     without needing a heavy color block. 2px chosen to match the system
+     "selection indicator" weight in macOS toolbars. */
   content: "";
   position: absolute;
   top: 0;
@@ -204,10 +222,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: var(--nz-space-16);
+  height: var(--nz-space-16);
   border-radius: var(--nz-radius-sm);
-  font-size: 14px;
+  font-size: var(--nz-text-lg);
   line-height: 1;
   color: var(--nz-text-faint);
   flex: 0 0 auto;
@@ -215,8 +233,8 @@
      Browser-tab convention: keep the strip visually quiet and only show
      close-affordances when the user is actually engaging with a tab. */
   opacity: 0;
-  transition: background 100ms var(--nz-ease), color 100ms var(--nz-ease), opacity 80ms
-    var(--nz-ease);
+  transition: background var(--nz-dur-fast) var(--nz-ease), color var(--nz-dur-fast) var(--nz-ease),
+    opacity var(--nz-dur-instant) var(--nz-ease);
 }
 .nz-pane-tab:hover .nz-pane-tab-close,
 .nz-pane-tab.active .nz-pane-tab-close {
@@ -228,7 +246,7 @@
 }
 .nz-pane-tabs-new,
 .nz-pane-tabs-dropdown-trigger {
-  flex: 0 0 28px;
+  flex: 0 0 var(--nz-space-28);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -238,7 +256,7 @@
   border: none;
   border-left: 1px solid var(--nz-divider);
   cursor: pointer;
-  transition: background 100ms var(--nz-ease), color 100ms var(--nz-ease);
+  transition: background var(--nz-dur-fast) var(--nz-ease), color var(--nz-dur-fast) var(--nz-ease);
 }
 .nz-pane-tabs-new:hover,
 .nz-pane-tabs-dropdown-trigger:hover {
@@ -247,7 +265,7 @@
 }
 .nz-pane-tabs-dropdown {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + var(--nz-space-4));
   right: 0;
   z-index: 30;
   min-width: 220px;
@@ -256,15 +274,15 @@
   border: 1px solid var(--nz-divider);
   border-radius: var(--nz-radius-md);
   box-shadow: var(--nz-shadow);
-  padding: 6px;
+  padding: var(--nz-space-6);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--nz-space-4);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
 .nz-pane-tabs-dropdown-filter {
-  padding: 6px 8px;
+  padding: var(--nz-space-6) var(--nz-space-8);
   border: 1px solid var(--nz-divider);
   border-radius: var(--nz-radius-sm);
   background: var(--nz-bg-row);
@@ -284,7 +302,7 @@
 }
 .nz-pane-tabs-dropdown-row {
   text-align: left;
-  padding: 6px 8px;
+  padding: var(--nz-space-6) var(--nz-space-8);
   border-radius: var(--nz-radius-sm);
   font-size: var(--nz-text-md);
   color: var(--nz-text);
@@ -307,7 +325,7 @@
   white-space: nowrap;
 }
 .nz-pane-tabs-dropdown-empty {
-  padding: 12px 8px;
+  padding: var(--nz-space-12) var(--nz-space-8);
   font-size: var(--nz-text-sm);
   color: var(--nz-text-faint);
   text-align: center;
@@ -341,7 +359,9 @@
    grab on a vertical drag - the row case got away with it because a 4px
    *wide* full-height strip is still easy to land on. */
 .nz-pane-splitter {
-  flex: 0 0 4px;
+  /* 6px to match the host's outside padding - the gap between adjacent
+     cards reads identically to the gap from a card to the window edge. */
+  flex: 0 0 var(--nz-space-6);
   position: relative;
   z-index: 2;
   background: transparent;
@@ -352,19 +372,25 @@
 .nz-pane-splitter.column {
   cursor: row-resize;
 }
+/* Idle: invisible. The 6px gap + the 1px card borders on either side
+   already supply enough visual separation, so the divider line would
+   just be a third stripe in the gap. On hover / active drag the line
+   appears as a 2px pill centered in the 6px splitter. */
 .nz-pane-splitter::before {
   content: "";
   position: absolute;
-  inset: 0;
-  background: var(--nz-divider);
-  transition: background 120ms var(--nz-ease);
+  inset: var(--nz-space-2);
+  border-radius: var(--nz-radius-pill);
+  background: transparent;
+  transition: background var(--nz-dur-fast) var(--nz-ease);
   pointer-events: none;
 }
 /* Invisible expanded hit zone. Pointer events on the pseudo route to the
    originating element, so a 12px-wide grab target overlays the 4px line
    without affecting layout. The cells around it have `overflow: hidden`
    but live as siblings of the splitter inside `.nz-split`, so the ::after
-   sits cleanly above them in the splitter's stacking context. */
+   sits cleanly above them in the splitter's stacking context. The -4px
+   inset matches the splitter's own 4px width, mirroring it on both sides. */
 .nz-pane-splitter::after {
   content: "";
   position: absolute;
@@ -406,7 +432,7 @@ body.nz-resizing [data-tauri-drag-region] {
 }
 .nz-pane-drop-highlight {
   position: absolute;
-  inset: 6px;
+  inset: var(--nz-space-6);
   border: 1.5px solid var(--nz-accent);
   border-radius: var(--nz-radius-md);
   background: var(--nz-accent-soft);
@@ -414,7 +440,7 @@ body.nz-resizing [data-tauri-drag-region] {
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  transition: inset 80ms var(--nz-ease);
+  transition: inset var(--nz-dur-instant) var(--nz-ease);
 }
 .nz-pane-drop-highlight[data-zone="left"] {
   right: 50%;
@@ -432,7 +458,7 @@ body.nz-resizing [data-tauri-drag-region] {
   background: var(--nz-bg-overlay);
   border: 1px solid var(--nz-divider-strong);
   border-radius: var(--nz-radius-sm);
-  padding: 4px 10px;
+  padding: var(--nz-space-4) var(--nz-space-10);
   font-size: var(--nz-text-md);
   color: var(--nz-text);
   backdrop-filter: blur(12px);
@@ -447,7 +473,7 @@ body.nz-resizing [data-tauri-drag-region] {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: var(--nz-space-24);
 }
 .nz-empty-pane-shell {
   width: 100%;
@@ -455,10 +481,10 @@ body.nz-resizing [data-tauri-drag-region] {
   background: var(--nz-bg-elev);
   border: 1px solid var(--nz-divider);
   border-radius: var(--nz-radius-md);
-  padding: 6px;
+  padding: var(--nz-space-6);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--nz-space-2);
   box-shadow: var(--nz-shadow);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -466,8 +492,8 @@ body.nz-resizing [data-tauri-drag-region] {
 .nz-empty-pane-input-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
+  gap: var(--nz-space-8);
+  padding: var(--nz-space-6) var(--nz-space-8);
   border: 1px solid var(--nz-divider);
   border-radius: var(--nz-radius-sm);
   background: var(--nz-bg-row);
@@ -487,7 +513,7 @@ body.nz-resizing [data-tauri-drag-region] {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--nz-text-faint);
-  padding: 8px 8px 2px;
+  padding: var(--nz-space-8) var(--nz-space-8) var(--nz-space-2);
 }
 .nz-empty-pane-results {
   display: flex;
@@ -499,8 +525,8 @@ body.nz-resizing [data-tauri-drag-region] {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 7px 10px;
+  gap: var(--nz-space-8);
+  padding: var(--nz-space-8) var(--nz-space-10);
   border-radius: var(--nz-radius-sm);
   font-size: var(--nz-text-md);
   color: var(--nz-text);
@@ -526,14 +552,14 @@ body.nz-resizing [data-tauri-drag-region] {
   font-variant-numeric: tabular-nums;
 }
 .nz-empty-pane-empty {
-  padding: 12px 10px;
+  padding: var(--nz-space-12) var(--nz-space-10);
   font-size: var(--nz-text-md);
   color: var(--nz-text-faint);
   text-align: center;
 }
 .nz-empty-pane-create {
-  margin-top: 4px;
-  padding: 7px 10px;
+  margin-top: var(--nz-space-4);
+  padding: var(--nz-space-8) var(--nz-space-10);
   border-radius: var(--nz-radius-sm);
   background: var(--nz-bg-row);
   border: 1px solid var(--nz-divider);
@@ -542,7 +568,8 @@ body.nz-resizing [data-tauri-drag-region] {
   font-family: inherit;
   text-align: center;
   cursor: pointer;
-  transition: background 100ms var(--nz-ease), border-color 100ms var(--nz-ease);
+  transition: background var(--nz-dur-fast) var(--nz-ease), border-color var(--nz-dur-fast)
+    var(--nz-ease);
 }
 .nz-empty-pane-create:hover {
   background: var(--nz-bg-hover);
@@ -599,14 +626,14 @@ body.nz-resizing [data-tauri-drag-region] {
 .nz-note-item.open-elsewhere::before {
   content: "";
   position: absolute;
-  left: 2px;
+  left: var(--nz-space-2);
   top: 50%;
   transform: translateY(-50%);
-  width: 2px;
+  width: var(--nz-space-2);
   height: 50%;
   background: var(--nz-accent);
   opacity: 0.5;
-  border-radius: 2px;
+  border-radius: var(--nz-radius-hairline);
   pointer-events: none;
 }
 .nz-note-item {

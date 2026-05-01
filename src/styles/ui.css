@@ -1,0 +1,334 @@
+/* ─────────────────────────────────────────────────────────────
+ * UI primitives. The single source of truth for buttons, inputs,
+ * badges, and keyboard chips. Components in `src/components/ui/`
+ * emit the BEM classes below; nothing else in the app should
+ * style `<button>` / `<input>` / pill-shaped chips ad-hoc.
+ *
+ * Naming: `.nz-<primitive>` for the base, `.nz-<primitive>--<variant>`
+ * for modifiers, `.is-<state>` for runtime states (active, loading).
+ * ────────────────────────────────────────────────────────────── */
+
+/* ─── Button ───────────────────────────────────────────────────
+ * The general-purpose actionable button.
+ *
+ * Variant matrix:
+ *   variant: secondary (default) | primary | danger | ghost
+ *   size:    sm | md (default)
+ *   shape:   rect (default) | pill
+ *
+ * Disabled state honors the native `:disabled` selector — no
+ * separate `.is-disabled` class — so HTML semantics carry the
+ * full meaning (screen readers, form submission gating). */
+.nz-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nz-space-6);
+  background: var(--nz-bg-row);
+  border: 1px solid var(--nz-divider);
+  color: var(--nz-text-strong);
+  font-family: var(--nz-font-ui);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  white-space: nowrap;
+  -webkit-appearance: none;
+  appearance: none;
+  transition:
+    background var(--nz-dur) var(--nz-ease), color var(--nz-dur) var(--nz-ease),
+    border-color var(--nz-dur) var(--nz-ease), transform var(--nz-dur-fast) var(--nz-ease),
+    box-shadow var(--nz-dur-medium) var(--nz-ease);
+}
+
+.nz-btn:hover:not(:disabled) {
+  background: var(--nz-bg-hover);
+  border-color: var(--nz-divider-strong);
+}
+
+.nz-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.nz-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.nz-btn:focus-visible {
+  outline: 2px solid var(--nz-focus-ring);
+  outline-offset: 1px;
+}
+
+/* Sizes. Padding is asymmetric (more horizontal than vertical) to
+ * match macOS button proportions - tall enough to read, wide enough
+ * for two-word labels without crowding. */
+.nz-btn--sm {
+  padding: var(--nz-space-4) var(--nz-space-10);
+  font-size: var(--nz-text-md);
+}
+
+.nz-btn--md {
+  padding: var(--nz-space-8) var(--nz-space-16);
+  font-size: var(--nz-text-base);
+}
+
+/* Shapes. Pill for in-flow CTAs, rect for utility actions in tool
+ * surfaces (dev panel, filter rows). */
+.nz-btn--rect {
+  border-radius: var(--nz-radius-md);
+}
+
+.nz-btn--pill {
+  border-radius: var(--nz-radius-pill);
+}
+
+/* Variants. The default `--secondary` deliberately has no extra
+ * rules — it's just `.nz-btn` itself. The class still exists so
+ * call sites can be explicit. */
+.nz-btn--secondary {
+  /* identity */
+}
+
+.nz-btn--primary {
+  background: var(--nz-accent);
+  /* #062e1d == near-black green that stays legible on the accent
+     across all themes. Hard-coded because it's not a palette token. */
+  color: #062e1d;
+  border-color: var(--nz-accent-hot);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.nz-btn--primary:hover:not(:disabled) {
+  background: var(--nz-accent-hot);
+  border-color: var(--nz-accent-hot);
+  box-shadow: 0 4px 14px var(--nz-accent-glow);
+}
+
+.nz-btn--danger {
+  color: var(--nz-danger);
+  border-color: rgba(213, 74, 58, 0.28);
+}
+
+.nz-btn--danger:hover:not(:disabled) {
+  background: rgba(213, 74, 58, 0.12);
+  border-color: var(--nz-danger);
+}
+
+.nz-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--nz-text-muted);
+}
+
+.nz-btn--ghost:hover:not(:disabled) {
+  background: var(--nz-bg-hover);
+  color: var(--nz-text-strong);
+  border-color: transparent;
+}
+
+/* ─── IconButton ───────────────────────────────────────────────
+ * Square icon-only or icon+label control. Used in toolbars,
+ * sidebar headers, dialog corners, and the editor formatting strip.
+ *
+ * Variant matrix:
+ *   size:    xs (20) | sm (24) | md (28, default)
+ *   --flex:  allow horizontal growth so icon+text combos fit
+ *   --toggle: enables the `.is-active` accent state
+ *
+ * Reaches for the system "compact control" feel - 28px tall is the
+ * smallest macOS toolbar button height that doesn't read as a
+ * "tap target" on touch displays. */
+.nz-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--nz-radius-sm);
+  color: var(--nz-text-muted);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  flex-shrink: 0;
+  padding: 0;
+  transition: background var(--nz-dur-fast) var(--nz-ease), color var(--nz-dur-fast) var(--nz-ease),
+    transform var(--nz-dur-instant) var(--nz-ease);
+}
+
+.nz-iconbtn:hover:not(:disabled) {
+  background: var(--nz-bg-hover);
+  color: var(--nz-text-strong);
+}
+
+.nz-iconbtn:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.nz-iconbtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.nz-iconbtn:focus-visible {
+  outline: 2px solid var(--nz-focus-ring);
+  outline-offset: 1px;
+}
+
+.nz-iconbtn--xs {
+  width: var(--nz-space-20);
+  height: var(--nz-space-20);
+  min-width: var(--nz-space-20);
+}
+
+.nz-iconbtn--sm {
+  width: var(--nz-space-24);
+  height: var(--nz-space-24);
+  min-width: var(--nz-space-24);
+}
+
+.nz-iconbtn--md {
+  width: var(--nz-space-28);
+  height: var(--nz-space-28);
+  min-width: var(--nz-space-28);
+}
+
+/* Allow horizontal growth for icon+label combos (e.g. the "H1"
+ * toolbar button). Width becomes content-driven; height stays
+ * locked to the size variant so the strip rhythm is preserved. */
+.nz-iconbtn--flex {
+  width: auto;
+  padding: 0 var(--nz-space-6);
+  gap: var(--nz-space-4);
+}
+
+/* Toggleable state. Opt-in via `--toggle` so non-toggle icon
+ * buttons (close, settings) don't grow `.is-active` styling by
+ * accident if a parent toggles a class. */
+.nz-iconbtn--toggle.is-active {
+  background: var(--nz-bg-active);
+  color: var(--nz-accent-hot);
+}
+
+.nz-iconbtn--toggle.is-active:hover:not(:disabled) {
+  background: var(--nz-bg-active-strong);
+}
+
+/* ─── Badge ────────────────────────────────────────────────────
+ * Small inline label - count chips, type markers, version pill.
+ * Always pill-shaped, always single-line. Use a Button if it's
+ * clickable; this is for static metadata. */
+.nz-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--nz-space-2) var(--nz-space-8);
+  border-radius: var(--nz-radius-pill);
+  font-size: var(--nz-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+  line-height: 1.5;
+}
+
+.nz-badge--neutral {
+  background: var(--nz-bg-hover);
+  color: var(--nz-text-muted);
+}
+
+.nz-badge--accent {
+  background: var(--nz-accent-soft);
+  color: var(--nz-accent-hot);
+}
+
+/* Mono variant for version strings, hashes, and other tabular IDs.
+ * Slightly smaller text so the monospace doesn't feel chunky next
+ * to surrounding sans-serif copy. */
+.nz-badge--mono {
+  background: var(--nz-bg-hover);
+  color: var(--nz-text-faint);
+  font-family: var(--nz-font-mono);
+  font-size: var(--nz-text-xxs);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+/* ─── Input ────────────────────────────────────────────────────
+ * Single-line text input. The same shell handles `<input>` and
+ * `<textarea>`; pass the right `tag` from the component layer.
+ *
+ * Variant matrix:
+ *   size:   sm (compact dialogs) | md (default forms)
+ *   --mono: monospace font for keys, paths, IDs */
+.nz-input {
+  display: block;
+  width: 100%;
+  background: var(--nz-bg-input, var(--nz-bg-hover));
+  border: 1px solid var(--nz-divider-strong);
+  color: var(--nz-text-strong);
+  font-family: var(--nz-font-ui);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: border-color var(--nz-dur-fast) var(--nz-ease);
+}
+
+.nz-input::placeholder {
+  color: var(--nz-text-faint);
+}
+
+.nz-input:focus {
+  border-color: var(--nz-accent-hot);
+  outline: 2px solid var(--nz-focus-ring);
+  outline-offset: -1px;
+}
+
+.nz-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.nz-input--sm {
+  padding: var(--nz-space-6) var(--nz-space-8);
+  border-radius: var(--nz-radius-sm);
+  font-size: var(--nz-text-md);
+}
+
+.nz-input--md {
+  padding: var(--nz-space-8) var(--nz-space-12);
+  border-radius: var(--nz-radius-md);
+  font-size: var(--nz-text-md);
+}
+
+.nz-input--mono {
+  font-family: var(--nz-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Kbd ──────────────────────────────────────────────────────
+ * Keyboard shortcut chip. The 20px height matches IconButton --xs
+ * so a row of "ESC | ↵ Save" hints reads visually balanced. */
+.nz-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--nz-space-20);
+  height: var(--nz-space-20);
+  padding: 0 var(--nz-space-4);
+  font-family: var(--nz-font-mono);
+  font-size: var(--nz-text-xxs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--nz-text-whisper);
+  background: transparent;
+  border: 1px solid var(--nz-divider);
+  border-radius: var(--nz-radius-xs);
+  user-select: none;
+  -webkit-user-select: none;
+}

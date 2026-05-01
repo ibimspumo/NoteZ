@@ -287,14 +287,35 @@ export function getEditorStateSnapshot(editor: LexicalEditor): unknown {
   return editor.getEditorState().toJSON();
 }
 
-export function loadEditorStateFromJSON(editor: LexicalEditor, json: string) {
+export type LoadEditorStateResult =
+  | { ok: true }
+  | { ok: false; reason: "empty" }
+  | { ok: false; reason: "parse_error"; error: unknown };
+
+/**
+ * Load a serialized Lexical state into an editor.
+ *
+ * IMPORTANT: This used to swallow parse errors silently and leave the editor
+ * blank. That was a data-loss bug - the next save in the pipeline would
+ * overwrite the on-disk `content_json` with an empty root paragraph because
+ * the editor "looked" empty. The caller now receives a typed result and is
+ * expected to put the editor into a read-only recovery state on `parse_error`,
+ * which the save pipeline must respect (no overwrite of broken-but-on-disk
+ * content).
+ */
+export function loadEditorStateFromJSON(
+  editor: LexicalEditor,
+  json: string,
+): LoadEditorStateResult {
   if (!json || json === "{}" || json.trim().length === 0) {
-    return;
+    return { ok: false, reason: "empty" };
   }
   try {
     const parsed = editor.parseEditorState(json);
     editor.setEditorState(parsed);
+    return { ok: true };
   } catch (e) {
-    console.warn("failed to parse editor state, leaving blank", e);
+    console.error("[Lexical] failed to parse editor state - editor in recovery mode", e);
+    return { ok: false, reason: "parse_error", error: e };
   }
 }

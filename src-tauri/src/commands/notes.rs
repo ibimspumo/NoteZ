@@ -56,8 +56,13 @@ pub fn get_note(db: State<Db>, id: String) -> Result<Note> {
     fetch_note(&conn, &id)
 }
 
+/// Returns the slim metadata for a saved note. We intentionally do NOT echo
+/// the `content_json` / `content_text` fields back: the renderer just sent
+/// them and already has them in memory, and on a multi-MB note that's the
+/// dominant bandwidth cost of the IPC. The frontend patches its in-memory
+/// cache with the values it had + the new metadata it gets back here.
 #[tauri::command]
-pub fn update_note(db: State<Db>, input: UpdateNoteInput) -> Result<Note> {
+pub fn update_note(db: State<Db>, input: UpdateNoteInput) -> Result<NoteSummary> {
     // Defense-in-depth: reject pathological inputs at the IPC boundary so a
     // buggy/compromised renderer can't blow up SQLite or the FTS index.
     if input.content_text.len() > MAX_NOTE_TEXT_BYTES {
@@ -89,9 +94,17 @@ pub fn update_note(db: State<Db>, input: UpdateNoteInput) -> Result<Note> {
     let tx = conn.transaction()?;
 
     let now = now_iso();
+    // Tolerant update: a save can race against a soft-delete (Cmd+Shift+
+    // Backspace + late-debounce). Previously the `AND deleted_at IS NULL`
+    // gate produced a NotFound error toast on a delete the user just asked
+    // for. We now update the row regardless of trash state - the trash UI
+    // re-shows the row's metadata, the FTS row stays in sync, and the user
+    // doesn't see a phantom "Saving failed". Truly-purged rows still hit
+    // the `updated == 0` path below and surface NotFound, which is the
+    // correct signal for "this note no longer exists".
     let updated = tx.execute(
         "UPDATE notes SET title = ?1, content_json = ?2, content_text = ?3, updated_at = ?4
-         WHERE id = ?5 AND deleted_at IS NULL",
+         WHERE id = ?5",
         rusqlite::params![input.title, input.content_json, input.content_text, now, input.id],
     )?;
     if updated == 0 {
@@ -99,21 +112,31 @@ pub fn update_note(db: State<Db>, input: UpdateNoteInput) -> Result<Note> {
     }
 
     tx.execute("DELETE FROM mentions WHERE source_note_id = ?1", rusqlite::params![input.id])?;
-    for target in &input.mention_target_ids {
-        if target == &input.id {
-            continue;
-        }
-        let exists: i64 = tx
-            .query_row(
-                "SELECT COUNT(1) FROM notes WHERE id = ?1 AND deleted_at IS NULL",
-                rusqlite::params![target],
-                |r| r.get(0),
-            )
-            .unwrap_or(0);
-        if exists > 0 {
+    if !input.mention_target_ids.is_empty() {
+        // Bulk insert via json_each: one round-trip even for hundreds of
+        // mentions on a single index-style note. The previous per-target
+        // SELECT+INSERT was 2N statements; this is 1.
+        //
+        // Pre-filter by UUID-shape: a malicious / buggy renderer can't waste
+        // FK-trip cycles by sending arbitrary 1 KB strings. UUIDs only.
+        let cleaned: Vec<&str> = input
+            .mention_target_ids
+            .iter()
+            .filter(|t| t.as_str() != input.id.as_str())
+            .filter(|t| Uuid::parse_str(t).is_ok())
+            .map(|s| s.as_str())
+            .collect();
+        if !cleaned.is_empty() {
+            let json = serde_json::to_string(&cleaned)?;
             tx.execute(
-                "INSERT OR IGNORE INTO mentions (source_note_id, target_note_id, created_at) VALUES (?1, ?2, ?3)",
-                rusqlite::params![input.id, target, now],
+                "INSERT OR IGNORE INTO mentions (source_note_id, target_note_id, created_at)
+                 SELECT ?1, value, ?2
+                 FROM json_each(?3)
+                 WHERE EXISTS(
+                     SELECT 1 FROM notes
+                     WHERE id = json_each.value AND deleted_at IS NULL
+                 )",
+                rusqlite::params![input.id, now, json],
             )?;
         }
     }
@@ -128,17 +151,28 @@ pub fn update_note(db: State<Db>, input: UpdateNoteInput) -> Result<Note> {
         rusqlite::params![input.id],
     )?;
     if !input.asset_ids.is_empty() {
-        let mut insert = tx.prepare(
-            "INSERT OR IGNORE INTO note_assets (note_id, asset_id)
-             SELECT ?1, ?2 WHERE EXISTS (SELECT 1 FROM assets WHERE id = ?2)",
-        )?;
-        for asset_id in &input.asset_ids {
-            insert.execute(rusqlite::params![input.id, asset_id])?;
+        // Asset ids are sha256 hex strings - filter to that shape so a
+        // compromised renderer can't poke at FK-validated SQL.
+        let cleaned: Vec<&str> = input
+            .asset_ids
+            .iter()
+            .filter(|s| s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit()))
+            .map(|s| s.as_str())
+            .collect();
+        if !cleaned.is_empty() {
+            let json = serde_json::to_string(&cleaned)?;
+            tx.execute(
+                "INSERT OR IGNORE INTO note_assets (note_id, asset_id)
+                 SELECT ?1, value
+                 FROM json_each(?2)
+                 WHERE EXISTS(SELECT 1 FROM assets WHERE id = json_each.value)",
+                rusqlite::params![input.id, json],
+            )?;
         }
     }
 
     tx.commit()?;
-    fetch_note(&conn, &input.id)
+    fetch_note_summary(&conn, &input.id)
 }
 
 /// Paginated active-notes listing.
@@ -283,15 +317,76 @@ pub fn purge_note(db: State<Db>, id: String) -> Result<()> {
     Ok(())
 }
 
+/// Return the subset of `ids` that still exist as alive (non-trashed) notes.
+/// Used by the frontend to prune the panes layout after bulk hard-deletes
+/// (`empty_trash`, `purge_old_trash`, dev "delete all generated") - any tab
+/// referencing an id that's no longer in the result set has its noteId
+/// nulled so the empty picker takes over instead of an editor stuck on a
+/// row that's gone from the DB.
+///
+/// Chunked at 500 ids per query to stay well under SQLite's bind-parameter
+/// cap (default 32k since 3.32, but we don't want to lean on that). The
+/// realistic upper bound is `MAX_PANES (8) × tabs-per-pane`, so a single
+/// chunk is almost always enough.
+#[tauri::command]
+pub fn notes_filter_existing(db: State<Db>, ids: Vec<String>) -> Result<Vec<String>> {
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    const CHUNK: usize = 500;
+    let conn = db.conn()?;
+    let mut alive: Vec<String> = Vec::with_capacity(ids.len());
+    for chunk in ids.chunks(CHUNK) {
+        let placeholders = vec!["?"; chunk.len()].join(",");
+        let sql = format!(
+            "SELECT id FROM notes WHERE deleted_at IS NULL AND id IN ({})",
+            placeholders
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let params: Vec<Value> = chunk.iter().map(|s| Value::from(s.clone())).collect();
+        let rows = stmt.query_map(rusqlite::params_from_iter(params), |r| r.get::<_, String>(0))?;
+        for r in rows {
+            alive.push(r?);
+        }
+    }
+    Ok(alive)
+}
+
+/// Batch size for bulk-delete loops in `empty_trash` / `purge_old_trash`.
+/// Each chunk commits before the next starts so writers (save pipeline,
+/// folder mutations) can interleave instead of waiting on a multi-second
+/// transaction at 100k+ rows. The FTS5 trigger fires once per row, so per-
+/// chunk overhead is fixed - smaller CHUNK = more interleave but more
+/// transactions; 250 mirrors the dev_generate_notes batch size that's
+/// already proven on-target.
+const TRASH_DELETE_CHUNK: i64 = 250;
+
 #[tauri::command]
 pub fn empty_trash(db: State<Db>) -> Result<u64> {
-    let conn = db.conn()?;
-    let n = conn.execute("DELETE FROM notes WHERE deleted_at IS NOT NULL", [])?;
+    let mut conn = db.conn()?;
+    let mut total: u64 = 0;
+    loop {
+        let tx = conn.transaction()?;
+        let n = tx.execute(
+            "DELETE FROM notes
+             WHERE id IN (
+                 SELECT id FROM notes
+                 WHERE deleted_at IS NOT NULL
+                 LIMIT ?1
+             )",
+            rusqlite::params![TRASH_DELETE_CHUNK],
+        )?;
+        tx.commit()?;
+        if n == 0 {
+            break;
+        }
+        total += n as u64;
+    }
     drop(conn);
     // Bulk delete - reclaim WAL pages so the working set doesn't bloat
     // (FTS triggers fired per row, that's a lot of journal traffic).
     let _ = wal_checkpoint(&db);
-    Ok(n as u64)
+    Ok(total)
 }
 
 /// Purge soft-deleted notes older than `days` days.
@@ -313,14 +408,35 @@ pub fn purge_old_trash(db: State<Db>, days: u32) -> Result<u64> {
             "purge_old_trash: days must be > 0 (use empty_trash to delete all)".into(),
         ));
     }
-    let conn = db.conn()?;
-    let n = conn.execute(
-        "DELETE FROM notes
-         WHERE deleted_at IS NOT NULL
-           AND julianday(deleted_at) < julianday('now', ?1)",
-        rusqlite::params![format!("-{} days", days)],
-    )?;
-    Ok(n as u64)
+    // Same batching reasoning as `empty_trash`: a single huge DELETE locks the
+    // writer for the full FTS-trigger fan-out at 100k+ stale rows. Chunked
+    // commits let the save pipeline interleave.
+    let cutoff_offset = format!("-{} days", days);
+    let mut conn = db.conn()?;
+    let mut total: u64 = 0;
+    loop {
+        let tx = conn.transaction()?;
+        let n = tx.execute(
+            "DELETE FROM notes
+             WHERE id IN (
+                 SELECT id FROM notes
+                 WHERE deleted_at IS NOT NULL
+                   AND julianday(deleted_at) < julianday('now', ?1)
+                 LIMIT ?2
+             )",
+            rusqlite::params![cutoff_offset, TRASH_DELETE_CHUNK],
+        )?;
+        tx.commit()?;
+        if n == 0 {
+            break;
+        }
+        total += n as u64;
+    }
+    drop(conn);
+    if total > 0 {
+        let _ = wal_checkpoint(&db);
+    }
+    Ok(total)
 }
 
 fn fetch_note(conn: &rusqlite::Connection, id: &str) -> Result<Note> {
@@ -349,6 +465,26 @@ fn fetch_note(conn: &rusqlite::Connection, id: &str) -> Result<Note> {
             other => NoteZError::Database(other),
         })?;
     Ok(note)
+}
+
+/// Slim metadata fetch for the post-save IPC. Returns just what the
+/// renderer needs to update its sidebar summary - no `content_json` and no
+/// `content_text` echo. The backend is also the canonical source of the
+/// `preview` (single-line, ellipsised, char-bounded), so the frontend's
+/// summary stays consistent across save vs. refresh paths.
+fn fetch_note_summary(conn: &rusqlite::Connection, id: &str) -> Result<NoteSummary> {
+    let summary = conn
+        .query_row(
+            "SELECT id, title, content_text, is_pinned, pinned_at, updated_at, folder_id
+             FROM notes WHERE id = ?1",
+            rusqlite::params![id],
+            |row| note_row_to_summary(conn, row),
+        )
+        .map_err(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => NoteZError::NotFound(id.to_string()),
+            other => NoteZError::Database(other),
+        })?;
+    Ok(summary)
 }
 
 fn clamp_limit(requested: Option<u32>, default: u32) -> u32 {

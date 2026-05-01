@@ -19,9 +19,8 @@
     "nz-danger": "#c63a2a",
 
     "nz-body-bg": "#f5f3ee",
-    "nz-bg-app": "rgba(252, 251, 249, 0.55)",
-    "nz-bg-sidebar": "rgba(250, 248, 244, 0.78)",
-    "nz-bg-main": "rgba(255, 254, 252, 0.82)",
+    "nz-bg-app": "rgba(250, 248, 244, 0.78)",
+    "nz-bg-card": "rgba(255, 255, 255, 0.85)",
     "nz-bg-elev": "rgba(255, 255, 255, 0.96)",
     "nz-bg-overlay": "rgba(255, 254, 252, 0.96)",
     "nz-bg-hover": "rgba(20, 20, 22, 0.06)",

@@ -1,23 +1,34 @@
 /* Full-page Settings view (replaces the editor pane). The model picker
    and other modals still use the .nz-settings-backdrop class below. */
 
+/* Settings replaces the pane area when open and inherits the same card
+   chrome (border + lg radius + shadow) so toggling Settings doesn't
+   change the visual paradigm of the right column - it's still a card on
+   the canvas, just one with a back button instead of pane tabs. */
 .nz-settings-view {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
-  background: var(--nz-bg-main);
+  /* Same as panes/sidebar: paint `--nz-bg-card` so the lift differential
+     against the `.nz-app` canvas matches across the whole app. */
+  background: var(--nz-bg-card);
+  border: 1px solid var(--nz-divider);
+  border-radius: var(--nz-radius-lg);
+  box-shadow: var(--nz-shadow-sm);
+  overflow: hidden;
   color: var(--nz-text);
-  animation: nz-fade-in 160ms var(--nz-ease);
+  animation: nz-fade-in var(--nz-dur) var(--nz-ease);
 }
 
 .nz-settings-view-header {
+  /* 44px == macOS standard control row height; matches .nz-main-header. */
   height: 44px;
   flex: 0 0 44px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 12px 0 8px;
+  gap: var(--nz-space-10);
+  padding: 0 var(--nz-space-12) 0 var(--nz-space-8);
   border-bottom: 1px solid var(--nz-divider);
   background: transparent;
 }
@@ -25,16 +36,16 @@
 .nz-settings-view-back {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 5px 10px 5px 8px;
+  gap: var(--nz-space-4);
+  padding: var(--nz-space-4) var(--nz-space-10) var(--nz-space-4) var(--nz-space-8);
   border: 0;
   background: transparent;
   border-radius: var(--nz-radius-sm);
   color: var(--nz-text-muted);
-  font-size: 12.5px;
+  font-size: var(--nz-text-md);
   font-weight: 500;
   cursor: pointer;
-  transition: background 140ms var(--nz-ease), color 140ms var(--nz-ease);
+  transition: background var(--nz-dur) var(--nz-ease), color var(--nz-dur) var(--nz-ease);
 }
 
 .nz-settings-view-back:hover {
@@ -44,7 +55,7 @@
 
 .nz-settings-view-title {
   margin: 0;
-  font-size: 13.5px;
+  font-size: var(--nz-text-lg);
   font-weight: 600;
   letter-spacing: -0.005em;
   color: var(--nz-text-strong);
@@ -60,14 +71,14 @@
   width: 100%;
   max-width: 720px;
   margin: 0 auto;
-  padding: 32px 40px 64px;
+  padding: var(--nz-space-32) var(--nz-space-40) var(--nz-space-64);
   display: flex;
   flex-direction: column;
 }
 
 @media (max-width: 720px) {
   .nz-settings-view-inner {
-    padding: 24px 20px 48px;
+    padding: var(--nz-space-24) var(--nz-space-20) var(--nz-space-48);
   }
 }
 
@@ -84,25 +95,25 @@
   background: rgba(0, 0, 0, 0.42);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  animation: nz-fade-in 160ms var(--nz-ease);
-  padding: 24px;
+  animation: nz-fade-in var(--nz-dur) var(--nz-ease);
+  padding: var(--nz-space-24);
 }
 
 .nz-settings-divider {
   height: 1px;
   background: var(--nz-divider);
-  margin: 22px 0;
+  margin: var(--nz-space-24) 0;
 }
 
 .nz-settings-section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--nz-space-12);
 }
 
 .nz-settings-section-header h3 {
-  margin: 0 0 4px;
-  font-size: 13px;
+  margin: 0 0 var(--nz-space-4);
+  font-size: var(--nz-text-base);
   font-weight: 600;
   letter-spacing: -0.005em;
   color: var(--nz-text-strong);
@@ -110,7 +121,7 @@
 
 .nz-settings-section-hint {
   margin: 0;
-  font-size: 11.5px;
+  font-size: var(--nz-text-sm);
   line-height: 1.45;
   color: var(--nz-text-muted);
 }
@@ -118,20 +129,20 @@
 .nz-settings-pill-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--nz-space-6);
 }
 
 .nz-settings-pill {
   border: 1px solid var(--nz-divider-strong);
   background: transparent;
   color: var(--nz-text-muted);
-  padding: 5px 12px;
-  border-radius: 999px;
-  font-size: 12px;
+  padding: var(--nz-space-4) var(--nz-space-12);
+  border-radius: var(--nz-radius-pill);
+  font-size: var(--nz-text-md);
   font-weight: 500;
   cursor: pointer;
-  transition: background 140ms var(--nz-ease), color 140ms var(--nz-ease), border-color 140ms
-    var(--nz-ease);
+  transition: background var(--nz-dur) var(--nz-ease), color var(--nz-dur) var(--nz-ease),
+    border-color var(--nz-dur) var(--nz-ease);
 }
 
 .nz-settings-pill:hover {
@@ -148,18 +159,18 @@
 .nz-settings-shortcut-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--nz-space-10);
 }
 
 .nz-settings-shortcut-row {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 8px 14px;
+  gap: var(--nz-space-8) var(--nz-space-14);
 }
 
 .nz-settings-shortcut-label {
-  font-size: 12.5px;
+  font-size: var(--nz-text-md);
   font-weight: 500;
   color: var(--nz-text);
 }
@@ -167,14 +178,14 @@
 .nz-settings-shortcut-controls {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--nz-space-6);
 }
 
 .nz-settings-shortcut-input {
   min-width: 100px;
-  padding: 6px 12px;
+  padding: var(--nz-space-6) var(--nz-space-12);
   font-family: var(--nz-font-mono);
-  font-size: 12px;
+  font-size: var(--nz-text-md);
   font-weight: 600;
   color: var(--nz-text-strong);
   background: var(--nz-bg-hover);
@@ -183,8 +194,8 @@
   cursor: pointer;
   text-align: center;
   letter-spacing: 0.05em;
-  transition: border-color 140ms var(--nz-ease), background 140ms var(--nz-ease), color 140ms
-    var(--nz-ease);
+  transition: border-color var(--nz-dur) var(--nz-ease), background var(--nz-dur) var(--nz-ease),
+    color var(--nz-dur) var(--nz-ease);
 }
 
 .nz-settings-shortcut-input:hover {
@@ -214,12 +225,12 @@
   background: transparent;
   border: 0;
   color: var(--nz-text-faint);
-  font-size: 11px;
+  font-size: var(--nz-text-xs);
   font-weight: 500;
-  padding: 4px 8px;
+  padding: var(--nz-space-4) var(--nz-space-8);
   border-radius: var(--nz-radius-sm);
   cursor: pointer;
-  transition: background 120ms var(--nz-ease), color 120ms var(--nz-ease);
+  transition: background var(--nz-dur-fast) var(--nz-ease), color var(--nz-dur-fast) var(--nz-ease);
 }
 
 .nz-settings-shortcut-reset:hover {
@@ -230,22 +241,22 @@
 .nz-settings-color-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 10px;
+  gap: var(--nz-space-10);
 }
 
 .nz-settings-color-card {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
-  padding: 12px 14px;
+  gap: var(--nz-space-4);
+  padding: var(--nz-space-12) var(--nz-space-14);
   border-radius: var(--nz-radius-md);
   border: 1px solid var(--nz-divider-strong);
   background: var(--nz-bg-hover);
   cursor: pointer;
   text-align: left;
-  transition: border-color 140ms var(--nz-ease), background 140ms var(--nz-ease), transform 120ms
-    var(--nz-ease);
+  transition: border-color var(--nz-dur) var(--nz-ease), background var(--nz-dur) var(--nz-ease),
+    transform var(--nz-dur-fast) var(--nz-ease);
 }
 
 .nz-settings-color-card:hover {
@@ -260,51 +271,27 @@
 
 .nz-settings-color-swatch {
   width: 100%;
-  height: 26px;
+  height: var(--nz-space-28);
   border-radius: var(--nz-radius-sm);
   border: 1px solid var(--nz-divider);
-  margin-bottom: 4px;
+  margin-bottom: var(--nz-space-4);
 }
 
 .nz-settings-color-name {
-  font-size: 12.5px;
+  font-size: var(--nz-text-md);
   font-weight: 600;
   color: var(--nz-text-strong);
 }
 
 .nz-settings-color-meta {
-  font-size: 11px;
+  font-size: var(--nz-text-xs);
   color: var(--nz-text-muted);
 }
 
 .nz-settings-error {
-  margin: 6px 0 0;
-  font-size: 11.5px;
+  margin: var(--nz-space-6) 0 0;
+  font-size: var(--nz-text-sm);
   color: var(--nz-danger);
-}
-
-.nz-settings-button {
-  background: transparent;
-  border: 0;
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--nz-radius-sm);
-  cursor: pointer;
-  color: var(--nz-text-whisper);
-  transition: background 140ms var(--nz-ease), color 140ms var(--nz-ease);
-}
-
-.nz-settings-button:hover {
-  background: var(--nz-bg-hover);
-  color: var(--nz-text-faint);
-}
-
-.nz-settings-button.active {
-  background: var(--nz-accent-soft);
-  color: var(--nz-accent-hot);
 }
 
 /* ─── AI title section ─────────────────────────────────────── */
@@ -312,12 +299,12 @@
 .nz-ai-key-row {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 4px;
+  gap: var(--nz-space-6);
+  margin-top: var(--nz-space-4);
 }
 
 .nz-ai-key-label {
-  font-size: 11.5px;
+  font-size: var(--nz-text-sm);
   font-weight: 500;
   color: var(--nz-text-muted);
   letter-spacing: -0.003em;
@@ -326,8 +313,8 @@
 .nz-ai-key-stored {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px 6px 12px;
+  gap: var(--nz-space-8);
+  padding: var(--nz-space-6) var(--nz-space-10) var(--nz-space-6) var(--nz-space-12);
   border: 1px solid var(--nz-divider-strong);
   border-radius: var(--nz-radius-md);
   background: var(--nz-bg-hover);
@@ -336,7 +323,7 @@
 
 .nz-ai-key-mask {
   font-family: var(--nz-font-mono);
-  font-size: 12px;
+  font-size: var(--nz-text-md);
   letter-spacing: 0.1em;
   color: var(--nz-text-faint);
 }
@@ -344,22 +331,22 @@
 .nz-ai-key-input-wrap {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--nz-space-6);
   flex-wrap: wrap;
 }
 
 .nz-ai-key-input {
   flex: 1;
   min-width: 200px;
-  padding: 7px 11px;
+  padding: var(--nz-space-8) var(--nz-space-12);
   font-family: var(--nz-font-mono);
-  font-size: 12px;
+  font-size: var(--nz-text-md);
   border: 1px solid var(--nz-divider-strong);
   border-radius: var(--nz-radius-md);
   background: var(--nz-bg-hover);
   color: var(--nz-text-strong);
   outline: none;
-  transition: border-color 120ms var(--nz-ease);
+  transition: border-color var(--nz-dur-fast) var(--nz-ease);
 }
 
 .nz-ai-key-input:focus {
@@ -371,13 +358,13 @@
 .nz-ai-key-eye {
   background: transparent;
   border: 0;
-  padding: 5px 8px;
-  font-size: 11px;
+  padding: var(--nz-space-4) var(--nz-space-8);
+  font-size: var(--nz-text-xs);
   font-weight: 500;
   color: var(--nz-text-faint);
   cursor: pointer;
   border-radius: var(--nz-radius-sm);
-  transition: background 120ms var(--nz-ease), color 120ms var(--nz-ease);
+  transition: background var(--nz-dur-fast) var(--nz-ease), color var(--nz-dur-fast) var(--nz-ease);
 }
 
 .nz-ai-key-eye:hover {
@@ -386,8 +373,8 @@
 }
 
 .nz-ai-key-hint {
-  margin: 2px 0 0;
-  font-size: 11px;
+  margin: var(--nz-space-2) 0 0;
+  font-size: var(--nz-text-xs);
   color: var(--nz-text-muted);
 }
 
@@ -406,24 +393,25 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-top: 4px;
+  gap: var(--nz-space-12);
+  margin-top: var(--nz-space-4);
 }
 
 .nz-ai-model-button {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px 6px 12px;
+  gap: var(--nz-space-8);
+  padding: var(--nz-space-6) var(--nz-space-10) var(--nz-space-6) var(--nz-space-12);
   border: 1px solid var(--nz-divider-strong);
   border-radius: var(--nz-radius-md);
   background: var(--nz-bg-hover);
   color: var(--nz-text-strong);
   font-family: var(--nz-font-mono);
-  font-size: 12px;
+  font-size: var(--nz-text-md);
   cursor: pointer;
   max-width: 100%;
-  transition: border-color 120ms var(--nz-ease), background 120ms var(--nz-ease);
+  transition: border-color var(--nz-dur-fast) var(--nz-ease), background var(--nz-dur-fast)
+    var(--nz-ease);
 }
 
 .nz-ai-model-button:hover {
@@ -441,15 +429,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-top: 4px;
-  padding: 8px 12px;
+  gap: var(--nz-space-12);
+  margin-top: var(--nz-space-4);
+  padding: var(--nz-space-8) var(--nz-space-12);
   border: 1px dashed var(--nz-divider-strong);
   border-radius: var(--nz-radius-md);
 }
 
 .nz-ai-activity-summary {
-  font-size: 12px;
+  font-size: var(--nz-text-md);
   color: var(--nz-text-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -477,15 +465,15 @@
   border: 1px solid var(--nz-divider-strong);
   border-radius: var(--nz-radius-lg);
   box-shadow: var(--nz-shadow-lg);
-  animation: nz-rise 200ms var(--nz-ease);
+  animation: nz-rise var(--nz-dur-medium) var(--nz-ease);
   overflow: hidden;
 }
 
 .nz-ai-picker-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 10px 10px 14px;
+  gap: var(--nz-space-8);
+  padding: var(--nz-space-10) var(--nz-space-10) var(--nz-space-10) var(--nz-space-14);
   border-bottom: 1px solid var(--nz-divider);
 }
 
@@ -494,9 +482,9 @@
   background: transparent;
   border: 0;
   outline: none;
-  font-size: 14px;
+  font-size: var(--nz-text-lg);
   color: var(--nz-text-strong);
-  padding: 4px 0;
+  padding: var(--nz-space-4) 0;
 }
 
 .nz-ai-picker-search::placeholder {
@@ -506,7 +494,7 @@
 .nz-ai-picker-list {
   list-style: none;
   margin: 0;
-  padding: 6px;
+  padding: var(--nz-space-6);
   overflow-y: auto;
   flex: 1 1 auto;
   min-height: 0;
@@ -517,14 +505,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 8px 10px;
+  gap: var(--nz-space-12);
+  padding: var(--nz-space-8) var(--nz-space-10);
   border: 0;
   background: transparent;
   border-radius: var(--nz-radius-md);
   cursor: pointer;
   text-align: left;
-  transition: background 100ms var(--nz-ease);
+  transition: background var(--nz-dur-fast) var(--nz-ease);
 }
 
 .nz-ai-picker-row:hover {
@@ -542,12 +530,12 @@
 .nz-ai-picker-row-main {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--nz-space-2);
   min-width: 0;
 }
 
 .nz-ai-picker-name {
-  font-size: 12.5px;
+  font-size: var(--nz-text-md);
   font-weight: 600;
   color: var(--nz-text-strong);
   white-space: nowrap;
@@ -557,7 +545,7 @@
 
 .nz-ai-picker-id {
   font-family: var(--nz-font-mono);
-  font-size: 11px;
+  font-size: var(--nz-text-xs);
   color: var(--nz-text-faint);
   white-space: nowrap;
   overflow: hidden;
@@ -566,7 +554,7 @@
 
 .nz-ai-picker-price {
   font-family: var(--nz-font-mono);
-  font-size: 11px;
+  font-size: var(--nz-text-xs);
   color: var(--nz-text-muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -580,7 +568,7 @@
 .nz-ai-picker-empty {
   list-style: none;
   text-align: center;
-  padding: 32px 16px;
+  padding: var(--nz-space-32) var(--nz-space-16);
   color: var(--nz-text-muted);
-  font-size: 13px;
+  font-size: var(--nz-text-base);
 }

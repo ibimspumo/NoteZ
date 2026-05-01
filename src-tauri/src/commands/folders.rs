@@ -225,26 +225,34 @@ pub fn move_note_to_folder(
 
 /// Reparent a folder, optionally placing it at a specific sort order. Refuses
 /// cycles (placing a folder under itself or one of its descendants).
+///
+/// Wrapped in a single IMMEDIATE transaction so concurrent `move_folder`
+/// calls (e.g. two Tauri windows, future sync) can't read consistent state
+/// between cycle-check and UPDATE and create a tree cycle. SQLite's WAL
+/// serialises a single writer, so IMMEDIATE acquires the write lock up
+/// front and either succeeds atomically or rolls back the whole op.
 #[tauri::command]
 pub fn move_folder(
     db: State<Db>,
     id: String,
     new_parent_id: Option<String>,
 ) -> Result<Folder> {
-    let conn = db.conn()?;
-    ensure_folder_exists(&conn, &id)?;
+    let mut conn = db.conn()?;
+    let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+
+    ensure_folder_exists(&tx, &id)?;
 
     if let Some(target) = new_parent_id.as_ref() {
         if target == &id {
             return Err(NoteZError::InvalidInput("cannot move folder into itself".into()));
         }
-        ensure_folder_exists(&conn, target)?;
-        if is_descendant_of(&conn, target, &id)? {
+        ensure_folder_exists(&tx, target)?;
+        if is_descendant_of(&tx, target, &id)? {
             return Err(NoteZError::InvalidInput(
                 "cannot move folder into one of its own descendants".into(),
             ));
         }
-        let depth = depth_of(&conn, target)?;
+        let depth = depth_of(&tx, target)?;
         if depth + 1 >= MAX_FOLDER_DEPTH {
             return Err(NoteZError::InvalidInput(format!(
                 "folder tree too deep (max {})",
@@ -254,18 +262,20 @@ pub fn move_folder(
     }
 
     let now = now_iso();
-    let next_sort: i64 = conn
+    let next_sort: i64 = tx
         .query_row(
             "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM folders WHERE parent_id IS ?1",
             rusqlite::params![new_parent_id],
             |r| r.get(0),
         )
         .unwrap_or(0);
-    conn.execute(
+    tx.execute(
         "UPDATE folders SET parent_id = ?1, sort_order = ?2, updated_at = ?3 WHERE id = ?4",
         rusqlite::params![new_parent_id, next_sort, now, id],
     )?;
-    fetch_folder(&conn, &id)
+    let folder = fetch_folder(&tx, &id)?;
+    tx.commit()?;
+    Ok(folder)
 }
 
 fn fetch_folder(conn: &Connection, id: &str) -> Result<Folder> {

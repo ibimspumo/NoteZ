@@ -20,6 +20,7 @@ import {
 import { applyFolderFilter, moveNoteToFolder, refreshNotes } from "../../stores/notes";
 import { dragNoteId } from "../../stores/panes";
 import { ChevronRightIcon, FolderIcon, PlusIcon } from "../icons";
+import { IconButton } from "../ui";
 import { DeleteFolderDialog } from "./DeleteFolderDialog";
 
 /** MIME type used to advertise a folder drag through the native DnD pipeline.
@@ -109,15 +110,9 @@ export const FolderTree: Component<Props> = (_props) => {
           <span class="nz-folders-label">{barLabel()}</span>
         </button>
         <Show when={open()}>
-          <button
-            type="button"
-            class="nz-icon-btn nz-folder-add"
-            aria-label="New folder"
-            title="New folder"
-            onClick={handleCreate}
-          >
+          <IconButton size="sm" aria-label="New folder" title="New folder" onClick={handleCreate}>
             <PlusIcon width="11" height="11" />
-          </button>
+          </IconButton>
         </Show>
       </div>
 

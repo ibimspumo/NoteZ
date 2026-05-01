@@ -8,8 +8,8 @@
   background: rgba(0, 0, 0, 0.42);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  animation: nz-fade-in 160ms var(--nz-ease);
-  padding: 24px;
+  animation: nz-fade-in var(--nz-dur) var(--nz-ease);
+  padding: var(--nz-space-24);
 }
 
 .nz-trash-dialog {
@@ -27,7 +27,7 @@
   border: 1px solid var(--nz-divider-strong);
   border-radius: var(--nz-radius-lg);
   box-shadow: var(--nz-shadow-lg);
-  animation: nz-rise 200ms var(--nz-ease);
+  animation: nz-rise var(--nz-dur-medium) var(--nz-ease);
   color: var(--nz-text);
   overflow: hidden;
 }
@@ -36,20 +36,20 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 18px 6px;
+  padding: var(--nz-space-16) var(--nz-space-16) var(--nz-space-6);
   flex-shrink: 0;
 }
 
 .nz-trash-title-wrap {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: var(--nz-space-8);
   color: var(--nz-text-strong);
 }
 
 .nz-trash-title {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--nz-text-xl);
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--nz-text-strong);
@@ -57,35 +57,19 @@
 
 .nz-trash-count {
   font-family: var(--nz-font-mono);
-  font-size: 11px;
+  font-size: var(--nz-text-xs);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  padding: 1px 8px;
-  border-radius: 999px;
+  padding: var(--nz-space-2) var(--nz-space-8);
+  border-radius: var(--nz-radius-pill);
   background: var(--nz-bg-hover);
   color: var(--nz-text-muted);
 }
 
-.nz-trash-close {
-  width: 26px;
-  height: 26px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--nz-radius-sm);
-  color: var(--nz-text-faint);
-  transition: background 120ms var(--nz-ease), color 120ms var(--nz-ease);
-}
-
-.nz-trash-close:hover {
-  background: var(--nz-bg-hover);
-  color: var(--nz-text-strong);
-}
-
 .nz-trash-blurb {
   margin: 0;
-  padding: 0 18px 12px;
-  font-size: 12px;
+  padding: 0 var(--nz-space-16) var(--nz-space-12);
+  font-size: var(--nz-text-md);
   color: var(--nz-text-muted);
   letter-spacing: -0.003em;
 }
@@ -94,22 +78,25 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 10px 6px;
+  padding: 0 var(--nz-space-10) var(--nz-space-6);
 }
 
 .nz-trash-loading,
 .nz-trash-empty {
-  padding: 48px 18px;
+  padding: var(--nz-space-48) var(--nz-space-16);
   text-align: center;
   color: var(--nz-text-muted);
-  font-size: 13px;
+  font-size: var(--nz-text-base);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: var(--nz-space-10);
 }
 
 .nz-trash-empty-icon {
+  /* 36px is the smallest size at which a circular icon reads as a
+     "container" rather than a glyph — kept off the spacing scale because
+     it's an iconography decision, not layout. */
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -130,16 +117,16 @@
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--nz-space-2);
 }
 
 .nz-trash-item {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 10px 10px;
+  gap: var(--nz-space-10);
+  padding: var(--nz-space-10);
   border-radius: var(--nz-radius-md);
-  transition: background 120ms var(--nz-ease);
+  transition: background var(--nz-dur-fast) var(--nz-ease);
 }
 
 .nz-trash-item:hover {
@@ -151,11 +138,11 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--nz-space-2);
 }
 
 .nz-trash-item-title {
-  font-size: 13px;
+  font-size: var(--nz-text-base);
   font-weight: 600;
   letter-spacing: -0.005em;
   color: var(--nz-text-strong);
@@ -165,7 +152,7 @@
 }
 
 .nz-trash-item-preview {
-  font-size: 12px;
+  font-size: var(--nz-text-md);
   color: var(--nz-text-faint);
   white-space: nowrap;
   overflow: hidden;
@@ -173,13 +160,13 @@
 }
 
 .nz-trash-item-meta {
-  font-size: 11px;
+  font-size: var(--nz-text-xs);
   color: var(--nz-text-muted);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--nz-space-6);
   font-variant-numeric: tabular-nums;
-  margin-top: 2px;
+  margin-top: var(--nz-space-2);
 }
 
 .nz-trash-dot {
@@ -193,39 +180,23 @@
 .nz-trash-item-actions {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--nz-space-6);
   flex-shrink: 0;
-  padding-top: 1px;
-}
-
-.nz-trash-item-actions .nz-pill-btn {
-  padding: 5px 12px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.nz-pill-btn.danger {
-  color: var(--nz-danger);
-  border-color: rgba(213, 74, 58, 0.28);
-}
-
-.nz-pill-btn.danger:hover {
-  background: rgba(213, 74, 58, 0.12);
-  border-color: var(--nz-danger);
+  padding-top: var(--nz-space-2);
 }
 
 .nz-trash-loadmore {
   display: block;
-  width: calc(100% - 12px);
-  margin: 8px 6px 4px;
-  padding: 8px;
+  width: calc(100% - var(--nz-space-12));
+  margin: var(--nz-space-8) var(--nz-space-6) var(--nz-space-4);
+  padding: var(--nz-space-8);
   border-radius: var(--nz-radius-md);
   background: transparent;
   color: var(--nz-text-muted);
-  font-size: 12px;
+  font-size: var(--nz-text-md);
   font-weight: 500;
   border: 1px dashed var(--nz-divider-strong);
-  transition: background 120ms var(--nz-ease), color 120ms var(--nz-ease);
+  transition: background var(--nz-dur-fast) var(--nz-ease), color var(--nz-dur-fast) var(--nz-ease);
 }
 
 .nz-trash-loadmore:hover {
@@ -235,7 +206,7 @@
 
 .nz-trash-footer {
   flex-shrink: 0;
-  padding: 12px 18px 16px;
+  padding: var(--nz-space-12) var(--nz-space-16) var(--nz-space-16);
   border-top: 1px solid var(--nz-divider);
   display: flex;
   justify-content: flex-end;
@@ -253,15 +224,15 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--nz-space-2);
 }
 
 .nz-ai-row {
   display: flex;
   align-items: flex-start;
-  padding: 10px;
+  padding: var(--nz-space-10);
   border-radius: var(--nz-radius-md);
-  transition: background 120ms var(--nz-ease);
+  transition: background var(--nz-dur-fast) var(--nz-ease);
 }
 
 .nz-ai-row:hover {
@@ -277,18 +248,18 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--nz-space-4);
 }
 
 .nz-ai-row-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--nz-space-10);
 }
 
 .nz-ai-row-title {
-  font-size: 13px;
+  font-size: var(--nz-text-base);
   font-weight: 600;
   letter-spacing: -0.005em;
   color: var(--nz-text-strong);
@@ -301,33 +272,33 @@
 
 .nz-ai-row-cost {
   font-family: var(--nz-font-mono);
-  font-size: 11.5px;
+  font-size: var(--nz-text-sm);
   color: var(--nz-text);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
 
 .nz-ai-row-meta {
-  font-size: 11px;
+  font-size: var(--nz-text-xs);
   color: var(--nz-text-muted);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--nz-space-6);
   flex-wrap: wrap;
   font-variant-numeric: tabular-nums;
 }
 
 .nz-ai-row-model {
   font-family: var(--nz-font-mono);
-  font-size: 10.5px;
+  font-size: var(--nz-text-xxs);
   color: var(--nz-text-faint);
 }
 
 .nz-ai-row-error {
-  font-size: 11px;
+  font-size: var(--nz-text-xs);
   color: var(--nz-danger);
   background: rgba(213, 74, 58, 0.08);
-  padding: 4px 8px;
+  padding: var(--nz-space-4) var(--nz-space-8);
   border-radius: var(--nz-radius-sm);
   font-family: var(--nz-font-mono);
   white-space: nowrap;

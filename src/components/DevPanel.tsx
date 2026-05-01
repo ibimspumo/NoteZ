@@ -1,6 +1,7 @@
 import { type Component, For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import { type DevProgress, api, onDevProgress } from "../lib/tauri";
-import { hardRefreshNotes, setSelectedId } from "../stores/notes";
+import { hardRefreshNotes } from "../stores/notes";
+import { Button, IconButton } from "./ui";
 
 type Props = {
   open: boolean;
@@ -126,11 +127,11 @@ export const DevPanel: Component<Props> = (props) => {
     try {
       const removed = await api.devDeleteGeneratedNotes();
       const ms = Math.round(performance.now() - t0);
-      // Drop selection first - the editor's effect bails on null, so it
-      // won't try to load a now-deleted note via the cache. Then a hard
-      // reset blows away every loaded summary + the cache map so the
-      // sidebar can't keep painting deleted rows.
-      setSelectedId(null);
+      // Hard reset: drops the per-note cache + every loaded summary so the
+      // sidebar can't keep painting deleted rows, AND walks every open tab
+      // across every pane to null out references to notes that no longer
+      // exist (otherwise the in-memory editor copies stay rendered until
+      // the user reloads or closes the tab).
       await hardRefreshNotes();
       await refreshTracked();
       setStatus({
@@ -163,9 +164,9 @@ export const DevPanel: Component<Props> = (props) => {
               <span class="nz-dev-tag">DEV</span>
               <h2 id="nz-dev-title">Stress test notes</h2>
             </div>
-            <button class="nz-dev-close" aria-label="Close" onClick={props.onClose}>
+            <IconButton aria-label="Close" onClick={props.onClose}>
               ×
-            </button>
+            </IconButton>
           </header>
 
           <div class="nz-dev-body">
@@ -218,33 +219,25 @@ export const DevPanel: Component<Props> = (props) => {
             </div>
 
             <div class="nz-dev-actions">
-              <button
-                class="nz-dev-btn primary"
-                disabled={status().kind === "running"}
-                onClick={onGenerate}
-              >
+              <Button variant="primary" disabled={status().kind === "running"} onClick={onGenerate}>
                 Generate
-              </button>
-              <button
-                class="nz-dev-btn danger"
+              </Button>
+              <Button
+                variant="danger"
                 disabled={status().kind === "running" || tracked() === 0}
                 onClick={onDeleteAll}
               >
                 Delete all generated
-              </button>
+              </Button>
             </div>
 
             <div class="nz-dev-divider" />
 
             <div class="nz-dev-section-label">Marketing screenshots</div>
             <div class="nz-dev-actions">
-              <button
-                class="nz-dev-btn"
-                disabled={status().kind === "running"}
-                onClick={onSeedDemo}
-              >
+              <Button disabled={status().kind === "running"} onClick={onSeedDemo}>
                 Seed 20 demo notes
-              </button>
+              </Button>
             </div>
 
             <Show when={status().kind === "running"}>

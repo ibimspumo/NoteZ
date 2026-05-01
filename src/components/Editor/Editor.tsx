@@ -4,6 +4,7 @@ import { stringifyEditorState } from "../../lib/editorStringify";
 import { api } from "../../lib/tauri";
 import type { MentionStatus } from "../../lib/types";
 import { getMentionStatus } from "../../stores/mentionRegistry";
+import { toast } from "../../stores/toasts";
 import type { EditorSnapshot } from "../../views/useSavePipeline";
 import { BrokenMentionPopover } from "./BrokenMentionPopover";
 import { MentionPopover } from "./MentionPopover";
@@ -53,6 +54,11 @@ type EditorProps = {
   onChange: (change: EditorChange) => void;
   onOpenNote: (noteId: string, opts?: MentionClickOpts) => void;
   onReady?: (editor: LexicalEditor | null) => void;
+  /** Called when the editor enters or leaves recovery mode (parse failure
+   *  on load). The host is expected to suspend the save pipeline while
+   *  recovery is active so a "looks empty" editor state cannot overwrite
+   *  on-disk content the user has just been told is broken-but-recoverable. */
+  onRecoveryChange?: (isRecovering: boolean) => void;
 };
 
 export const Editor: Component<EditorProps> = (props) => {
@@ -88,6 +94,13 @@ export const Editor: Component<EditorProps> = (props) => {
     status: Extract<MentionStatus, "trashed" | "missing">;
   } | null>(null);
   const [isEmpty, setIsEmpty] = createSignal(true);
+  // Recovery mode: set when initial state load fails to parse. The save
+  // pipeline is suspended while this is true (the host gates on it via
+  // `onRecoveryChange`), and the editor surface shows a banner so the user
+  // knows their note is *not* lost - it's just refusing to overwrite
+  // possibly-corrupted but on-disk content with whatever blank state Lexical
+  // happens to be in right now.
+  const [recovering, setRecovering] = createSignal(false);
   let confirmFn: (() => boolean) | null = null;
   let navigateFn: ((dir: "up" | "down") => void) | null = null;
 
@@ -167,6 +180,11 @@ export const Editor: Component<EditorProps> = (props) => {
 
         if (suppressChange) return;
         if (dirtyElements.size === 0 && dirtyLeaves.size === 0) return;
+        // Recovery mode: do NOT propagate dirty events. The save pipeline is
+        // already gated by `onRecoveryChange`, but belt-and-braces here means
+        // a stray transaction (selection-only formatting toggle, etc.) can't
+        // sneak through and mark the note dirty against blank state.
+        if (recovering()) return;
 
         // Don't compute the snapshot here - pass the deferred provider to the host.
         // The save pipeline debounces and pulls the snapshot once per save burst.
@@ -190,6 +208,24 @@ export const Editor: Component<EditorProps> = (props) => {
     });
   });
 
+  /** Save the editor's current caret position to in-session memory + the
+   *  cursors table for the given note id. Synchronous from the user's
+   *  perspective (best-effort IPC), no debounce - used on switches/external
+   *  updates where a debounced write would lose the position before the
+   *  state replacement runs. */
+  const persistOutgoingCursor = (outgoingId: string) => {
+    if (!liveSelection) return;
+    selectionsByNote.set(outgoingId, liveSelection);
+    if (persistTimer != null) {
+      clearTimeout(persistTimer);
+      persistTimer = null;
+    }
+    const outgoingSel = liveSelection;
+    void api
+      .setCursor(outgoingId, JSON.stringify(outgoingSel))
+      .catch((e) => console.warn("failed to persist cursor", e));
+  };
+
   createEffect(() => {
     const id = props.noteId;
     if (!editorRef) return;
@@ -198,17 +234,8 @@ export const Editor: Component<EditorProps> = (props) => {
     // Save the outgoing note's caret position before we wipe state. Cancel
     // any pending debounced persist for the outgoing note and write
     // synchronously instead so a fast switch doesn't lose the position.
-    if (lastNoteId !== null && liveSelection) {
-      selectionsByNote.set(lastNoteId, liveSelection);
-      if (persistTimer != null) {
-        clearTimeout(persistTimer);
-        persistTimer = null;
-      }
-      const outgoingId = lastNoteId;
-      const outgoingSel = liveSelection;
-      void api
-        .setCursor(outgoingId, JSON.stringify(outgoingSel))
-        .catch((e) => console.warn("failed to persist cursor", e));
+    if (lastNoteId !== null) {
+      persistOutgoingCursor(lastNoteId);
     }
     lastNoteId = id;
     liveSelection = null;
@@ -218,8 +245,30 @@ export const Editor: Component<EditorProps> = (props) => {
 
     suppressChange = true;
     if (props.initialJson && props.initialJson !== "{}") {
-      loadEditorStateFromJSON(editorRef, props.initialJson);
+      const result = loadEditorStateFromJSON(editorRef, props.initialJson);
+      if (!result.ok && result.reason === "parse_error") {
+        // Don't blank-load the editor. Surface a sticky toast and flip the
+        // recovery flag so the host's save pipeline freezes - we will NOT
+        // overwrite the on-disk content_json with whatever blank state
+        // Lexical happens to have. The user can choose to restore from a
+        // snapshot or to manually clear and start over (latter is intentionally
+        // not exposed automatically - it's destructive and the user must opt in).
+        setRecovering(true);
+        props.onRecoveryChange?.(true);
+        toast.error(
+          "This note's content didn't parse - editor is in recovery mode. Open snapshot history to restore.",
+        );
+      } else {
+        if (recovering()) {
+          setRecovering(false);
+          props.onRecoveryChange?.(false);
+        }
+      }
     } else {
+      if (recovering()) {
+        setRecovering(false);
+        props.onRecoveryChange?.(false);
+      }
       editorRef.update(() => {
         const root = $getRoot();
         root.clear();
@@ -272,7 +321,13 @@ export const Editor: Component<EditorProps> = (props) => {
 
   return (
     <div class="nz-editor-shell">
-      <Show when={isEmpty()}>
+      <Show when={recovering()}>
+        <div class="nz-editor-recovery" role="alert">
+          <strong>Recovery mode.</strong> This note's content couldn't be parsed. Editing is
+          disabled until you restore a snapshot - your saved content is untouched on disk.
+        </div>
+      </Show>
+      <Show when={isEmpty() && !recovering()}>
         <div class="nz-editor-placeholder" aria-hidden="true">
           Title
         </div>
@@ -280,8 +335,9 @@ export const Editor: Component<EditorProps> = (props) => {
       <div
         ref={(el) => (containerRef = el)}
         class="nz-editor-content"
-        contentEditable={true}
-        spellcheck={true}
+        classList={{ "nz-editor-content--recovery": recovering() }}
+        contentEditable={!recovering()}
+        spellcheck={!recovering()}
       />
       <Show when={activeMatch()}>
         {(match) => (

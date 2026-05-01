@@ -14,8 +14,8 @@
 .nz-snapshots-take {
   display: flex;
   align-items: center;
-  gap: var(--nz-space-3);
-  padding: 0 var(--nz-space-7) var(--nz-space-4);
+  gap: var(--nz-space-6);
+  padding: 0 var(--nz-space-14) var(--nz-space-8);
 }
 
 .nz-snapshots-take .nz-ai-key-input {
@@ -26,17 +26,17 @@
 .nz-snapshots-list {
   list-style: none;
   margin: 0;
-  padding: 0 var(--nz-space-3);
+  padding: 0 var(--nz-space-6);
   display: flex;
   flex-direction: column;
-  gap: var(--nz-space-2);
+  gap: var(--nz-space-4);
 }
 
 .nz-snapshot-item {
   display: flex;
   align-items: stretch;
-  gap: var(--nz-space-4);
-  padding: var(--nz-space-1);
+  gap: var(--nz-space-8);
+  padding: var(--nz-space-2);
   border-radius: var(--nz-radius-md);
   background: var(--nz-bg-row);
   border: 1px solid var(--nz-divider);
@@ -61,8 +61,8 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--nz-space-1);
-  padding: var(--nz-space-3) var(--nz-space-4);
+  gap: var(--nz-space-2);
+  padding: var(--nz-space-6) var(--nz-space-8);
   background: transparent;
   border: 0;
   text-align: left;
@@ -78,7 +78,7 @@
 .nz-snapshot-top {
   display: flex;
   align-items: center;
-  gap: var(--nz-space-3);
+  gap: var(--nz-space-6);
   min-width: 0;
 }
 
@@ -103,7 +103,7 @@
   text-transform: uppercase;
   color: var(--nz-accent-hot);
   background: var(--nz-accent-soft);
-  padding: 1px 6px;
+  padding: var(--nz-space-2) var(--nz-space-6);
   border-radius: var(--nz-radius-sm);
 }
 
@@ -121,7 +121,7 @@
   font-variant-numeric: tabular-nums;
   display: flex;
   align-items: center;
-  gap: var(--nz-space-3);
+  gap: var(--nz-space-6);
 }
 
 .nz-snapshot-cta {
@@ -139,8 +139,8 @@
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: var(--nz-space-2);
-  padding-right: var(--nz-space-3);
+  gap: var(--nz-space-4);
+  padding-right: var(--nz-space-6);
 }
 
 /* ─── Diff view ────────────────────────────────────────────────────────── */
@@ -149,15 +149,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--nz-space-4);
-  padding: 0 var(--nz-space-7) var(--nz-space-4);
+  gap: var(--nz-space-8);
+  padding: 0 var(--nz-space-14) var(--nz-space-8);
   flex-wrap: wrap;
 }
 
 .nz-diff-meta {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--nz-space-2);
   min-width: 0;
 }
 
@@ -175,7 +175,7 @@
 .nz-diff-substats {
   display: flex;
   align-items: center;
-  gap: var(--nz-space-3);
+  gap: var(--nz-space-6);
   font-size: var(--nz-text-xs);
   color: var(--nz-text-faint);
   font-variant-numeric: tabular-nums;
@@ -194,7 +194,7 @@
 
 .nz-diff-mode {
   display: inline-flex;
-  gap: var(--nz-space-1);
+  gap: var(--nz-space-2);
   flex-shrink: 0;
 }
 
@@ -202,7 +202,7 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 var(--nz-space-7) var(--nz-space-4);
+  padding: 0 var(--nz-space-14) var(--nz-space-8);
 }
 
 .nz-diff {
@@ -218,8 +218,10 @@
 .nz-diff-row {
   display: flex;
   align-items: flex-start;
-  gap: var(--nz-space-3);
-  padding: 1px var(--nz-space-4);
+  gap: var(--nz-space-6);
+  /* 1px vertical: intentional dense diff rhythm. Anything larger reads
+     as a list, not a code diff. */
+  padding: 1px var(--nz-space-8);
   white-space: pre-wrap;
   word-break: break-word;
   border-left: 3px solid transparent;
@@ -259,10 +261,14 @@
 
 /* ─── Word-level highlights inside changed lines ───────────────────────── */
 
+/* Word-level highlights use a zero-net-shift trick: 1px padding
+ * extends the colored background past the glyph edges, and -1px margin
+ * cancels the layout impact so adjacent text doesn't reflow when a word
+ * is highlighted. Don't change the 1px without also changing the margin. */
 .nz-diff-word-add {
   background: var(--nz-diff-add-bg-strong);
   color: var(--nz-diff-add-fg-strong);
-  border-radius: 2px;
+  border-radius: var(--nz-radius-hairline);
   padding: 0 1px;
   margin: 0 -1px;
 }
@@ -270,7 +276,7 @@
 .nz-diff-word-remove {
   background: var(--nz-diff-remove-bg-strong);
   color: var(--nz-diff-remove-fg-strong);
-  border-radius: 2px;
+  border-radius: var(--nz-radius-hairline);
   padding: 0 1px;
   margin: 0 -1px;
   text-decoration: line-through;
@@ -279,7 +285,7 @@
 
 .nz-diff-empty {
   text-align: center;
-  padding: var(--nz-space-12) var(--nz-space-7);
+  padding: var(--nz-space-24) var(--nz-space-14);
   color: var(--nz-text-faint);
   font-size: var(--nz-text-base);
 }

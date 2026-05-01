@@ -1,5 +1,6 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { type UnlistenFn, listen } from "@tauri-apps/api/event";
+import { LRU } from "./lru";
 import type {
   AiCallsCursor,
   AiCallsPage,
@@ -16,6 +17,7 @@ import type {
   FolderFilter,
   MentionTargetStatus,
   Note,
+  NoteSummary,
   NotesCursor,
   NotesPage,
   SearchHit,
@@ -32,7 +34,11 @@ export const api = {
   createNote: (folderId?: string | null) =>
     invoke<Note>("create_note", { folderId: folderId ?? null }),
   getNote: (id: string) => invoke<Note>("get_note", { id }),
-  updateNote: (input: UpdateNoteInput) => invoke<Note>("update_note", { input }),
+  /** `update_note` returns slim metadata only - no `content_json` /
+   *  `content_text` echo. The renderer just sent both, no need to ship them
+   *  back over the IPC for every keystroke save. Saves O(content_size) per
+   *  keystroke burst on big notes. */
+  updateNote: (input: UpdateNoteInput) => invoke<NoteSummary>("update_note", { input }),
   listNotes: (cursor?: NotesCursor | null, limit?: number, folder?: FolderFilter | null) =>
     invoke<NotesPage>("list_notes", { cursor: cursor ?? null, limit, folder: folder ?? null }),
   listTrash: (cursor?: TrashCursor | null, limit?: number) =>
@@ -43,6 +49,10 @@ export const api = {
   purgeNote: (id: string) => invoke<void>("purge_note", { id }),
   emptyTrash: () => invoke<number>("empty_trash"),
   purgeOldTrash: (days: number) => invoke<number>("purge_old_trash", { days }),
+  /** Returns the subset of `ids` that still exist as alive (non-trashed)
+   *  notes. Used to prune the panes layout after bulk hard-deletes so tabs
+   *  don't keep rendering an in-memory copy of a row that's gone from the DB. */
+  notesFilterExisting: (ids: string[]) => invoke<string[]>("notes_filter_existing", { ids }),
 
   // search
   searchNotes: (query: string, limit?: number) =>
@@ -138,23 +148,16 @@ export const api = {
 
 // Tauri's `convertFileSrc` is pure (path → URL) for a given target webview,
 // so memoizing it once is safe and saves the per-render call cost across
-// thousands of image renders. The cache is bounded by the number of unique
-// asset paths ever rendered in a session - effectively the number of
-// distinct images the user has opened, which is small.
-const assetUrlCache = new Map<string, string>();
+// thousands of image renders. Bounded by an LRU so a power-user session that
+// opens thousands of distinct images doesn't grow this map unbounded.
 const ASSET_URL_CACHE_MAX = 1024;
+const assetUrlCache = new LRU<string, string>(ASSET_URL_CACHE_MAX);
 
 /** Convert an absolute on-disk asset path to a webview-loadable URL. */
 export function assetUrl(absolutePath: string): string {
   const cached = assetUrlCache.get(absolutePath);
   if (cached !== undefined) return cached;
   const url = convertFileSrc(absolutePath);
-  if (assetUrlCache.size >= ASSET_URL_CACHE_MAX) {
-    // Trivial first-key eviction - we don't need true LRU for what is
-    // already a hot-path micro-optimisation.
-    const firstKey = assetUrlCache.keys().next().value;
-    if (firstKey !== undefined) assetUrlCache.delete(firstKey);
-  }
   assetUrlCache.set(absolutePath, url);
   return url;
 }

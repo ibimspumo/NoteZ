@@ -4,14 +4,45 @@
  *
  * Themable tokens (colors, shadows, etc.) are injected at runtime by
  * `src/lib/applyTheme.ts` into a `<style id="nz-theme">` element. See
- * `src/themes/contract.ts` for the full list. */
+ * `src/themes/contract.ts` for the full list.
+ *
+ * DESIGN SYSTEM RULES (Apple-grade discipline):
+ *
+ * 1. NEVER hardcode padding, margin, gap, or border-radius in component
+ *    CSS. Always use the tokens below. The only legitimate hardcoded
+ *    values are: `border-width: 1px`, layout constants tied to physical
+ *    UI (e.g. 80px traffic-light reservation, 720px max content width),
+ *    and 0/auto/100%.
+ *
+ * 2. Radii follow strict role assignment - mixing breaks the visual
+ *    rhythm. Pick by container role, not by "what looks right":
+ *      - hairline (2px): inline text accents - search highlight,
+ *        inline-code background. Sparingly.
+ *      - xs (4px): tiny chips, badges within rows, code-block markers.
+ *      - sm (6px): compact inputs, kbd shortcut hints.
+ *      - md (8px): the workhorse - buttons, sidebar rows, tabs,
+ *        editor toolbar, pane bodies.
+ *      - lg (12px): floating surfaces - popovers, command palette,
+ *        dialogs, the capture window.
+ *      - xl (16px): large hero containers (rare).
+ *      - pill (999px): pills, status badges, version chip.
+ *
+ * 3. Spacing is on a 2px grid, with a strong bias for the 4px sub-grid
+ *    (4, 8, 12, 16, 20, 24, 32, ...). Half-steps (2, 6, 10, 14) exist
+ *    for fine adjustments inside dense UI (sidebar rows, toolbars) but
+ *    should never be the first reach. When unsure, snap to the nearest
+ *    4px multiple. */
 
 :root {
+  /* Border radii. See rule #2 above for role assignment. */
+  --nz-radius-hairline: 2px;
+  --nz-radius-xs: 4px;
   --nz-radius-sm: 6px;
   --nz-radius-md: 8px;
   --nz-radius-lg: 12px;
   --nz-radius-xl: 16px;
   --nz-radius-pill: 999px;
+
   --nz-ease: cubic-bezier(0.32, 0.72, 0, 1);
 
   /* Animation duration scale. Keep the count small so motion stays
@@ -36,17 +67,26 @@
   --nz-text-4xl: 26px;
   --nz-text-title: 28px;
 
-  /* 4 px spacing scale. Use these for padding/margin consistency. */
-  --nz-space-1: 2px;
-  --nz-space-2: 4px;
-  --nz-space-3: 6px;
-  --nz-space-4: 8px;
-  --nz-space-5: 10px;
-  --nz-space-6: 12px;
-  --nz-space-7: 14px;
-  --nz-space-8: 16px;
-  --nz-space-10: 20px;
-  --nz-space-12: 24px;
+  /* Spacing scale (px = N for clarity). Numeric suffix == pixel value;
+     this is the one place we deviate from "step number" conventions
+     because explicit pixels make audits and code review trivial. */
+  --nz-space-2: 2px;
+  --nz-space-4: 4px;
+  --nz-space-6: 6px;
+  --nz-space-8: 8px;
+  --nz-space-10: 10px;
+  --nz-space-12: 12px;
+  --nz-space-14: 14px;
+  --nz-space-16: 16px;
+  --nz-space-20: 20px;
+  --nz-space-24: 24px;
+  --nz-space-28: 28px;
+  --nz-space-32: 32px;
+  --nz-space-40: 40px;
+  --nz-space-48: 48px;
+  --nz-space-56: 56px;
+  --nz-space-64: 64px;
+  --nz-space-96: 96px;
 
   --nz-font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue",
     Helvetica, Arial, sans-serif;

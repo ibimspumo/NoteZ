@@ -1,11 +1,6 @@
 import { createEffect, createRoot } from "solid-js";
 import { unwrap } from "solid-js/store";
-import {
-  type LayoutNode,
-  type PaneId,
-  migrateLegacyLayout,
-  reconcileWithExistingNotes,
-} from "../lib/paneTree";
+import { type LayoutNode, type PaneId, migrateLegacyLayout } from "../lib/paneTree";
 import { api } from "../lib/tauri";
 import { activePaneId, panesState, replaceLayout } from "./panes";
 
@@ -50,23 +45,29 @@ export function restoreLayoutFromSettings(p: Persisted) {
   replaceLayout(p.root, p.activePaneId);
 }
 
-/** Drop noteId references that are no longer valid. Used after `empty_trash`
- *  or any other bulk hard-delete that the layout could be referencing. */
-export function pruneLayoutForValidNotes(validIds: Set<string>) {
-  const next = reconcileWithExistingNotes(unwrap(panesState.root), validIds);
-  if (next !== unwrap(panesState.root)) replaceLayout(next, activePaneId());
-}
-
 let persistTimer: number | null = null;
-let pendingJson: string | null = null;
+let pendingDirty = false;
 let persistInstalled = false;
 let firstTickConsumed = false;
 
 function flushPersist() {
   persistTimer = null;
-  const json = pendingJson;
-  pendingJson = null;
-  if (!json) return;
+  if (!pendingDirty) return;
+  pendingDirty = false;
+  // Stringify the live tree at flush time (after the debounce stilled).
+  // Previously we stringified inside the reactive effect, which paid the
+  // cost on every drag-frame; now it's once per burst.
+  const payload: Persisted = {
+    root: unwrap(panesState.root),
+    activePaneId: activePaneId(),
+  };
+  let json: string;
+  try {
+    json = JSON.stringify(payload);
+  } catch (e) {
+    console.warn("panes layout: stringify failed, skipping persist", e);
+    return;
+  }
   void api.setSetting(SETTING_KEY, json).catch((e) => {
     console.warn("panes layout persist failed:", e);
   });
@@ -76,12 +77,18 @@ function flushPersist() {
  *  write to the settings table. Idempotent - calling more than once is a
  *  no-op.
  *
- *  We compute the full JSON inside the effect so Solid tracks every nested
- *  property as a dependency. With `reconcile`, deep mutations (e.g. dragging
- *  a divider, which only touches `sizes` inside one split node, or switching
- *  the active tab in a pane) don't fire the top-level `root` accessor;
- *  reading the full payload here makes those updates reach the persist
- *  scheduler. */
+ *  Performance contract: the effect MUST NOT do work proportional to tree
+ *  size on every reactive frame, because splitter-drag triggers reactive
+ *  updates at pointermove cadence (60 fps × pane-count). We:
+ *   - Walk the tree once to register fine-grained Solid deps (O(panes +
+ *     splits + tabs), bounded by MAX_PANES + tabs).
+ *   - Defer the actual `JSON.stringify(unwrap(...))` to the debounce-tail
+ *     `flushPersist`. During a drag burst we re-arm the timer hundreds of
+ *     times but only stringify once at the end.
+ *
+ *  The previous implementation stringified inside the effect itself, which
+ *  meant a drag burst over a 6-pane / 12-tab layout did 60 × deep
+ *  serialisations per second of dragging. */
 export function scheduleLayoutPersist() {
   if (persistInstalled) return;
   persistInstalled = true;
@@ -90,21 +97,15 @@ export function scheduleLayoutPersist() {
   // be torn down with MainView.
   createRoot(() => {
     createEffect(() => {
-      const payload: Persisted = {
-        root: unwrap(panesState.root),
-        activePaneId: activePaneId(),
-      };
-      // Walk the tree reactively to make every nested change a dep.
-      // Doing this *separately* from unwrap above means unwrap returns a
-      // plain (non-proxy) snapshot for serialization, while the explicit
-      // reads below set up the dependency graph.
+      // Read for reactivity only - no allocation-heavy work here.
+      void activePaneId();
       readDeep(panesState.root);
-      const json = JSON.stringify(payload);
       if (!firstTickConsumed) {
         firstTickConsumed = true;
         return;
       }
-      pendingJson = json;
+      // Re-arm the debounce. Stringify happens in `flushPersist`.
+      pendingDirty = true;
       if (persistTimer != null) clearTimeout(persistTimer);
       persistTimer = window.setTimeout(flushPersist, PERSIST_DEBOUNCE_MS);
     });

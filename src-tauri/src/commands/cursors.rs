@@ -11,11 +11,25 @@
 
 use crate::db::{now_iso, Db};
 use crate::error::{NoteZError, Result};
+use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::State;
 
 /// Maximum cursor-blob length. A real `SerializedSelection` is <500 bytes;
 /// this is just a defense-in-depth cap.
 const MAX_CURSOR_BYTES: usize = 8 * 1024;
+
+/// Drop cursor rows untouched for this many days. The exact caret position
+/// inside a long-untouched note isn't worth the storage; on next open the
+/// editor lands at the natural top-of-note default, which is what the user
+/// would expect anyway.
+const CURSOR_RETENTION_DAYS: i64 = 180;
+
+/// Approximate budget between opportunistic prune passes. We don't run on
+/// every `set_cursor` (would multiply per-keystroke caret persists by N);
+/// we run roughly once per ~250 calls.
+const CURSOR_PRUNE_INTERVAL_CALLS: u64 = 256;
+
+static CURSOR_SET_CALLS_SINCE_PRUNE: AtomicU64 = AtomicU64::new(0);
 
 #[tauri::command]
 pub fn get_cursor(db: State<Db>, note_id: String) -> Result<Option<String>> {
@@ -62,5 +76,19 @@ pub fn set_cursor(db: State<Db>, note_id: String, value: String) -> Result<()> {
          ON CONFLICT(note_id) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
         rusqlite::params![note_id, value, now],
     )?;
+
+    // Opportunistic prune. Runs ~1 in 256 calls so per-keystroke cost stays
+    // amortised down to nothing, but a long-running session still GCs stale
+    // rows. The prune itself uses the partial-index-friendly julianday
+    // comparator and is bounded by however many rows exceed retention -
+    // typically zero in steady state.
+    let prev = CURSOR_SET_CALLS_SINCE_PRUNE.fetch_add(1, Ordering::Relaxed);
+    if prev % CURSOR_PRUNE_INTERVAL_CALLS == 0 {
+        let _ = conn.execute(
+            "DELETE FROM cursors
+             WHERE julianday(updated_at) < julianday('now', ?1)",
+            rusqlite::params![format!("-{} days", CURSOR_RETENTION_DAYS)],
+        );
+    }
     Ok(())
 }

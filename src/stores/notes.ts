@@ -28,9 +28,11 @@ import { markAllTrashedAsMissing, setMentionStatus } from "./mentionRegistry";
 import {
   activePaneNoteId,
   allTabApis,
+  openNoteIds,
   openNoteInActivePane,
   openNoteInPane,
   paneForNote,
+  reconcileLayoutWithNotes,
 } from "./panes";
 
 /**
@@ -80,24 +82,30 @@ export const notesState = state;
 // animation on a row whose bucket or position changed during a save. Set
 // from updateNote and auto-cleared after the animation duration. Single-id
 // state - if a second note moves while the first is still highlighted, the
-// flag jumps to the new id and the previous row's animation aborts; that's
-// fine because the user only sees one save per keystroke burst per note.
+// flag jumps to the new id and the previous row's animation aborts.
+//
+// Generation token: rapid back-to-back `flashMoved` calls used to race - the
+// first call's setTimeout would fire after the second's setRMI, clearing the
+// (now-correct) signal mid-animation on the second note. We bump a counter
+// per call and gate the timer's clear on its own generation, so only the
+// most recent flash's timer clears the signal.
 const [recentlyMovedId, setRecentlyMovedId] = createSignal<string | null>(null);
-let recentlyMovedTimer: number | null = null;
+let flashGeneration = 0;
 const MOVED_FLASH_MS = 600;
 
 export const recentlyMovedNoteId = recentlyMovedId;
 
 function flashMoved(id: string) {
-  if (recentlyMovedTimer != null) clearTimeout(recentlyMovedTimer);
+  const my = ++flashGeneration;
   // Re-set in two ticks so the animation restarts cleanly when the same
   // note moves again before its previous flash finished.
   setRecentlyMovedId(null);
   queueMicrotask(() => {
+    if (my !== flashGeneration) return;
     setRecentlyMovedId(id);
-    recentlyMovedTimer = window.setTimeout(() => {
+    window.setTimeout(() => {
+      if (my !== flashGeneration) return;
       setRecentlyMovedId(null);
-      recentlyMovedTimer = null;
     }, MOVED_FLASH_MS);
   });
 }
@@ -152,7 +160,38 @@ export async function hardRefreshNotes() {
     trashCursor: null,
     trashLoaded: false,
   });
-  await refreshNotes();
+  await Promise.all([refreshNotes(), pruneOrphanedTabsAgainstBackend()]);
+}
+
+/** Ask the backend which currently-open noteIds still exist, then null any
+ *  tab whose note is gone. Without this, a bulk hard-delete (empty trash,
+ *  purge old trash, dev "delete all generated") leaves orphaned panes still
+ *  rendering an in-memory copy of a deleted note - the editor only re-evaluates
+ *  on `noteId` prop change, and nothing tells it the underlying row is gone.
+ *  Cheap when no panes are open; bounded by `MAX_PANES * tabs` even in the
+ *  worst case. */
+async function pruneOrphanedTabsAgainstBackend(): Promise<void> {
+  const open = Array.from(openNoteIds());
+  if (open.length === 0) return;
+  let alive: string[];
+  try {
+    alive = await api.notesFilterExisting(open);
+  } catch (e) {
+    console.warn("pruneOrphanedTabsAgainstBackend: filter failed", e);
+    return;
+  }
+  if (alive.length === open.length) return;
+  const validSet = new Set(alive);
+  // Cancel any debounced save targeting an orphaned id - otherwise the
+  // 350ms timer would fire after we null the tab and surface NotFound.
+  for (const id of open) {
+    if (!validSet.has(id)) {
+      cache.delete(id);
+      setMentionStatus(id, "missing");
+      for (const tabApi of allTabApis()) tabApi.cancelPendingSave(id);
+    }
+  }
+  reconcileLayoutWithNotes(validSet);
 }
 
 /** Load the next page of unpinned items. No-op if there's nothing more.
@@ -242,14 +281,41 @@ export async function createNote(): Promise<Note> {
   return note;
 }
 
+/**
+ * Save a note. The IPC returns slim sidebar metadata only - we don't ship
+ * `content_json` / `content_text` back over the IPC for every keystroke,
+ * because the renderer just sent both and they can be MB-sized. The full
+ * Note in our local cache is patched in place from `input` (what we sent)
+ * + the metadata returned by the backend (canonical title / updated_at /
+ * preview). Saves O(content_size) per keystroke burst on big notes.
+ */
 export async function updateNote(input: UpdateNoteInput): Promise<Note> {
-  const note = await api.updateNote(input);
-  cache.set(note.id, note);
+  const summary = await api.updateNote(input);
+  // Reconstruct the Note for the cache. We need created_at / deleted_at
+  // from the previous cached value (those don't change on save). If there
+  // was no cached entry, fall back to a fresh getNote IPC - but that's a
+  // cold path (the editor would have loaded the note before triggering a
+  // save).
+  const cached = cache.get(summary.id);
+  const patched: Note = {
+    id: summary.id,
+    title: summary.title,
+    content_json: input.content_json,
+    content_text: input.content_text,
+    is_pinned: summary.is_pinned,
+    pinned_at: summary.pinned_at,
+    created_at: cached?.created_at ?? summary.updated_at,
+    updated_at: summary.updated_at,
+    deleted_at: cached?.deleted_at ?? null,
+    folder_id: summary.folder_id,
+  };
+  cache.set(summary.id, patched);
+
   let movedOrRebucketed = false;
   setState(
     produce((s) => {
-      const list = note.is_pinned ? s.pinned : s.items;
-      const idx = list.findIndex((n) => n.id === note.id);
+      const list = summary.is_pinned ? s.pinned : s.items;
+      const idx = list.findIndex((n) => n.id === summary.id);
       if (idx < 0) return;
       // Mutate the proxy at idx in place. Replacing it with `list[idx] =
       // summary` would orphan the existing proxy, and any consumer that
@@ -259,27 +325,28 @@ export async function updateNote(input: UpdateNoteInput): Promise<Note> {
       // writing properties on the existing proxy we keep its identity and
       // every reactive read of its updated_at sees the new value.
       const item = list[idx];
-      const newPreview = shortPreview(note.content_text);
       // Compare buckets BEFORE we overwrite updated_at so we still flash
       // the row when the only change is a bucket transition (e.g. the
       // single Yesterday note rolling into Today at idx 0, where the
       // splice/unshift below is skipped).
-      const boundaries = note.is_pinned ? null : bucketBoundaries();
+      const boundaries = summary.is_pinned ? null : bucketBoundaries();
       const bucketChanged =
         boundaries !== null &&
-        bucketFor(item.updated_at, boundaries) !== bucketFor(note.updated_at, boundaries);
-      if (item.title !== note.title) item.title = note.title;
-      if (item.preview !== newPreview) item.preview = newPreview;
-      if (item.is_pinned !== note.is_pinned) item.is_pinned = note.is_pinned;
-      if (item.pinned_at !== note.pinned_at) item.pinned_at = note.pinned_at;
-      if (item.updated_at !== note.updated_at) item.updated_at = note.updated_at;
+        bucketFor(item.updated_at, boundaries) !== bucketFor(summary.updated_at, boundaries);
+      if (item.title !== summary.title) item.title = summary.title;
+      // Backend-canonical preview - matches what `make_preview` produces
+      // for `list_notes` so save vs. refresh paths can't drift.
+      if (item.preview !== summary.preview) item.preview = summary.preview;
+      if (item.is_pinned !== summary.is_pinned) item.is_pinned = summary.is_pinned;
+      if (item.pinned_at !== summary.pinned_at) item.pinned_at = summary.pinned_at;
+      if (item.updated_at !== summary.updated_at) item.updated_at = summary.updated_at;
       // Keep recently-edited unpinned notes near the top of the loaded prefix.
       // Skip when already at idx 0 - the splice/unshift would be a no-op
       // visually but Solid's array reconciliation may still rebuild the
       // proxy at index 0, breaking captured references. (Ordering across
       // the pagination boundary is a server concern; this only fixes the
       // visible window.)
-      if (!note.is_pinned && idx > 0) {
+      if (!summary.is_pinned && idx > 0) {
         list.splice(idx, 1);
         list.unshift(item);
         movedOrRebucketed = true;
@@ -288,8 +355,8 @@ export async function updateNote(input: UpdateNoteInput): Promise<Note> {
       }
     }),
   );
-  if (movedOrRebucketed) flashMoved(note.id);
-  return note;
+  if (movedOrRebucketed) flashMoved(summary.id);
+  return patched;
 }
 
 /** Toggle pin without a server round-trip for the list - we know the new state. */
@@ -450,7 +517,13 @@ export async function purgeNote(id: string): Promise<void> {
     tabApi.cancelPendingSave(id);
   }
   await api.purgeNote(id);
+  cache.delete(id);
   setMentionStatus(id, "missing");
+  // Rare but possible: a trashed note could still be referenced by a tab
+  // (e.g. another window restored+trashed it without us hearing). Null any
+  // tab pointing at the now-purged id so the picker takes over.
+  const showingPane = paneForNote(id);
+  if (showingPane) openNoteInPane(showingPane, null);
   setState(
     produce((s) => {
       const idx = s.trash.findIndex((n) => n.id === id);
@@ -468,6 +541,21 @@ export async function emptyTrash(): Promise<number> {
       s.trashCursor = null;
     }),
   );
+  await pruneOrphanedTabsAgainstBackend();
+  return n;
+}
+
+/** Hard-delete trashed notes older than N days. Returns the row count.
+ *  Like `emptyTrash`, this is a bulk hard-delete - any pane referencing one
+ *  of the purged ids would otherwise keep painting it. */
+export async function purgeOldTrash(days: number): Promise<number> {
+  const n = await api.purgeOldTrash(days);
+  if (n > 0) {
+    // We don't get the purged id list back, so reconcile against the backend
+    // for any currently-open tab. Also drop any now-stale trash summaries the
+    // dialog had loaded.
+    await Promise.all([loadTrash().catch(() => {}), pruneOrphanedTabsAgainstBackend()]);
+  }
   return n;
 }
 
@@ -483,10 +571,30 @@ function summaryFromNote(note: Note): NoteSummary {
   };
 }
 
+/**
+ * Mirror of Rust-side `make_preview` (db.rs). Single source of truth for the
+ * sidebar/command-bar preview format. Keep these two in sync - the post-save
+ * IPC delivers the backend-canonical preview already, so this only runs on
+ * client-side patches (createNote / restoreNote / togglePin / etc.) where
+ * we don't round-trip through the backend just to generate a preview.
+ *
+ *   - split on '\n'
+ *   - trim each line
+ *   - drop empty lines
+ *   - join with " · "
+ *   - truncate to 140 chars (codepoint-counted, not byte-counted)
+ */
 function shortPreview(text: string): string {
-  const oneLine = text.replace(/\s+/g, " ").trim();
-  if (oneLine.length <= 140) return oneLine;
-  return `${oneLine.slice(0, 140)}…`;
+  const PREVIEW_MAX = 140;
+  const cleaned = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0)
+    .join(" · ");
+  // Iterator-based slice keeps astral codepoints (emoji) intact.
+  const codepoints = Array.from(cleaned);
+  if (codepoints.length <= PREVIEW_MAX) return cleaned;
+  return `${codepoints.slice(0, PREVIEW_MAX).join("")}…`;
 }
 
 /** "Selected note" is now derived from the active pane in the panes store -

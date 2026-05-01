@@ -8,6 +8,7 @@ import {
   onCleanup,
 } from "solid-js";
 import { AIActivityDialog } from "../components/AIActivityDialog";
+import { Button, IconButton, Input } from "../components/ui";
 import { api } from "../lib/tauri";
 import type { AiModel, AiStats } from "../lib/types";
 import {
@@ -394,9 +395,9 @@ const UpdatesSection: Component = () => {
         <h3>Auto Update</h3>
         <p class="nz-settings-section-hint">
           NoteZ checks GitHub once an hour for new releases - that's the only background network
-          call it makes. When auto-update is on, the new version is fetched and unpacked silently
-          in the background; the sidebar pill flips to "Restart to apply" once it's ready, and
-          quitting NoteZ at any point lands you on the new version next launch.
+          call it makes. When auto-update is on, the new version is fetched and unpacked silently in
+          the background; the sidebar pill flips to "Restart to apply" once it's ready, and quitting
+          NoteZ at any point lands you on the new version next launch.
         </p>
       </header>
       <div class="nz-settings-pill-row" role="radiogroup" aria-label="Auto update">
@@ -527,17 +528,17 @@ const AISection: Component = () => {
           fallback={
             <div class="nz-ai-key-stored">
               <span class="nz-ai-key-mask">••••••••••••••••</span>
-              <button class="nz-pill-btn danger" type="button" onClick={() => void onClearKey()}>
+              <Button variant="danger" shape="pill" onClick={() => void onClearKey()}>
                 Clear
-              </button>
+              </Button>
             </div>
           }
         >
           <div class="nz-ai-key-input-wrap">
-            <input
+            <Input
               id="nz-openrouter-key"
               type={showKey() ? "text" : "password"}
-              class="nz-ai-key-input"
+              mono
               placeholder="sk-or-v1-..."
               autocomplete="off"
               spellcheck={false}
@@ -559,25 +560,23 @@ const AISection: Component = () => {
             >
               {showKey() ? "Hide" : "Show"}
             </button>
-            <button
-              type="button"
-              class="nz-pill-btn"
+            <Button
+              shape="pill"
               onClick={() => void onSaveKey()}
               disabled={savingKey() || keyInput().trim().length === 0}
             >
               Save
-            </button>
+            </Button>
             <Show when={aiHasKey()}>
-              <button
-                type="button"
-                class="nz-pill-btn"
+              <Button
+                shape="pill"
                 onClick={() => {
                   setKeyInput("");
                   setShowKey(false);
                 }}
               >
                 Cancel
-              </button>
+              </Button>
             </Show>
           </div>
         </Show>
@@ -621,9 +620,9 @@ const AISection: Component = () => {
             </span>
           )}
         </Show>
-        <button type="button" class="nz-pill-btn" onClick={() => setActivityOpen(true)}>
+        <Button shape="pill" onClick={() => setActivityOpen(true)}>
           View activity
-        </button>
+        </Button>
       </div>
 
       <Show when={error()}>
@@ -716,7 +715,7 @@ const ModelPicker: Component<ModelPickerProps> = (props) => {
               value={query()}
               onInput={(e) => setQuery(e.currentTarget.value)}
             />
-            <button type="button" class="nz-trash-close" aria-label="Close" onClick={props.onClose}>
+            <IconButton aria-label="Close" onClick={props.onClose}>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path
                   d="m3.5 3.5 7 7M10.5 3.5l-7 7"
@@ -725,7 +724,7 @@ const ModelPicker: Component<ModelPickerProps> = (props) => {
                   stroke-linecap="round"
                 />
               </svg>
-            </button>
+            </IconButton>
           </div>
           <Show when={err()}>
             <p class="nz-settings-error" style={{ padding: "0 14px" }}>

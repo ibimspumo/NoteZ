@@ -79,6 +79,17 @@ pub fn create_snapshot(
         ],
     )?;
 
+    // Mirror the live note's asset references into snapshot_assets so the
+    // GC pipeline can use a JOIN instead of a content-blob scan. Snapshots
+    // are immutable so this is the only insert path; FK CASCADE on snapshot
+    // delete cleans these up automatically when an auto-snapshot rotates
+    // out below.
+    conn.execute(
+        "INSERT OR IGNORE INTO snapshot_assets (snapshot_id, asset_id)
+         SELECT ?1, asset_id FROM note_assets WHERE note_id = ?2",
+        rusqlite::params![id, note_id],
+    )?;
+
     if !manual {
         // Keep only the newest MAX_AUTO_SNAPSHOTS_PER_NOTE auto-snapshots.
         // The previous implementation used `DELETE … WHERE id NOT IN

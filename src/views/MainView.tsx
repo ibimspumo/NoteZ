@@ -4,11 +4,12 @@ import { DevPanel } from "../components/DevPanel";
 import { EditorToolbar } from "../components/Editor/Toolbar";
 import { PaneTree } from "../components/Pane/PaneTree";
 import { Sidebar } from "../components/Sidebar/Sidebar";
+import { SidebarSplitter } from "../components/SidebarSplitter";
 import { SnapshotsDialog } from "../components/SnapshotsDialog";
-import { HistoryIcon, SidebarIcon } from "../components/icons";
+import { SidebarIcon } from "../components/icons";
 import { matchHotkey } from "../lib/keymap";
 import { findPane } from "../lib/paneTree";
-import { api, onEvent } from "../lib/tauri";
+import { onEvent } from "../lib/tauri";
 import { loadFolderPrefs, refreshFolders } from "../stores/folders";
 import {
   createNote,
@@ -17,6 +18,7 @@ import {
   loadMoreNotes,
   notesState,
   patchCachedNote,
+  purgeOldTrash,
   refreshNotes,
   selectedId,
   setSelectedId,
@@ -47,10 +49,15 @@ import { loadSettings, trashRetentionDays } from "../stores/settings";
 import {
   closeCommandBar,
   closeSettings,
+  closeSnapshots,
   commandBarOpen,
+  loadSidebarWidth,
   openCommandBar,
+  openSnapshotsFor,
   settingsOpen,
   sidebarCollapsed,
+  sidebarWidth,
+  snapshotsTargetId,
   toggleSidebar,
 } from "../stores/ui";
 import { startUpdateChecker } from "../stores/update";
@@ -58,7 +65,6 @@ import { SettingsView } from "./SettingsView";
 import { useShortcuts } from "./useShortcuts";
 
 export const MainView: Component = () => {
-  const [snapshotsOpen, setSnapshotsOpen] = createSignal(false);
   const [devPanelOpen, setDevPanelOpen] = createSignal(false);
 
   const savingState = createMemo(() => activeApi()?.savingState() ?? "idle");
@@ -149,7 +155,15 @@ export const MainView: Component = () => {
 
   const handleSnapshotRestored = async (noteId: string) => {
     const a = activeApi();
-    if (a) await a.reloadFromBackend(noteId);
+    if (!a) return;
+    // Belt-and-braces: even though the dialog awaits the restore IPC before
+    // calling us, a save that landed concurrently in another pane could
+    // already be in flight. Cancel pending + flush in-flight before pulling
+    // the post-restore content. Without this the next reloadFromBackend
+    // could race a tail-end save and re-baseline against pre-restore JSON.
+    a.cancelPendingSave(noteId);
+    if (a.hasPendingSave()) await a.flushSave();
+    await a.reloadFromBackend(noteId);
   };
 
   const handleTogglePin = async (id: string) => {
@@ -224,9 +238,10 @@ export const MainView: Component = () => {
 
   onMount(async () => {
     await loadSettings().catch((e) => console.warn("loadSettings failed:", e));
+    await loadSidebarWidth().catch((e) => console.warn("loadSidebarWidth failed:", e));
     const days = trashRetentionDays();
     if (days > 0) {
-      api.purgeOldTrash(days).catch((e) => console.warn("purge_old_trash failed:", e));
+      purgeOldTrash(days).catch((e) => console.warn("purge_old_trash failed:", e));
     }
     // Folders + persisted UI prefs must load BEFORE the initial notes
     // refresh: the prefs hydrate the active folder filter, which in turn
@@ -286,7 +301,8 @@ export const MainView: Component = () => {
     {
       hotkey: { key: "h", mods: ["mod", "shift"] },
       handler: () => {
-        if (selectedId()) setSnapshotsOpen(true);
+        const id = selectedId();
+        if (id) openSnapshotsFor(id);
       },
     },
     {
@@ -376,25 +392,42 @@ export const MainView: Component = () => {
   });
 
   return (
-    <div class="nz-app" classList={{ "sidebar-collapsed": sidebarCollapsed() }}>
+    <div
+      class="nz-app"
+      classList={{ "sidebar-collapsed": sidebarCollapsed() }}
+      style={{
+        // Always set inline so the grid template stays in lockstep with
+        // the collapsed signal. Earlier we tried `undefined` for the
+        // collapsed branch, but inline `style` properties beat the
+        // `.sidebar-collapsed` class rule on specificity, so the previous
+        // value was sticking and the layout broke (sidebar invisible but
+        // its column still 248px wide → main content blanked out behind
+        // the splitter column).
+        "grid-template-columns": sidebarCollapsed()
+          ? "0px 0px minmax(0, 1fr)"
+          : `${sidebarWidth()}px var(--nz-space-6) minmax(0, 1fr)`,
+      }}
+    >
+      <button
+        type="button"
+        class="nz-window-toggle"
+        aria-label={sidebarCollapsed() ? "Show sidebar" : "Collapse sidebar"}
+        title={`${sidebarCollapsed() ? "Show" : "Collapse"} sidebar · ⌘\\`}
+        onClick={toggleSidebar}
+      >
+        <SidebarIcon />
+      </button>
       <Sidebar
         onCreate={handleCreateNote}
         onTogglePin={handleTogglePin}
         onDelete={handleDelete}
         onOpenNote={handleOpenNote}
       />
+      <SidebarSplitter />
       <main class="nz-main">
         <Show when={!settingsOpen()} fallback={<SettingsView />}>
           <header class="nz-main-header" data-tauri-drag-region>
             <div class="nz-traffic-light-spacer" data-tauri-drag-region />
-            <button
-              class="nz-icon-btn"
-              aria-label="Toggle sidebar"
-              title="Toggle sidebar · ⌘\\"
-              onClick={toggleSidebar}
-            >
-              <SidebarIcon />
-            </button>
             <div class="nz-main-header-toolbar" data-tauri-drag-region>
               {/* Always render the toolbar so the chrome stays stable on tab/note
                   switches. EditorToolbar gracefully handles a null editor by
@@ -411,17 +444,6 @@ export const MainView: Component = () => {
               <Show when={savingState() === "saved"}>Saved</Show>
               <Show when={savingState() === "error"}>Save failed</Show>
             </div>
-            <Show when={selectedId()}>
-              <button
-                type="button"
-                class="nz-icon-btn"
-                aria-label="Snapshot history"
-                title="Snapshot history · ⌘⇧H"
-                onClick={() => setSnapshotsOpen(true)}
-              >
-                <HistoryIcon width="15" height="15" />
-              </button>
-            </Show>
           </header>
           <div class="nz-pane-host">
             <PaneTree node={layoutRoot()} onOpenNote={handleOpenNote} onCreate={handleCreateNote} />
@@ -435,9 +457,9 @@ export const MainView: Component = () => {
         onCreateWithTitle={handleCreateWithTitle}
       />
       <SnapshotsDialog
-        open={snapshotsOpen()}
-        noteId={selectedId()}
-        onClose={() => setSnapshotsOpen(false)}
+        open={snapshotsTargetId() !== null}
+        noteId={snapshotsTargetId()}
+        onClose={closeSnapshots}
         onRestored={handleSnapshotRestored}
       />
       <Show when={import.meta.env.DEV}>

@@ -293,8 +293,9 @@ export function eventToAccelerator(e: KeyboardEvent): string | null {
   if (e.altKey) mods.push("alt");
   if (e.shiftKey) mods.push("shift");
   if (e.ctrlKey) mods.push("ctrl");
-  // Reject modifier-only events.
-  const isModifierKey = ["Meta", "Alt", "Shift", "Control", "OS"].includes(e.key);
+  // Reject modifier-only events. ("OS" is a Firefox-only key name; we run in
+  // WKWebView which uses "Meta" - kept off the list intentionally.)
+  const isModifierKey = ["Meta", "Alt", "Shift", "Control"].includes(e.key);
   if (isModifierKey) return null;
   if (mods.length === 0) return null; // bare-key shortcuts not allowed
   // event.code is layout-independent ("KeyN" regardless of QWERTY/AZERTY).

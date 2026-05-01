@@ -52,11 +52,18 @@ pub fn search_notes(db: State<Db>, query: String, limit: Option<u32>) -> Result<
     // Stage 1: pull a candidate pool from FTS, ordered by raw bm25.
     // We deliberately fetch more than `limit` so the re-rank can surface a great
     // title-match that lost on bm25 alone (e.g. very short titles that bm25 underweights).
+    //
+    // Highlight markers: U+E000 / U+E001 (Private Use Area, BMP). User content
+    // can legitimately contain literal `<<…>>` (e.g. comparators, generics)
+    // which the previous markers would mistake for FTS hits. PUA codepoints
+    // are reserved for application-specific use, so they never appear in
+    // normal note text. The frontend splits on these sentinels and renders
+    // <mark> via real Solid components - no innerHTML round-trip.
     let sql = "
         SELECT
             n.id,
             n.title,
-            snippet(notes_fts, 1, '<<', '>>', '…', 12) AS snippet,
+            snippet(notes_fts, 1, char(57344), char(57345), '…', 12) AS snippet,
             n.is_pinned,
             n.updated_at,
             bm25(notes_fts) AS bm25,

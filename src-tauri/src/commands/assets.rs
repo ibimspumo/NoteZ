@@ -6,7 +6,7 @@ use crate::pagination::{collect_page, next_cursor};
 use image::GenericImageView;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use tauri::State;
 
@@ -227,87 +227,113 @@ pub async fn gc_orphan_assets(db: State<'_, Db>) -> Result<u64> {
 }
 
 fn gc_orphan_assets_blocking(db: &Db) -> Result<u64> {
-    let conn = db.conn()?;
-
-    // Stage 1: orphans per the join table. LEFT JOIN returns the asset rows
-    // that have NO matching note_assets entry. Bounded by the assets table
-    // size, not the content size.
-    let stage1_orphans: Vec<(String, String)> = {
-        let mut stmt = conn.prepare(
-            "SELECT a.id, a.ext
-               FROM assets a
-               LEFT JOIN note_assets na ON na.asset_id = a.id
-              WHERE na.asset_id IS NULL",
-        )?;
-        let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
-        rows.collect::<rusqlite::Result<Vec<_>>>()?
-    };
-
-    let known_ids_for_disk: HashSet<String> = {
-        let mut stmt = conn.prepare("SELECT id FROM assets")?;
-        let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
-        rows.collect::<rusqlite::Result<HashSet<_>>>()?
-    };
-
-    if stage1_orphans.is_empty() {
-        // No DB-side orphans: just heal disk leaks.
-        return reap_disk_orphans(&db.assets_dir, &known_ids_for_disk);
+    // We deliberately scope the DB connection to the queries-only phase so
+    // we don't hold a pool slot while the filesystem reaping below walks
+    // every shard directory. The previous code held the connection for the
+    // entire pipeline; on a 1M-asset DB that's many minutes of read_dir +
+    // remove_file blocking other writers (save pipeline) on the pool.
+    //
+    // Stage 1 + 2 collect what to delete; we then close the connection and
+    // do disk + write phase separately on a fresh connection.
+    struct Plan {
+        orphan_ids: Vec<String>,
+        orphan_paths: Vec<PathBuf>,
+        live_kept: HashSet<String>,
     }
 
-    // Stage 2: of the stage-1 orphans, exclude any that are still referenced
-    // by a snapshot. Snapshots are NOT in note_assets (they're immutable
-    // historical content), so we substring-scan the snapshot blobs - but ONLY
-    // for the orphan candidates, so the pattern set is tiny.
-    let mut still_referenced: HashSet<String> = HashSet::new();
-    {
-        let candidate_ids: Vec<&str> =
-            stage1_orphans.iter().map(|(id, _)| id.as_str()).collect();
-        let ac = aho_corasick::AhoCorasick::new(&candidate_ids)
-            .map_err(|e| NoteZError::Other(format!("aho-corasick: {e}")))?;
-        let mut stmt = conn.prepare("SELECT content_json FROM snapshots")?;
-        let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
-        for r in rows {
-            let blob = r?;
-            for m in ac.find_iter(&blob) {
-                still_referenced.insert(stage1_orphans[m.pattern().as_usize()].0.clone());
+    let plan: Plan = {
+        let conn = db.conn()?;
+        // Stage 1: orphans per the join table.
+        let stage1_orphans: Vec<(String, String)> = {
+            let mut stmt = conn.prepare(
+                "SELECT a.id, a.ext
+                   FROM assets a
+                   LEFT JOIN note_assets na ON na.asset_id = a.id
+                  WHERE na.asset_id IS NULL",
+            )?;
+            let rows =
+                stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()?
+        };
+
+        let known_ids_for_disk: HashSet<String> = {
+            let mut stmt = conn.prepare("SELECT id FROM assets")?;
+            let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
+            rows.collect::<rusqlite::Result<HashSet<_>>>()?
+        };
+
+        if stage1_orphans.is_empty() {
+            Plan {
+                orphan_ids: Vec::new(),
+                orphan_paths: Vec::new(),
+                live_kept: known_ids_for_disk,
+            }
+        } else {
+            // Stage 2: exclude orphans still referenced by a snapshot via
+            // the snapshot_assets join table (populated by `create_snapshot`,
+            // backfilled by migration v8). This makes GC O(stage1_orphans)
+            // instead of O(orphans × snapshot_bytes).
+            let referenced: HashSet<String> = {
+                let candidate_json = serde_json::to_string(
+                    &stage1_orphans.iter().map(|(id, _)| id.as_str()).collect::<Vec<_>>(),
+                )?;
+                let mut stmt = conn.prepare(
+                    "SELECT DISTINCT sa.asset_id
+                       FROM snapshot_assets sa
+                       JOIN json_each(?1) je ON je.value = sa.asset_id",
+                )?;
+                let rows = stmt.query_map(rusqlite::params![candidate_json], |r| {
+                    r.get::<_, String>(0)
+                })?;
+                rows.collect::<rusqlite::Result<HashSet<_>>>()?
+            };
+
+            let mut orphan_ids: Vec<String> = Vec::new();
+            let mut orphan_paths: Vec<PathBuf> = Vec::new();
+            for (id, ext) in &stage1_orphans {
+                if referenced.contains(id) {
+                    continue;
+                }
+                orphan_ids.push(id.clone());
+                orphan_paths.push(asset_path(&db.assets_dir, id, ext));
+            }
+
+            let live_kept: HashSet<String> = known_ids_for_disk
+                .into_iter()
+                .filter(|id| !orphan_ids.iter().any(|o| o == id))
+                .collect();
+
+            Plan {
+                orphan_ids,
+                orphan_paths,
+                live_kept,
             }
         }
-    }
-
-    // True orphans = stage 1 orphans MINUS snapshot-referenced ones.
-    let mut orphan_ids: Vec<String> = Vec::new();
-    let mut orphan_paths: Vec<PathBuf> = Vec::new();
-    for (id, ext) in &stage1_orphans {
-        if still_referenced.contains(id) {
-            continue;
-        }
-        orphan_ids.push(id.clone());
-        orphan_paths.push(asset_path(&db.assets_dir, id, ext));
-    }
+    };
+    // ↑ `conn` dropped here: pool slot returns, other writers can interleave.
 
     let mut deleted: u64 = 0;
-    if !orphan_ids.is_empty() {
-        let placeholders = std::iter::repeat_n("?", orphan_ids.len())
-            .collect::<Vec<_>>()
-            .join(",");
-        let sql = format!("DELETE FROM assets WHERE id IN ({})", placeholders);
-        let params: Vec<&dyn rusqlite::ToSql> =
-            orphan_ids.iter().map(|s| s as &dyn rusqlite::ToSql).collect();
-        conn.execute(&sql, params.as_slice())?;
-        for p in &orphan_paths {
+    if !plan.orphan_ids.is_empty() {
+        // Re-acquire connection for the DELETE only.
+        let conn = db.conn()?;
+        // Bulk-delete via json_each so we don't hand-build placeholder SQL
+        // for variable-length IN clauses.
+        let json = serde_json::to_string(&plan.orphan_ids)?;
+        conn.execute(
+            "DELETE FROM assets WHERE id IN (SELECT value FROM json_each(?1))",
+            rusqlite::params![json],
+        )?;
+        drop(conn);
+
+        for p in &plan.orphan_paths {
             let _ = std::fs::remove_file(p);
         }
-        deleted = orphan_ids.len() as u64;
+        deleted = plan.orphan_ids.len() as u64;
     }
 
-    // Recompute the live-id set after deletes for the disk reaper.
-    let live_after: HashSet<String> = known_ids_for_disk
-        .iter()
-        .filter(|id| !orphan_ids.iter().any(|o| o == *id))
-        .cloned()
-        .collect();
-    deleted += reap_disk_orphans(&db.assets_dir, &live_after)?;
-
+    // Disk-only reaping has no DB connection. Heals files left behind by
+    // crash-during-save scenarios.
+    deleted += reap_disk_orphans(&db.assets_dir, &plan.live_kept)?;
     Ok(deleted)
 }
 
@@ -398,14 +424,23 @@ pub async fn save_asset_from_path(
     path: String,
     mime: String,
 ) -> Result<AssetRef> {
-    // Validate the source on the blocking pool: metadata() is cheap but it's
-    // still a syscall, and `read` itself MUST happen there.
-    let path_for_meta = path.clone();
+    // TOCTOU-safe pipeline:
+    //   1. `symlink_metadata` returns the *link* metadata (does not follow).
+    //      Reject symlinks here so the open() below can't be redirected.
+    //   2. `File::open` returns a real fd that hangs on to the inode. Even
+    //      if a hostile process swaps the path now, our fd still points at
+    //      the original file (or rather: the `open` resolves before the
+    //      swap, and the kernel keeps the inode alive until we close).
+    //   3. Read the OPEN file's metadata - this is the size that the read
+    //      will actually see, not the pre-open size which a swap could lie
+    //      about. Reject too-large files here.
+    //   4. `Read::take(MAX_ASSET_BYTES + 1)` makes the read defensively
+    //      bounded even if the file grew between metadata-on-fd and read.
     let bytes = tauri::async_runtime::spawn_blocking(move || -> Result<Vec<u8>> {
-        // `symlink_metadata` doesn't follow symlinks, so the file_type check
-        // sees the link itself rather than its target.
-        let meta = std::fs::symlink_metadata(&path_for_meta)?;
-        let ft = meta.file_type();
+        // 1. Pre-open symlink + filetype check. The check is cheap and
+        //    trips the obvious-path attack early.
+        let pre_meta = std::fs::symlink_metadata(&path)?;
+        let ft = pre_meta.file_type();
         if ft.is_symlink() {
             return Err(NoteZError::InvalidInput(
                 "symlinked asset paths are not allowed".into(),
@@ -416,16 +451,43 @@ pub async fn save_asset_from_path(
                 "asset path is not a regular file".into(),
             ));
         }
+
+        // 2. Open before any further metadata read. Holding the fd makes
+        //    the rest race-free: a path swap after this point cannot
+        //    redirect our reads.
+        let mut f = std::fs::File::open(&path)?;
+
+        // 3. Re-check metadata via the open fd. This is the metadata of
+        //    the file we'll actually read.
+        let meta = f.metadata()?;
+        if !meta.file_type().is_file() {
+            return Err(NoteZError::InvalidInput(
+                "asset path is not a regular file (post-open)".into(),
+            ));
+        }
+        if meta.len() == 0 {
+            return Err(NoteZError::InvalidInput("empty asset".into()));
+        }
         if meta.len() > MAX_ASSET_BYTES {
             return Err(NoteZError::InvalidInput(format!(
                 "asset too large: {} bytes (max {MAX_ASSET_BYTES})",
                 meta.len()
             )));
         }
-        if meta.len() == 0 {
-            return Err(NoteZError::InvalidInput("empty asset".into()));
+
+        // 4. Hard-cap the read length even against a file that grew between
+        //    metadata and read. `take` truncates at the limit; if we hit
+        //    exactly the cap+1, we know the file is over-budget.
+        let mut buf = Vec::with_capacity(meta.len() as usize);
+        let read_n = std::io::Read::by_ref(&mut f)
+            .take(MAX_ASSET_BYTES + 1)
+            .read_to_end(&mut buf)?;
+        if read_n as u64 > MAX_ASSET_BYTES {
+            return Err(NoteZError::InvalidInput(format!(
+                "asset grew during read; rejected (max {MAX_ASSET_BYTES})"
+            )));
         }
-        Ok(std::fs::read(&path_for_meta)?)
+        Ok(buf)
     })
     .await
     .map_err(|e| NoteZError::Other(format!("read join: {e}")))??;

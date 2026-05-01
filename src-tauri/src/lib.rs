@@ -10,6 +10,7 @@ mod setup;
 mod shortcuts;
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use tauri_plugin_window_state::{AppHandleExt as _, StateFlags};
@@ -21,6 +22,16 @@ use crate::constants::{
 use crate::db::Db;
 use crate::error::{NoteZError, Result};
 use crate::shortcuts::{ShortcutSpec, ShortcutsState};
+
+/// Re-entrancy gate for the Quick-Capture global shortcut handler.
+///
+/// macOS will deliver a stream of `Pressed` events when the user mashes the
+/// shortcut key fast enough. Without a gate, every press spawns its own
+/// `toggle_capture_window` task and two concurrent tasks race on
+/// `is_visible()` -> `show()` / `hide()`, producing a flickering window. We
+/// short-circuit any press while a toggle is in-flight; the dropped events
+/// match user intent (a mash means "open it", not "toggle 30 times").
+static QUICK_CAPTURE_TOGGLE_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 
 struct AppPaths {
     db: PathBuf,
@@ -44,6 +55,20 @@ fn resolve_app_paths(app: &AppHandle) -> std::io::Result<AppPaths> {
 /// Migrate a legacy plain-text OpenRouter API key out of the `settings` table
 /// and into the OS keychain. No-op if there's nothing to migrate. Logged but
 /// non-fatal on failure - the key stays where it is and we retry next launch.
+///
+/// Defense-in-depth against forensic recovery:
+///   1. Overwrite the legacy row's `value` column with random bytes BEFORE
+///      deleting it. SQLite's default-mode delete just frees the page; the
+///      bytes stay readable until the page is recycled. Random overwrite
+///      shreds them at the cell level first.
+///   2. Set `PRAGMA secure_delete = ON` for the operation, then DELETE.
+///      secure_delete zeroes freed pages on commit.
+///   3. Fire a checkpoint(TRUNCATE) so the legacy bytes don't linger in the
+///      WAL after the main DB has been shredded.
+///
+/// Without this, a Time-Machine snapshot or `notez.db-wal` backup taken
+/// between "user stored key" and "migration ran" would still contain the
+/// plain-text credential indefinitely.
 fn migrate_openrouter_key_to_keychain(db: &Db) {
     let conn = match db.conn() {
         Ok(c) => c,
@@ -62,7 +87,7 @@ fn migrate_openrouter_key_to_keychain(db: &Db) {
     let Some(value) = legacy else { return };
     let trimmed = value.trim();
     if trimmed.is_empty() {
-        // Empty row is meaningless - drop it.
+        // Empty row is meaningless - drop it (no secret to shred).
         let _ = conn.execute(
             "DELETE FROM settings WHERE key = ?1",
             rusqlite::params![SETTING_OPENROUTER_KEY_LEGACY],
@@ -73,20 +98,36 @@ fn migrate_openrouter_key_to_keychain(db: &Db) {
         tracing::warn!("openrouter key migration: keychain write failed: {e}");
         return;
     }
-    // Keychain write succeeded - replace the row with the "present" marker
-    // so the renderer sees has_key=true on cold start without rereading the
-    // legacy column.
-    let now = crate::db::now_iso();
+    // Step 1: cell-level overwrite. randomblob of the same byte length so
+    // the original bytes are physically replaced before any commit/page
+    // free can leave them recoverable.
+    let _ = conn.execute(
+        "UPDATE settings SET value = hex(randomblob(length(value)))
+         WHERE key = ?1",
+        rusqlite::params![SETTING_OPENROUTER_KEY_LEGACY],
+    );
+    // Step 2: secure_delete on; freed pages are zeroed on commit.
+    let _ = conn.pragma_update(None, "secure_delete", "ON");
     let _ = conn.execute(
         "DELETE FROM settings WHERE key = ?1",
         rusqlite::params![SETTING_OPENROUTER_KEY_LEGACY],
     );
+    let _ = conn.pragma_update(None, "secure_delete", "OFF");
+    // Step 3: write the present-marker so the renderer sees has_key=true.
+    let now = crate::db::now_iso();
     let _ = conn.execute(
         "INSERT INTO settings (key, value, updated_at)
          VALUES (?1, ?2, ?3)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
         rusqlite::params![SETTING_OPENROUTER_KEY_PRESENT, "1", now],
     );
+    drop(conn);
+    // Step 4: shred WAL too. Without this, the random-overwrite + secure
+    // delete only shred the *main* DB; until the next auto-checkpoint the
+    // legacy bytes are still in `notez.db-wal`.
+    if let Err(e) = crate::db::wal_checkpoint(db) {
+        tracing::warn!("openrouter key migration: wal checkpoint failed: {e}");
+    }
     tracing::info!("openrouter API key migrated from settings table to OS keychain");
 }
 
@@ -210,14 +251,28 @@ pub fn run() {
                     if let Some(spec) = qc {
                         if spec.matches(mods, key) {
                             let _ = app.emit("notez://global/quick-capture", ());
-                            let app_for_spawn = app.clone();
-                            tauri::async_runtime::spawn(async move {
-                                if let Err(e) =
-                                    crate::commands::capture::toggle_capture_window(app_for_spawn).await
-                                {
-                                    tracing::warn!("toggle capture failed: {e}");
-                                }
-                            });
+                            // Atomic compare-exchange: only spawn one toggle
+                            // task at a time. Subsequent presses while one is
+                            // running drop silently. Released in the spawned
+                            // task's tail regardless of success/failure.
+                            if QUICK_CAPTURE_TOGGLE_IN_FLIGHT
+                                .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+                                .is_ok()
+                            {
+                                let app_for_spawn = app.clone();
+                                tauri::async_runtime::spawn(async move {
+                                    if let Err(e) =
+                                        crate::commands::capture::toggle_capture_window(
+                                            app_for_spawn,
+                                        )
+                                        .await
+                                    {
+                                        tracing::warn!("toggle capture failed: {e}");
+                                    }
+                                    QUICK_CAPTURE_TOGGLE_IN_FLIGHT
+                                        .store(false, Ordering::SeqCst);
+                                });
+                            }
                             return;
                         }
                     }
@@ -306,6 +361,7 @@ pub fn run() {
             commands::notes::purge_note,
             commands::notes::empty_trash,
             commands::notes::purge_old_trash,
+            commands::notes::notes_filter_existing,
             // search
             commands::search::search_notes,
             commands::search::quick_lookup,

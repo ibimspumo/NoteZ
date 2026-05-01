@@ -11,7 +11,6 @@ import { formatRelative } from "../../lib/format";
 import { api } from "../../lib/tauri";
 import type { SearchHit } from "../../lib/types";
 import { nowTick } from "../../stores/clock";
-import { notesState } from "../../stores/notes";
 import { type PaneId, openNoteIds, openNoteInPane } from "../../stores/panes";
 
 type Props = {
@@ -47,12 +46,14 @@ export const EmptyPanePicker: Component<Props> = (props) => {
 
   createEffect(() => {
     const q = query();
-    // Track notes-list mutations so the picker refreshes when notes are
-    // created or deleted elsewhere (e.g. trashing rows from the sidebar
-    // while this empty pane is visible). Without these reads the effect
-    // would only re-run on query change and the recents list would go stale.
-    void notesState.items.length;
-    void notesState.pinned.length;
+    // We deliberately depend ONLY on the query: `quickLookup` is backend-
+    // authoritative (FTS5 + recency over `notes` table), so it always
+    // reflects the live DB regardless of what the in-memory list looks like.
+    // Tracking `notesState.items.length` previously caused the picker to
+    // refire on every save (length unchanged but new array identity inside
+    // the store), and missed in-place title edits anyway because length
+    // didn't change. The picker re-fetches on every keystroke debounce, and
+    // also when the user re-focuses the input - good enough.
     let cancelled = false;
     const handle = window.setTimeout(() => {
       api

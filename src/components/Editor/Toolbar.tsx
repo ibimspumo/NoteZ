@@ -21,7 +21,9 @@ import {
   SELECTION_CHANGE_COMMAND,
   UNDO_COMMAND,
 } from "lexical";
-import { type Component, createEffect, createSignal, onCleanup } from "solid-js";
+import { type Component, Show, createEffect, createSignal, onCleanup } from "solid-js";
+import { Portal } from "solid-js/web";
+import { IconButton } from "../ui";
 
 type BlockKind = "paragraph" | "h1" | "h2" | "h3" | "ul" | "ol" | "check";
 
@@ -40,6 +42,12 @@ export const EditorToolbar: Component<Props> = (props) => {
   const [codeFmt, setCodeFmt] = createSignal(false);
   const [link, setLink] = createSignal(false);
   const [block, setBlock] = createSignal<BlockKind>("paragraph");
+  // Anchored inline prompt for "insert link". `window.prompt` doesn't work
+  // reliably in Tauri's WKWebView (the JS text-input panel delegate is
+  // disabled in some configurations) - the link button was effectively dead
+  // before. Inline popover sits over the toolbar's link button and supports
+  // Esc to cancel + Enter to confirm.
+  const [linkPromptAt, setLinkPromptAt] = createSignal<DOMRect | null>(null);
 
   const isDisabled = () => props.editor === null;
 
@@ -172,7 +180,7 @@ export const EditorToolbar: Component<Props> = (props) => {
     ed.dispatchCommand(FORMAT_TEXT_COMMAND, f);
   };
 
-  const handleLink = () => {
+  const handleLink = (e?: MouseEvent) => {
     const ed = props.editor;
     if (!ed) return;
     ed.focus();
@@ -180,45 +188,84 @@ export const EditorToolbar: Component<Props> = (props) => {
       ed.dispatchCommand(TOGGLE_LINK_COMMAND, null);
       return;
     }
-    const url = window.prompt("Enter link URL");
+    const target = e?.currentTarget as HTMLElement | undefined;
+    const rect = target?.getBoundingClientRect() ?? null;
+    setLinkPromptAt(rect);
+  };
+
+  /** Validate + normalize a URL string entered in the link prompt.
+   *  Returns the normalized URL or null if invalid. We deliberately reject
+   *  anything that parses to a non-`http(s):` / non-`mailto:` scheme - the
+   *  Tauri opener capability already restricts these schemes, but the editor
+   *  shouldn't even *show* a link with an unrenderable href. */
+  const normalizeLinkUrl = (raw: string): string | null => {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    // mailto: is allowed verbatim.
+    if (trimmed.toLowerCase().startsWith("mailto:")) return trimmed;
+    // Auto-prepend https:// if no scheme given. Reject explicit non-http(s)
+    // schemes after normalization (data:, javascript:, file:, etc.).
+    const candidate = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    try {
+      const u = new URL(candidate);
+      if (u.protocol !== "http:" && u.protocol !== "https:" && u.protocol !== "mailto:") {
+        return null;
+      }
+      return u.toString();
+    } catch {
+      return null;
+    }
+  };
+
+  const commitLink = (raw: string) => {
+    const ed = props.editor;
+    setLinkPromptAt(null);
+    if (!ed) return;
+    const url = normalizeLinkUrl(raw);
     if (!url) return;
-    const trimmed = url.trim();
-    if (!trimmed) return;
-    const normalized = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-    ed.dispatchCommand(TOGGLE_LINK_COMMAND, normalized);
+    ed.dispatchCommand(TOGGLE_LINK_COMMAND, url);
   };
 
   const undo = () => props.editor?.dispatchCommand(UNDO_COMMAND, undefined);
   const redo = () => props.editor?.dispatchCommand(REDO_COMMAND, undefined);
 
-  const disabled = isDisabled();
+  // Must be an accessor, not a snapshot. `isDisabled()` was being evaluated
+  // once at component setup, freezing the toolbar in whatever state the
+  // editor was in at mount - if no editor was active yet, every button
+  // stayed greyed out forever even after a note was opened.
+  const disabled = () => isDisabled();
 
   return (
     <div
       class="nz-toolbar"
-      classList={{ disabled }}
+      classList={{ disabled: disabled() }}
       role="toolbar"
       aria-label="Formatting"
-      aria-disabled={disabled}
+      aria-disabled={disabled()}
       data-tauri-drag-region
     >
-      <div class="nz-toolbar-group" data-tauri-drag-region>
-        <ToolbarBtn label="Undo" hint="Undo · ⌘Z" disabled={disabled} onPress={undo}>
+      <div class="nz-toolbar-group" data-tauri-drag-region data-toolbar-prio="low">
+        <ToolbarBtn label="Undo" hint="Undo · ⌘Z" disabled={disabled()} onPress={undo}>
           <IconUndo />
         </ToolbarBtn>
-        <ToolbarBtn label="Redo" hint="Redo · ⌘⇧Z" disabled={disabled} onPress={redo}>
+        <ToolbarBtn label="Redo" hint="Redo · ⌘⇧Z" disabled={disabled()} onPress={redo}>
           <IconRedo />
         </ToolbarBtn>
       </div>
 
-      <span class="nz-toolbar-sep" aria-hidden="true" data-tauri-drag-region />
+      <span
+        class="nz-toolbar-sep"
+        aria-hidden="true"
+        data-tauri-drag-region
+        data-toolbar-prio="low"
+      />
 
       <div class="nz-toolbar-group" data-tauri-drag-region>
         <ToolbarBtn
           label="Body text"
           hint="Body"
           active={block() === "paragraph"}
-          disabled={disabled}
+          disabled={disabled()}
           onPress={() => applyBlock("paragraph")}
         >
           <IconParagraph />
@@ -227,7 +274,7 @@ export const EditorToolbar: Component<Props> = (props) => {
           label="Heading 1"
           hint="Heading 1"
           active={block() === "h1"}
-          disabled={disabled}
+          disabled={disabled()}
           onPress={() => applyBlock("h1")}
         >
           <IconH1 />
@@ -236,7 +283,7 @@ export const EditorToolbar: Component<Props> = (props) => {
           label="Heading 2"
           hint="Heading 2"
           active={block() === "h2"}
-          disabled={disabled}
+          disabled={disabled()}
           onPress={() => applyBlock("h2")}
         >
           <IconH2 />
@@ -245,21 +292,26 @@ export const EditorToolbar: Component<Props> = (props) => {
           label="Heading 3"
           hint="Heading 3"
           active={block() === "h3"}
-          disabled={disabled}
+          disabled={disabled()}
           onPress={() => applyBlock("h3")}
         >
           <IconH3 />
         </ToolbarBtn>
       </div>
 
-      <span class="nz-toolbar-sep" aria-hidden="true" data-tauri-drag-region />
+      <span
+        class="nz-toolbar-sep"
+        aria-hidden="true"
+        data-tauri-drag-region
+        data-toolbar-prio="med"
+      />
 
-      <div class="nz-toolbar-group" data-tauri-drag-region>
+      <div class="nz-toolbar-group" data-tauri-drag-region data-toolbar-prio="med">
         <ToolbarBtn
           label="Bulleted list"
           hint="Bulleted list"
           active={block() === "ul"}
-          disabled={disabled}
+          disabled={disabled()}
           onPress={() => applyBlock("ul")}
         >
           <IconBullet />
@@ -268,7 +320,7 @@ export const EditorToolbar: Component<Props> = (props) => {
           label="Numbered list"
           hint="Numbered list"
           active={block() === "ol"}
-          disabled={disabled}
+          disabled={disabled()}
           onPress={() => applyBlock("ol")}
         >
           <IconOrdered />
@@ -277,7 +329,7 @@ export const EditorToolbar: Component<Props> = (props) => {
           label="Checklist"
           hint="Checklist"
           active={block() === "check"}
-          disabled={disabled}
+          disabled={disabled()}
           onPress={() => applyBlock("check")}
         >
           <IconCheck />
@@ -291,7 +343,7 @@ export const EditorToolbar: Component<Props> = (props) => {
           label="Bold"
           hint="Bold · ⌘B"
           active={bold()}
-          disabled={disabled}
+          disabled={disabled()}
           onPress={() => fmt("bold")}
         >
           <IconBold />
@@ -300,7 +352,7 @@ export const EditorToolbar: Component<Props> = (props) => {
           label="Italic"
           hint="Italic · ⌘I"
           active={italic()}
-          disabled={disabled}
+          disabled={disabled()}
           onPress={() => fmt("italic")}
         >
           <IconItalic />
@@ -309,36 +361,122 @@ export const EditorToolbar: Component<Props> = (props) => {
           label="Underline"
           hint="Underline · ⌘U"
           active={underline()}
-          disabled={disabled}
+          disabled={disabled()}
           onPress={() => fmt("underline")}
         >
           <IconUnderline />
         </ToolbarBtn>
       </div>
 
-      <span class="nz-toolbar-sep" aria-hidden="true" data-tauri-drag-region />
+      <span
+        class="nz-toolbar-sep"
+        aria-hidden="true"
+        data-tauri-drag-region
+        data-toolbar-prio="low"
+      />
 
-      <div class="nz-toolbar-group" data-tauri-drag-region>
-        <ToolbarBtn
-          label="Link"
-          hint="Link"
+      <div class="nz-toolbar-group" data-tauri-drag-region data-toolbar-prio="low">
+        <IconButton
+          flex
+          toggle
           active={link()}
-          disabled={disabled}
-          onPress={handleLink}
+          disabled={disabled()}
+          aria-label="Link"
+          title="Link"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={handleLink}
         >
           <IconLink />
-        </ToolbarBtn>
+        </IconButton>
         <ToolbarBtn
           label="Inline code"
           hint="Inline code"
           active={codeFmt()}
-          disabled={disabled}
+          disabled={disabled()}
           onPress={() => fmt("code")}
         >
           <IconCode />
         </ToolbarBtn>
       </div>
+      <Show when={linkPromptAt()}>
+        {(rect) => (
+          <LinkPromptPopover
+            anchor={rect()}
+            onCommit={commitLink}
+            onClose={() => setLinkPromptAt(null)}
+          />
+        )}
+      </Show>
     </div>
+  );
+};
+
+/** Inline popover for entering a link URL. Anchored beneath the toolbar's
+ *  Link button. Esc cancels, Enter confirms. URL validation lives in the
+ *  parent (`normalizeLinkUrl`). */
+const LinkPromptPopover: Component<{
+  anchor: DOMRect;
+  onCommit: (url: string) => void;
+  onClose: () => void;
+}> = (props) => {
+  const [value, setValue] = createSignal("");
+  let inputRef: HTMLInputElement | undefined;
+
+  // Close on outside click + Esc.
+  createEffect(() => {
+    const onPointer = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest(".nz-link-prompt")) return;
+      props.onClose();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        props.onClose();
+      }
+    };
+    document.addEventListener("mousedown", onPointer, true);
+    document.addEventListener("keydown", onKey);
+    queueMicrotask(() => inputRef?.focus());
+    onCleanup(() => {
+      document.removeEventListener("mousedown", onPointer, true);
+      document.removeEventListener("keydown", onKey);
+    });
+  });
+
+  const styleAt = () => ({
+    left: `${Math.max(8, props.anchor.left)}px`,
+    top: `${props.anchor.bottom + 6}px`,
+  });
+
+  return (
+    <Portal>
+      <div class="nz-link-prompt" style={styleAt()}>
+        <input
+          ref={(el) => (inputRef = el)}
+          class="nz-link-prompt-input"
+          placeholder="https://example.com"
+          spellcheck={false}
+          autocomplete="off"
+          value={value()}
+          onInput={(e) => setValue(e.currentTarget.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              props.onCommit(value());
+            }
+          }}
+        />
+        <button
+          type="button"
+          class="nz-link-prompt-go"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => props.onCommit(value())}
+        >
+          Insert
+        </button>
+      </div>
+    </Portal>
   );
 };
 
@@ -350,19 +488,18 @@ const ToolbarBtn: Component<{
   onPress: () => void;
   children: import("solid-js").JSX.Element;
 }> = (props) => (
-  <button
-    class="nz-tb-btn nz-tb-icon"
-    classList={{ active: !!props.active, disabled: !!props.disabled }}
+  <IconButton
+    flex
+    toggle
+    active={!!props.active}
+    disabled={!!props.disabled}
     aria-label={props.label}
-    aria-pressed={props.active ? true : undefined}
-    aria-disabled={props.disabled ? true : undefined}
-    disabled={props.disabled}
     title={props.hint ?? props.label}
     onMouseDown={(e) => e.preventDefault()}
     onClick={props.onPress}
   >
     {props.children}
-  </button>
+  </IconButton>
 );
 
 const IconUndo: Component = () => (

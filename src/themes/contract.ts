@@ -55,8 +55,7 @@ export const THEME_TOKENS: TokenSpec[] = [
   // Surfaces
   { name: "nz-body-bg", label: "Body background", kind: "color", group: "body" },
   { name: "nz-bg-app", label: "App background", kind: "color", group: "surface" },
-  { name: "nz-bg-sidebar", label: "Sidebar", kind: "color", group: "surface" },
-  { name: "nz-bg-main", label: "Main", kind: "color", group: "surface" },
+  { name: "nz-bg-card", label: "Card surface", kind: "color", group: "surface" },
   { name: "nz-bg-elev", label: "Elevated surface", kind: "color", group: "surface" },
   { name: "nz-bg-overlay", label: "Overlay", kind: "color", group: "surface" },
   { name: "nz-bg-hover", label: "Hover", kind: "color", group: "surface" },

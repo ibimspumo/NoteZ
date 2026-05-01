@@ -7,7 +7,7 @@ import {
 } from "../../lib/rowHeightProbe";
 import type { NoteSummary } from "../../lib/types";
 import { APP_VERSION } from "../../lib/version";
-import { nowTick } from "../../stores/clock";
+import { dayTick } from "../../stores/clock";
 import { loadMoreNotes, notesState, selectedId, setSelectedId } from "../../stores/notes";
 import { openNoteIds } from "../../stores/panes";
 import { sidebarPreviewLines } from "../../stores/settings";
@@ -29,7 +29,8 @@ import {
 import { AboutDialog } from "../AboutDialog";
 import { MeasuredVirtualList } from "../MeasuredVirtualList";
 import { TrashDialog } from "../TrashDialog";
-import { NewNoteIcon, SearchIcon, SettingsGearIcon, TrashIcon } from "../icons";
+import { PlusIcon, SearchIcon, SettingsGearIcon, TrashIcon } from "../icons";
+import { Badge, Button, IconButton, Kbd } from "../ui";
 import { FolderTree } from "./FolderTree";
 import { NoteListItem } from "./NoteListItem";
 
@@ -61,13 +62,18 @@ export const Sidebar: Component<Props> = (props) => {
   // happen at predictable points. O(n) on loaded items only (≤ a few page
   // chunks at any time), and re-runs only when items mutate.
   //
-  // We pre-compute bucket boundaries once per tick (rather than allocating
-  // a Date inside `bucketFor` for every row). At ITEMS_SLIDING_WINDOW_MAX
-  // = 5000 rows × 1 tick / minute that's ~5000 fewer Date allocations per
-  // minute - small but free.
+  // CRITICAL perf detail: this memo depends on `dayTick`, NOT `nowTick`.
+  // Bucket membership is invariant inside a calendar day - "Today" stays
+  // "Today" until midnight. Reading the per-minute clock here would
+  // re-allocate a 5 000-element ListRow array every 60 s for no observable
+  // change, churning Solid's reconciler over the whole sidebar list. The
+  // per-row "Nm ago" labels still tick every minute, but they read
+  // `nowTick` independently inside NoteListItem - their cost is bounded by
+  // the visible window (~30 virtualized rows), not the loaded prefix.
   const rows = createMemo<ListRow[]>(() => {
+    dayTick(); // re-bucket only on calendar-day rollover
     const items = notesState.items;
-    const boundaries = bucketBoundaries(new Date(nowTick()));
+    const boundaries = bucketBoundaries(new Date());
     if (items.length === 0) return [];
     const out: ListRow[] = [];
     let last: Bucket | null = null;
@@ -104,16 +110,11 @@ export const Sidebar: Component<Props> = (props) => {
 
   return (
     <aside class="nz-sidebar" classList={{ collapsed: sidebarCollapsed() }}>
-      <div class="nz-sidebar-titlebar" data-tauri-drag-region />
       <div class="nz-sidebar-header" data-tauri-drag-region>
-        <button
-          class="nz-icon-btn"
-          aria-label="New note"
-          title="New note · ⌘N"
-          onClick={props.onCreate}
-        >
-          <NewNoteIcon />
-        </button>
+        <div class="nz-sidebar-header-spacer" data-tauri-drag-region />
+        <IconButton aria-label="New note" title="New note · ⌘N" onClick={props.onCreate}>
+          <PlusIcon />
+        </IconButton>
       </div>
 
       <div class="nz-sidebar-search">
@@ -125,7 +126,7 @@ export const Sidebar: Component<Props> = (props) => {
         >
           <SearchIcon width="13" height="13" />
           <span class="nz-search-trigger-label">Search notes</span>
-          <kbd class="nz-search-trigger-kbd">⌘K</kbd>
+          <Kbd>⌘K</Kbd>
         </button>
       </div>
 
@@ -159,9 +160,9 @@ export const Sidebar: Component<Props> = (props) => {
               <Show when={notesState.pinned.length === 0 && notesState.initialLoaded}>
                 <div class="nz-empty-state">
                   <p>No notes yet.</p>
-                  <button class="nz-pill-btn" onClick={props.onCreate}>
+                  <Button shape="pill" onClick={props.onCreate}>
                     Create your first note
-                  </button>
+                  </Button>
                 </div>
               </Show>
             }
@@ -220,21 +221,23 @@ export const Sidebar: Component<Props> = (props) => {
         <TrashIcon width="14" height="14" />
         <span class="nz-trash-row-label">Trash</span>
         <Show when={notesState.trashLoaded && notesState.trash.length > 0}>
-          <span class="nz-trash-row-count">{notesState.trash.length}</span>
+          <Badge variant="neutral" class="nz-trash-row-count">
+            {notesState.trash.length}
+          </Badge>
         </Show>
       </button>
 
       <div class="nz-sidebar-footer">
-        <button
-          class="nz-icon-btn nz-settings-button"
-          classList={{ active: settingsOpen() }}
+        <IconButton
+          size="sm"
+          toggle
+          active={settingsOpen()}
           aria-label={settingsOpen() ? "Close settings" : "Open settings"}
-          aria-pressed={settingsOpen()}
           title="Settings"
           onClick={() => (settingsOpen() ? closeSettings() : openSettings())}
         >
           <SettingsGearIcon width="14" height="14" />
-        </button>
+        </IconButton>
         <Show
           when={updateStage() === "checking"}
           fallback={

@@ -178,9 +178,13 @@ export class ImageNode extends ElementNode {
     // bytes haven't changed, and we can reuse the existing DOM. If the assetId
     // changes, returning true tells Lexical to recreate the DOM.
     if (prev.__assetId !== this.__assetId) return true;
-    if (prev.__widthPct !== this.__widthPct) {
-      applyWidthStyle(dom, this.__widthPct);
-    }
+    // Always re-apply the width style on update, even when the value didn't
+    // change. The live-resize path in `imagePlugin` writes inline styles
+    // directly on the figure for instant feedback during pointermove; if a
+    // subsequent transaction arrives with the same widthPct as the node's
+    // committed value, the inline style from the drag preview would
+    // otherwise stick. Re-applying canonicalises the DOM to the node state.
+    applyWidthStyle(dom, this.__widthPct);
     return false;
   }
 

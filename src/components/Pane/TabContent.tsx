@@ -11,8 +11,11 @@ import {
   registerTabApi,
   registerTabEditor,
 } from "../../stores/panes";
+import { openSnapshotsFor } from "../../stores/ui";
 import { useSavePipeline } from "../../views/useSavePipeline";
 import { Editor, type EditorChange } from "../Editor/Editor";
+import { HistoryIcon } from "../icons";
+import { IconButton } from "../ui";
 import { EmptyPanePicker } from "./EmptyPanePicker";
 
 type Props = {
@@ -142,6 +145,14 @@ export const TabContent: Component<Props> = (props) => {
     registerTabEditor(props.tabId, editor);
   };
 
+  /** Editor recovery (parse-error on load) freezes saves so the on-disk
+   *  content_json isn't overwritten by whatever blank state Lexical happens
+   *  to be in. We cancel any pending save up front; subsequent dirty events
+   *  are gated on the editor side too (belt-and-braces). */
+  const handleRecoveryChange = (recovering: boolean) => {
+    if (recovering) save.cancelPending();
+  };
+
   return (
     <Show
       when={activeNote()}
@@ -163,6 +174,16 @@ export const TabContent: Component<Props> = (props) => {
               </span>
               <span class="nz-meta-pin">Pinned</span>
             </Show>
+            <span class="nz-meta-spacer" aria-hidden="true" />
+            <IconButton
+              size="xs"
+              class="nz-meta-history"
+              aria-label="Snapshot history"
+              title="Snapshot history · ⌘⇧H"
+              onClick={() => openSnapshotsFor(note().id)}
+            >
+              <HistoryIcon width="13" height="13" />
+            </IconButton>
           </div>
           <div data-editor-key={editorKey()}>
             <Editor
@@ -171,6 +192,7 @@ export const TabContent: Component<Props> = (props) => {
               onChange={handleChange}
               onOpenNote={props.onOpenNote}
               onReady={handleEditorReady}
+              onRecoveryChange={handleRecoveryChange}
             />
           </div>
         </div>

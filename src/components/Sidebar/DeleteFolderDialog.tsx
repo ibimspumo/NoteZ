@@ -16,6 +16,8 @@ import {
   isAncestorOrSelf,
 } from "../../stores/folders";
 import { refreshNotes } from "../../stores/notes";
+import { trashRetentionDays } from "../../stores/settings";
+import { Button } from "../ui";
 
 type Props = {
   /** Folder to delete. `null` keeps the dialog closed. The parent (FolderTree)
@@ -187,12 +189,12 @@ export const DeleteFolderDialog: Component<Props> = (props) => {
               when={noteCount() > 0 || subfolderCount() > 0}
               fallback={
                 <footer class="nz-delete-folder-footer">
-                  <button class="nz-pill-btn" onClick={() => props.onClose()} disabled={busy()}>
+                  <Button shape="pill" onClick={() => props.onClose()} disabled={busy()}>
                     Cancel
-                  </button>
-                  <button class="nz-pill-btn danger" onClick={handlePrimary} disabled={busy()}>
+                  </Button>
+                  <Button variant="danger" shape="pill" onClick={handlePrimary} disabled={busy()}>
                     Delete
-                  </button>
+                  </Button>
                 </footer>
               }
             >
@@ -240,43 +242,49 @@ export const DeleteFolderDialog: Component<Props> = (props) => {
                 >
                   <span class="nz-delete-folder-option-title">Move all notes to Trash</span>
                   <span class="nz-delete-folder-option-sub">
-                    Recoverable from Trash for 30 days
+                    {trashRetentionDays() > 0
+                      ? `Recoverable from Trash for ${trashRetentionDays()} day${
+                          trashRetentionDays() === 1 ? "" : "s"
+                        }`
+                      : "Recoverable from Trash until you empty it manually"}
                   </span>
                 </button>
               </div>
 
               <footer class="nz-delete-folder-footer">
-                <button class="nz-pill-btn" onClick={() => props.onClose()} disabled={busy()}>
+                <Button shape="pill" onClick={() => props.onClose()} disabled={busy()}>
                   Cancel
-                </button>
+                </Button>
                 <Show
                   when={mode() === "trash"}
                   fallback={
                     <Show
                       when={mode() === "pick"}
                       fallback={
-                        <button
-                          class="nz-pill-btn primary"
+                        <Button
+                          variant="primary"
+                          shape="pill"
                           onClick={handlePrimary}
                           disabled={busy()}
                         >
                           Move &amp; delete folder
-                        </button>
+                        </Button>
                       }
                     >
-                      <button
-                        class="nz-pill-btn primary"
+                      <Button
+                        variant="primary"
+                        shape="pill"
                         onClick={handlePickConfirm}
                         disabled={busy()}
                       >
                         Move &amp; delete folder
-                      </button>
+                      </Button>
                     </Show>
                   }
                 >
-                  <button class="nz-pill-btn danger" onClick={handleTrash} disabled={busy()}>
+                  <Button variant="danger" shape="pill" onClick={handleTrash} disabled={busy()}>
                     Move {noteCount()} to Trash
-                  </button>
+                  </Button>
                 </Show>
               </footer>
             </Show>

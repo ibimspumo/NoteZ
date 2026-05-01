@@ -8,8 +8,8 @@
   background: rgba(0, 0, 0, 0.42);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  animation: nz-fade-in 160ms var(--nz-ease);
-  padding: 24px;
+  animation: nz-fade-in var(--nz-dur) var(--nz-ease);
+  padding: var(--nz-space-24);
 }
 
 .nz-about-dialog {
@@ -22,28 +22,18 @@
   border: 1px solid var(--nz-divider-strong);
   border-radius: var(--nz-radius-lg);
   box-shadow: var(--nz-shadow-lg);
-  padding: 28px 26px 20px;
-  animation: nz-rise 200ms var(--nz-ease);
+  padding: var(--nz-space-28) var(--nz-space-24) var(--nz-space-20);
+  animation: nz-rise var(--nz-dur-medium) var(--nz-ease);
   color: var(--nz-text);
 }
 
-.nz-about-close {
+/* Pin the IconButton into the top-right corner of the dialog frame.
+ * Visual chrome (size, hover, color) comes from the IconButton primitive;
+ * this class only owns position. */
+.nz-about-close-pos {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 26px;
-  height: 26px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--nz-radius-sm);
-  color: var(--nz-text-faint);
-  transition: background 120ms var(--nz-ease), color 120ms var(--nz-ease);
-}
-
-.nz-about-close:hover {
-  background: var(--nz-bg-hover);
-  color: var(--nz-text-strong);
+  top: var(--nz-space-12);
+  right: var(--nz-space-12);
 }
 
 .nz-about-hero {
@@ -51,19 +41,19 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 6px;
-  padding: 4px 0 6px;
+  gap: var(--nz-space-6);
+  padding: var(--nz-space-4) 0 var(--nz-space-6);
 }
 
 .nz-about-app {
   display: inline-flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--nz-space-8);
 }
 
 .nz-about-name {
   font-family: var(--nz-font-ui);
-  font-size: 26px;
+  font-size: var(--nz-text-4xl);
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--nz-text-strong);
@@ -73,31 +63,21 @@
 }
 
 .nz-about-name-z {
+  /* One-off display size for the branded "Z" character. Intentionally
+     above the standard type scale - this is identity, not body type. */
   font-size: 34px;
   font-weight: 800;
   color: var(--nz-accent-hot);
   letter-spacing: -0.03em;
+  /* 1px optical kerning nudge to align "Z" cap to the body baseline. */
   margin-left: 1px;
   line-height: 1;
   text-shadow: 0 1px 12px var(--nz-accent-glow);
 }
 
-.nz-about-version {
-  font-family: var(--nz-font-mono);
-  font-size: 11.5px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  color: var(--nz-text-faint);
-  font-variant-numeric: tabular-nums;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--nz-bg-hover);
-  align-self: center;
-}
-
 .nz-about-tagline {
-  margin: 2px 0 0;
-  font-size: 12.5px;
+  margin: var(--nz-space-2) 0 0;
+  font-size: var(--nz-text-md);
   color: var(--nz-text-muted);
   letter-spacing: -0.005em;
 }
@@ -105,7 +85,7 @@
 .nz-about-divider {
   height: 1px;
   background: var(--nz-divider);
-  margin: 18px -6px 16px;
+  margin: var(--nz-space-16) calc(var(--nz-space-6) * -1) var(--nz-space-16);
 }
 
 .nz-about-section {
@@ -113,11 +93,11 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 10px;
+  gap: var(--nz-space-10);
 }
 
 .nz-about-section-label {
-  font-size: 10px;
+  font-size: var(--nz-text-xxs);
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -128,10 +108,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 6px 12px;
+  padding: var(--nz-space-6) var(--nz-space-12);
   border-radius: var(--nz-radius-md);
   color: var(--nz-text-strong);
-  transition: color 160ms var(--nz-ease), transform 120ms var(--nz-ease);
+  transition: color var(--nz-dur) var(--nz-ease), transform var(--nz-dur-fast) var(--nz-ease);
 }
 
 .nz-about-brand:hover {
@@ -144,8 +124,8 @@
 }
 
 .nz-about-blurb {
-  margin: 4px 0 2px;
-  font-size: 12.5px;
+  margin: var(--nz-space-4) 0 var(--nz-space-2);
+  font-size: var(--nz-text-md);
   line-height: 1.5;
   color: var(--nz-text-muted);
   max-width: 30ch;
@@ -155,14 +135,14 @@
 .nz-about-link {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 12px;
+  gap: var(--nz-space-4);
+  font-size: var(--nz-text-md);
   font-weight: 500;
   color: var(--nz-accent-hot);
   text-decoration: none;
-  padding: 4px 10px;
-  border-radius: 999px;
-  transition: background 140ms var(--nz-ease), color 140ms var(--nz-ease);
+  padding: var(--nz-space-4) var(--nz-space-10);
+  border-radius: var(--nz-radius-pill);
+  transition: background var(--nz-dur) var(--nz-ease), color var(--nz-dur) var(--nz-ease);
 }
 
 .nz-about-link:hover {
@@ -170,14 +150,14 @@
 }
 
 .nz-about-footer {
-  margin-top: 18px;
-  padding-top: 12px;
+  margin-top: var(--nz-space-16);
+  padding-top: var(--nz-space-12);
   border-top: 1px solid var(--nz-divider);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  font-size: 10.5px;
+  gap: var(--nz-space-6);
+  font-size: var(--nz-text-xxs);
   color: var(--nz-text-whisper);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
@@ -191,17 +171,17 @@
 .nz-version-button {
   background: transparent;
   border: 0;
-  padding: 2px 6px;
+  padding: var(--nz-space-2) var(--nz-space-6);
   margin: 0;
-  border-radius: 6px;
+  border-radius: var(--nz-radius-sm);
   cursor: pointer;
   font-family: var(--nz-font-mono);
-  font-size: 10px;
+  font-size: var(--nz-text-xxs);
   font-weight: 500;
   letter-spacing: 0.02em;
   color: var(--nz-text-whisper);
   font-variant-numeric: tabular-nums;
-  transition: background 140ms var(--nz-ease), color 140ms var(--nz-ease);
+  transition: background var(--nz-dur) var(--nz-ease), color var(--nz-dur) var(--nz-ease);
 }
 
 .nz-version-button:hover {

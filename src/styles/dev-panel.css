@@ -8,8 +8,8 @@
   background: rgba(0, 0, 0, 0.42);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  animation: nz-fade-in 160ms var(--nz-ease);
-  padding: 24px;
+  animation: nz-fade-in var(--nz-dur) var(--nz-ease);
+  padding: var(--nz-space-24);
 }
 
 .nz-dev-panel {
@@ -22,7 +22,7 @@
   border: 1px solid var(--nz-divider-strong);
   border-radius: var(--nz-radius-lg);
   box-shadow: var(--nz-shadow-lg);
-  animation: nz-rise 200ms var(--nz-ease);
+  animation: nz-rise var(--nz-dur-medium) var(--nz-ease);
   color: var(--nz-text);
   overflow: hidden;
 }
@@ -31,13 +31,13 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
-  padding: 18px 22px 12px;
+  gap: var(--nz-space-12);
+  padding: var(--nz-space-16) var(--nz-space-24) var(--nz-space-12);
 }
 
 .nz-dev-header h2 {
-  margin: 4px 0 0;
-  font-size: 16px;
+  margin: var(--nz-space-4) 0 0;
+  font-size: var(--nz-text-xl);
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--nz-text-strong);
@@ -46,46 +46,28 @@
 .nz-dev-tag {
   display: inline-block;
   font-family: var(--nz-font-mono);
-  font-size: 9.5px;
+  font-size: var(--nz-text-xxs);
   font-weight: 700;
   letter-spacing: 0.12em;
-  padding: 2px 7px;
-  border-radius: 999px;
+  padding: var(--nz-space-2) var(--nz-space-8);
+  border-radius: var(--nz-radius-pill);
   color: #fff;
   background: linear-gradient(135deg, #f43f5e, #b45309);
 }
 
-.nz-dev-close {
-  width: 26px;
-  height: 26px;
-  font-size: 18px;
-  line-height: 1;
-  border-radius: var(--nz-radius-sm);
-  color: var(--nz-text-faint);
-  transition: background 120ms var(--nz-ease), color 120ms var(--nz-ease);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-.nz-dev-close:hover {
-  background: var(--nz-bg-hover);
-  color: var(--nz-text-strong);
-}
-
 .nz-dev-body {
-  padding: 8px 22px 20px;
+  padding: var(--nz-space-8) var(--nz-space-24) var(--nz-space-20);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--nz-space-12);
 }
 
 .nz-dev-row {
   display: grid;
   grid-template-columns: 100px 1fr;
   align-items: center;
-  gap: 12px;
-  font-size: 13px;
+  gap: var(--nz-space-12);
+  font-size: var(--nz-text-base);
 }
 
 .nz-dev-row > span {
@@ -96,8 +78,8 @@
 .nz-dev-row input,
 .nz-dev-row select {
   font: inherit;
-  font-size: 13px;
-  padding: 7px 10px;
+  font-size: var(--nz-text-base);
+  padding: var(--nz-space-8) var(--nz-space-10);
   border-radius: var(--nz-radius-sm);
   border: 1px solid var(--nz-divider-strong);
   background: var(--nz-bg-input, var(--nz-bg-hover));
@@ -114,21 +96,23 @@
 .nz-dev-quick {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--nz-space-6);
+  /* 112px aligns chips with the right column of the 100px label grid above
+     (100px label + 12px gap). Hard-coded because it tracks .nz-dev-row. */
   padding-left: 112px;
 }
 
 .nz-dev-chip {
   font: inherit;
-  font-size: 11.5px;
+  font-size: var(--nz-text-sm);
   font-variant-numeric: tabular-nums;
-  padding: 3px 9px;
-  border-radius: 999px;
+  padding: var(--nz-space-4) var(--nz-space-8);
+  border-radius: var(--nz-radius-pill);
   border: 1px solid var(--nz-divider-strong);
   background: transparent;
   color: var(--nz-text-muted);
   cursor: pointer;
-  transition: background 120ms var(--nz-ease), color 120ms var(--nz-ease);
+  transition: background var(--nz-dur-fast) var(--nz-ease), color var(--nz-dur-fast) var(--nz-ease);
 }
 
 .nz-dev-chip:hover {
@@ -137,9 +121,9 @@
 }
 
 .nz-dev-tracked {
-  font-size: 12px;
+  font-size: var(--nz-text-md);
   color: var(--nz-text-muted);
-  padding: 8px 0 4px;
+  padding: var(--nz-space-8) 0 var(--nz-space-4);
   border-top: 1px solid var(--nz-divider);
 }
 
@@ -150,76 +134,34 @@
 
 .nz-dev-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--nz-space-8);
 }
 
 .nz-dev-divider {
   height: 1px;
   background: var(--nz-divider);
-  margin: 4px 0 2px;
+  margin: var(--nz-space-4) 0 var(--nz-space-2);
 }
 
 .nz-dev-section-label {
-  font-size: 10.5px;
+  font-size: var(--nz-text-xxs);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--nz-text-muted);
-  margin-bottom: -2px;
-}
-
-.nz-dev-btn {
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  padding: 8px 14px;
-  border-radius: var(--nz-radius-md);
-  border: 1px solid var(--nz-divider-strong);
-  background: var(--nz-bg-hover);
-  color: var(--nz-text-strong);
-  cursor: pointer;
-  transition: background 120ms var(--nz-ease), color 120ms var(--nz-ease), transform 80ms
-    var(--nz-ease);
-}
-
-.nz-dev-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
-
-.nz-dev-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.nz-dev-btn.primary {
-  background: var(--nz-accent-hot);
-  color: var(--nz-on-accent);
-  border-color: transparent;
-}
-
-.nz-dev-btn.primary:hover:not(:disabled) {
-  filter: brightness(1.05);
-}
-
-.nz-dev-btn.danger {
-  color: #f43f5e;
-  border-color: rgba(244, 63, 94, 0.32);
-}
-
-.nz-dev-btn.danger:hover:not(:disabled) {
-  background: rgba(244, 63, 94, 0.1);
+  margin-bottom: calc(var(--nz-space-2) * -1);
 }
 
 .nz-dev-progress {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 4px 0 0;
+  gap: var(--nz-space-6);
+  padding: var(--nz-space-4) 0 0;
 }
 
 .nz-dev-progress-track {
-  height: 6px;
-  border-radius: 999px;
+  height: var(--nz-space-6);
+  border-radius: var(--nz-radius-pill);
   background: var(--nz-bg-hover);
   overflow: hidden;
 }
@@ -227,27 +169,27 @@
 .nz-dev-progress-fill {
   height: 100%;
   background: var(--nz-accent-hot);
-  border-radius: 999px;
-  transition: width 120ms var(--nz-ease);
+  border-radius: var(--nz-radius-pill);
+  transition: width var(--nz-dur-fast) var(--nz-ease);
 }
 
 .nz-dev-progress-meta {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: var(--nz-text-xs);
   color: var(--nz-text-muted);
   font-variant-numeric: tabular-nums;
 }
 
 .nz-dev-status {
-  font-size: 11.5px;
+  font-size: var(--nz-text-sm);
   line-height: 1.55;
   font-variant-numeric: tabular-nums;
-  padding: 8px 10px;
+  padding: var(--nz-space-8) var(--nz-space-10);
   border-radius: var(--nz-radius-sm);
   background: var(--nz-bg-hover);
   color: var(--nz-text-muted);
-  min-height: 32px;
+  min-height: var(--nz-space-32);
 }
 
 .nz-dev-status[data-kind="running"] {
@@ -266,9 +208,9 @@
 
 .nz-dev-hint code {
   font-family: var(--nz-font-mono);
-  font-size: 10.5px;
-  padding: 1px 5px;
-  margin: 0 2px;
-  border-radius: 4px;
+  font-size: var(--nz-text-xxs);
+  padding: var(--nz-space-2) var(--nz-space-4);
+  margin: 0 var(--nz-space-2);
+  border-radius: var(--nz-radius-xs);
   background: var(--nz-bg-overlay);
 }

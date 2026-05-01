@@ -1,4 +1,5 @@
 use crate::error::Result;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{
     utils::config::Color, LogicalPosition, LogicalSize, Manager, WebviewUrl,
     WebviewWindowBuilder, WindowEvent,
@@ -7,6 +8,14 @@ use tauri::{
 const CAPTURE_LABEL: &str = "capture";
 const CAPTURE_W: f64 = 640.0;
 const CAPTURE_H: f64 = 110.0;
+
+/// Tracks whether we've installed the focus-lost-hides-window listener for
+/// the current capture window. The listener is installed at first creation
+/// and persists for the window's lifetime. Without this flag, an edge-case
+/// path where the OS destroyed the underlying window (race during quit, app
+/// nap on macOS) and we recreate it would re-attach a duplicate listener,
+/// firing `hide()` twice on every focus loss.
+static CAPTURE_LISTENER_INSTALLED: AtomicBool = AtomicBool::new(false);
 
 #[tauri::command]
 pub async fn toggle_capture_window(app: tauri::AppHandle) -> Result<()> {
@@ -57,6 +66,14 @@ pub async fn toggle_capture_window(app: tauri::AppHandle) -> Result<()> {
     // Hide the window the moment it loses focus - Spotlight-style "click
     // outside to dismiss". Anything the user typed is discarded if they
     // didn't press ⌘↵; matches macOS expectations for HUD pop-ups.
+    //
+    // Idempotent install: the early-return above catches the typical
+    // toggle-after-build path. If we somehow reach here a second time
+    // (window torn down by OS app-nap and recreated), the atomic flag
+    // prevents double-listener registration.
+    if CAPTURE_LISTENER_INSTALLED
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
     {
         let app_handle = app.clone();
         win.on_window_event(move |event| {

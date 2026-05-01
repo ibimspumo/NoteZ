@@ -1,6 +1,7 @@
 import { type Component, Show, createEffect, onCleanup } from "solid-js";
 import { APP_VERSION } from "../lib/version";
 import { AgentZLogo } from "./AgentZLogo";
+import { Badge, IconButton } from "./ui";
 
 type Props = {
   open: boolean;
@@ -29,8 +30,8 @@ export const AboutDialog: Component<Props> = (props) => {
           aria-labelledby="nz-about-title"
           onClick={(e) => e.stopPropagation()}
         >
-          <button
-            class="nz-about-close"
+          <IconButton
+            class="nz-about-close-pos"
             aria-label="Close"
             title="Close · esc"
             onClick={props.onClose}
@@ -43,14 +44,14 @@ export const AboutDialog: Component<Props> = (props) => {
                 stroke-linecap="round"
               />
             </svg>
-          </button>
+          </IconButton>
 
           <div class="nz-about-hero">
             <div class="nz-about-app">
               <span class="nz-about-name">
                 Note<span class="nz-about-name-z">Z</span>
               </span>
-              <span class="nz-about-version">v{APP_VERSION}</span>
+              <Badge variant="mono">v{APP_VERSION}</Badge>
             </div>
             <p class="nz-about-tagline" id="nz-about-title">
               Fast, local, beautiful notes for Mac.

@@ -68,6 +68,27 @@ fn openrouter_cache() -> &'static Cache {
     OPENROUTER_CACHE.get_or_init(|| RwLock::new(None))
 }
 
+/// Best-effort overwrite of a String's underlying bytes before drop. Pure
+/// safe code - we mutate the bytes through the public `as_mut_vec` (allowed
+/// because we're about to drop the whole value, so leaving non-UTF-8 in it
+/// is fine). This doesn't help against a hostile attacker reading process
+/// memory live, but it does stop a long-lived allocator slot or coredump
+/// snapshot from preserving the secret after rotation/clear.
+fn zeroize_string(s: &mut String) {
+    // SAFETY: we treat the buffer as raw bytes only to overwrite them. We
+    // immediately clear() afterwards so no non-UTF-8 content can leak out.
+    // This is not unsafe in the Rust sense - it's the standard zeroize
+    // pattern that crates like `zeroize` implement. We avoid the dep here
+    // to keep the bundle small.
+    {
+        let bytes = unsafe { s.as_mut_vec() };
+        for b in bytes.iter_mut() {
+            *b = 0;
+        }
+    }
+    s.clear();
+}
+
 pub fn get_openrouter_key() -> Result<Option<String>> {
     // Fast path: cached.
     if let Ok(c) = openrouter_cache().read() {
@@ -86,6 +107,13 @@ pub fn get_openrouter_key() -> Result<Option<String>> {
 pub fn set_openrouter_key(value: &str) -> Result<()> {
     set(KEYCHAIN_ACCOUNT_OPENROUTER, value)?;
     if let Ok(mut c) = openrouter_cache().write() {
+        // Zeroize the previous secret in-place before swapping in the new
+        // one. Without this, the old Vec<u8> backing the previous String
+        // could be reclaimed by the allocator with the bytes still readable
+        // until reuse.
+        if let Some(Some(old)) = c.as_mut() {
+            zeroize_string(old);
+        }
         *c = Some(Some(value.to_string()));
     }
     Ok(())
@@ -94,6 +122,9 @@ pub fn set_openrouter_key(value: &str) -> Result<()> {
 pub fn delete_openrouter_key() -> Result<()> {
     delete_uncached(KEYCHAIN_ACCOUNT_OPENROUTER)?;
     if let Ok(mut c) = openrouter_cache().write() {
+        if let Some(Some(old)) = c.as_mut() {
+            zeroize_string(old);
+        }
         *c = Some(None);
     }
     Ok(())

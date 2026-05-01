@@ -91,10 +91,12 @@ impl Db {
             (5, MIGRATION_005),
             (6, MIGRATION_006),
             (7, MIGRATION_007),
+            (8, MIGRATION_008),
         ];
 
         let tx = conn.transaction()?;
         let mut crossed_v5 = false;
+        let mut crossed_v8 = false;
         for (version, sql) in migrations {
             if *version > current {
                 tracing::info!("applying migration v{}", version);
@@ -102,6 +104,9 @@ impl Db {
                 tx.execute_batch(&format!("PRAGMA user_version = {}", version))?;
                 if *version == 5 {
                     crossed_v5 = true;
+                }
+                if *version == 8 {
+                    crossed_v8 = true;
                 }
             }
         }
@@ -115,6 +120,16 @@ impl Db {
         if crossed_v5 {
             if let Err(e) = backfill_note_assets(&conn) {
                 tracing::warn!("note_assets backfill failed (will retry on next launch): {e}");
+            }
+        }
+        // Post-migration data backfill for v8: same logic but for the
+        // snapshot_assets join table - the GC pipeline can then drop its
+        // snapshot-content scan and become O(snapshots) via index lookup.
+        if crossed_v8 {
+            if let Err(e) = backfill_snapshot_assets(&conn) {
+                tracing::warn!(
+                    "snapshot_assets backfill failed (will retry on next launch): {e}"
+                );
             }
         }
         Ok(())
@@ -463,6 +478,31 @@ WHERE s.key LIKE 'cursor:%';
 DELETE FROM settings WHERE key LIKE 'cursor:%';
 "#;
 
+// v8: `snapshot_assets` join table mirroring `note_assets`, but for snapshots.
+//
+// The previous `gc_orphan_assets` had a Stage-2 substring scan over every
+// snapshot's content_json to keep assets referenced by snapshots from being
+// reclaimed. With 1M notes × 50 auto-snapshots = 50M snapshots × ~10 KB blob
+// = 500 GB pattern-match work per GC. Unbenutzbar im Zielkorpus.
+//
+// First-class join makes the GC O(orphan_candidates) via a JOIN against this
+// table. Snapshots are immutable, so the only insert path is `create_snapshot`
+// (mirrors the live note's `note_assets` rows at creation time). Migration
+// backfills the existing snapshot blobs once via the same Aho-Corasick scan
+// that `backfill_note_assets` runs.
+//
+// FK CASCADE on snapshot delete; the snapshot's own CASCADE (FK to notes)
+// already handles purge of a note's whole history.
+const MIGRATION_008: &str = r#"
+CREATE TABLE IF NOT EXISTS snapshot_assets (
+    snapshot_id TEXT NOT NULL REFERENCES snapshots(id) ON DELETE CASCADE,
+    asset_id TEXT NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+    PRIMARY KEY (snapshot_id, asset_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_snapshot_assets_asset ON snapshot_assets(asset_id);
+"#;
+
 /// One-shot backfill of the `note_assets` join table from the existing
 /// notes/snapshots content_json blobs. Used at v4→v5 migration time only.
 /// Idempotent (uses INSERT OR IGNORE) and bounded - skips if no assets exist.
@@ -497,6 +537,43 @@ fn backfill_note_assets(conn: &rusqlite::Connection) -> Result<()> {
         }
     }
     tracing::info!("note_assets backfill seeded {} entries", count);
+    Ok(())
+}
+
+/// One-shot backfill of the `snapshot_assets` join table from the existing
+/// snapshots content_json blobs. Used at v7→v8 migration time only.
+/// Idempotent (uses INSERT OR IGNORE) and bounded - skips if no assets exist.
+fn backfill_snapshot_assets(conn: &rusqlite::Connection) -> Result<()> {
+    let known: Vec<String> = {
+        let mut stmt = conn.prepare("SELECT id FROM assets")?;
+        let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()?
+    };
+    if known.is_empty() {
+        return Ok(());
+    }
+
+    let ac = aho_corasick::AhoCorasick::new(&known)
+        .map_err(|e| crate::error::NoteZError::Other(format!("aho-corasick: {e}")))?;
+
+    let mut insert = conn.prepare(
+        "INSERT OR IGNORE INTO snapshot_assets (snapshot_id, asset_id) VALUES (?1, ?2)",
+    )?;
+    let mut select = conn.prepare("SELECT id, content_json FROM snapshots")?;
+    let mut count: u64 = 0;
+    let rows = select.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+    for row in rows {
+        let (snap_id, blob) = row?;
+        let mut seen = std::collections::HashSet::new();
+        for m in ac.find_iter(&blob) {
+            let asset_id = &known[m.pattern().as_usize()];
+            if seen.insert(asset_id.clone()) {
+                insert.execute(rusqlite::params![snap_id, asset_id])?;
+                count += 1;
+            }
+        }
+    }
+    tracing::info!("snapshot_assets backfill seeded {} entries", count);
     Ok(())
 }
 

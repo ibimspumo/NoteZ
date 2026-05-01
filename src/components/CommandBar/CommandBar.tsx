@@ -1,6 +1,7 @@
 import { type Component, For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import { Portal } from "solid-js/web";
 import { formatRelative } from "../../lib/format";
+import { renderHighlightedSnippet } from "../../lib/snippetHighlight";
 import { api } from "../../lib/tauri";
 import type { SearchHit } from "../../lib/types";
 import { nowTick } from "../../stores/clock";
@@ -128,7 +129,7 @@ export const CommandBar: Component<Props> = (props) => {
                       </Show>
                     </div>
                     <Show when={hit.snippet}>
-                      <div class="nz-cb-row-snippet" innerHTML={highlight(hit.snippet)} />
+                      <div class="nz-cb-row-snippet">{renderHighlightedSnippet(hit.snippet)}</div>
                     </Show>
                     <div class="nz-cb-row-time">{formatRelative(hit.updated_at, nowTick())}</div>
                   </div>
@@ -159,14 +160,6 @@ export const CommandBar: Component<Props> = (props) => {
     </Show>
   );
 };
-
-function highlight(snippet: string): string {
-  return escapeHtml(snippet).replaceAll("&lt;&lt;", "<mark>").replaceAll("&gt;&gt;", "</mark>");
-}
-
-function escapeHtml(text: string): string {
-  return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-}
 
 const SearchIcon: Component = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">

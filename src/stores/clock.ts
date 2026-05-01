@@ -3,40 +3,75 @@ import { createSignal } from "solid-js";
 /**
  * Single global clock tick that all relative-time labels read from.
  *
- * Why one signal: the sidebar list, the editor meta-bar, and the command-bar
- * results all show "Nm ago" / "Nh ago" / "Just now" computed from the same
- * `updated_at`. Without a shared reactive `now`, each component captures its
- * mount time and they drift apart - the sidebar showing 22m while the meta
- * bar shows 24m for the same note.
+ * Two signals are exposed:
  *
- * Why 60s: `formatRelative` buckets transition at minute granularity for
- * the first hour and hour granularity after that. A 60s tick covers every
- * possible label change exactly once.
+ *   - `nowTick` ticks every 60 s. Cheap subscribers (per-row `formatRelative`
+ *     in the visible viewport - virtualized to ~30 rows) read this so
+ *     "Nm ago" / "Nh ago" labels stay live without drift.
  *
- * Why this is safe at 1M notes: the sidebar is virtualized, so only ~30
- * rows are in the DOM at any time. A tick re-evaluates `formatRelative` for
- * the visible rows + the open note + (if open) the command-bar results.
- * Cost is bounded by what's on-screen, not by the database size.
+ *   - `dayTick` ticks at most once an hour, AND only when the local calendar
+ *     day actually changes from the previous tick. Heavyweight bucketing
+ *     work (Sidebar's Today/Yesterday/This week grouping) hangs off this so
+ *     it doesn't pay the per-minute reconciliation cost - bucket membership
+ *     is invariant inside a day. Without this split, a 5 000-row sidebar
+ *     loaded prefix re-buckets every minute (300 k allocations/h) for no
+ *     observable change.
  *
  * Visibility-aware: when the page is hidden (window minimised, app in
- * background, laptop lid closed), we pause the interval so the renderer
- * doesn't spend CPU/wakeups on labels nobody can see. On `visibilitychange`
- * back to visible we tick once immediately so labels jump to the current
- * time, then resume the regular cadence.
+ * background, laptop lid closed), we pause both intervals. On
+ * `visibilitychange` back to visible we tick once immediately so labels jump
+ * to the current time, then resume the regular cadence. We also force a
+ * day-tick if the calendar day has actually rolled over while hidden.
  */
 const [now, setNow] = createSignal(Date.now());
+// Coarse "what day is it" signal - invalidated only when the local calendar
+// day flips (or the user resumes the app on a different day). Subscribers
+// don't need to read its value; the existence of the signal change is the
+// signal.
+const [dayKey, setDayKey] = createSignal(localDayKey(Date.now()));
 
-let intervalHandle: number | null = null;
+function localDayKey(ms: number): number {
+  // Use the local-tz midnight ms as the "key". Identity check (=== prev)
+  // is a single integer compare, no Date allocation per consumer.
+  const d = new Date(ms);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+let minuteHandle: number | null = null;
+let hourHandle: number | null = null;
+
+function tickMinute() {
+  const t = Date.now();
+  setNow(t);
+  // Cheap day-rollover guard: even minute ticks may catch a day change if
+  // the hourly handle drifted (sleep/wake skew). Single integer compare.
+  const k = localDayKey(t);
+  if (k !== dayKey()) setDayKey(k);
+}
+
+function tickHour() {
+  const k = localDayKey(Date.now());
+  if (k !== dayKey()) setDayKey(k);
+}
 
 function startTick() {
-  if (intervalHandle != null) return;
-  intervalHandle = window.setInterval(() => setNow(Date.now()), 60_000);
+  if (minuteHandle == null) {
+    minuteHandle = window.setInterval(tickMinute, 60_000);
+  }
+  if (hourHandle == null) {
+    hourHandle = window.setInterval(tickHour, 60 * 60_000);
+  }
 }
 
 function stopTick() {
-  if (intervalHandle == null) return;
-  window.clearInterval(intervalHandle);
-  intervalHandle = null;
+  if (minuteHandle != null) {
+    window.clearInterval(minuteHandle);
+    minuteHandle = null;
+  }
+  if (hourHandle != null) {
+    window.clearInterval(hourHandle);
+    hourHandle = null;
+  }
 }
 
 if (typeof window !== "undefined") {
@@ -50,7 +85,7 @@ if (typeof window !== "undefined") {
       } else {
         // Catch up immediately on resume so labels reflect the current time
         // rather than the moment the tick was paused.
-        setNow(Date.now());
+        tickMinute();
         startTick();
       }
     });
@@ -58,3 +93,4 @@ if (typeof window !== "undefined") {
 }
 
 export const nowTick = now;
+export const dayTick = dayKey;

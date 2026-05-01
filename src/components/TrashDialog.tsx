@@ -17,13 +17,14 @@ import {
   purgeNote,
   restoreNote,
 } from "../stores/notes";
+import { trashRetentionDays } from "../stores/settings";
+import { Badge, Button, IconButton } from "./ui";
 
 type Props = {
   open: boolean;
   onClose: () => void;
 };
 
-const RETENTION_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const TrashDialog: Component<Props> = (props) => {
@@ -71,15 +72,10 @@ export const TrashDialog: Component<Props> = (props) => {
                 Trash
               </h2>
               <Show when={items().length > 0}>
-                <span class="nz-trash-count">{items().length}</span>
+                <Badge variant="neutral">{items().length}</Badge>
               </Show>
             </div>
-            <button
-              class="nz-trash-close"
-              aria-label="Close"
-              title="Close · esc"
-              onClick={props.onClose}
-            >
+            <IconButton size="sm" aria-label="Close" title="Close · esc" onClick={props.onClose}>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path
                   d="m3.5 3.5 7 7M10.5 3.5l-7 7"
@@ -88,11 +84,17 @@ export const TrashDialog: Component<Props> = (props) => {
                   stroke-linecap="round"
                 />
               </svg>
-            </button>
+            </IconButton>
           </header>
 
           <p class="nz-trash-blurb">
-            Items in Trash are automatically deleted after {RETENTION_DAYS} days.
+            <Show
+              when={trashRetentionDays() > 0}
+              fallback={<>Items in Trash stay until you empty them manually.</>}
+            >
+              Items in Trash are automatically deleted after {trashRetentionDays()} day
+              {trashRetentionDays() === 1 ? "" : "s"}.
+            </Show>
           </p>
 
           <div class="nz-trash-body">
@@ -125,9 +127,9 @@ export const TrashDialog: Component<Props> = (props) => {
 
           <Show when={items().length > 0}>
             <footer class="nz-trash-footer">
-              <button class="nz-pill-btn danger" onClick={() => void handleEmpty()}>
+              <Button variant="danger" shape="pill" onClick={() => void handleEmpty()}>
                 {confirmEmpty() ? "Click again to confirm" : "Empty Trash"}
-              </button>
+              </Button>
             </footer>
           </Show>
         </div>
@@ -141,10 +143,13 @@ const TrashRow: Component<{ item: TrashSummary }> = (p) => {
   const title = () => p.item.title.trim() || "New Note";
   const preview = () => truncate(p.item.preview || "", 120);
   const remaining = () => {
+    // Setting `0` means "never auto-delete" - no countdown to show.
+    const retentionDays = trashRetentionDays();
+    if (retentionDays <= 0) return null;
     const deleted = Date.parse(p.item.deleted_at);
     if (Number.isNaN(deleted)) return null;
     const elapsed = Date.now() - deleted;
-    const left = RETENTION_DAYS * DAY_MS - elapsed;
+    const left = retentionDays * DAY_MS - elapsed;
     if (left <= 0) return "deleting soon";
     const days = Math.ceil(left / DAY_MS);
     return days === 1 ? "1 day left" : `${days} days left`;
@@ -168,11 +173,13 @@ const TrashRow: Component<{ item: TrashSummary }> = (p) => {
         </div>
       </div>
       <div class="nz-trash-item-actions">
-        <button class="nz-pill-btn" title="Restore" onClick={() => void restoreNote(p.item.id)}>
+        <Button size="sm" shape="pill" title="Restore" onClick={() => void restoreNote(p.item.id)}>
           Restore
-        </button>
-        <button
-          class="nz-pill-btn danger"
+        </Button>
+        <Button
+          variant="danger"
+          size="sm"
+          shape="pill"
           title="Delete forever"
           onClick={() => {
             if (!confirming()) {
@@ -183,7 +190,7 @@ const TrashRow: Component<{ item: TrashSummary }> = (p) => {
           }}
         >
           {confirming() ? "Confirm" : "Delete"}
-        </button>
+        </Button>
       </div>
     </li>
   );

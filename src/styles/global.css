@@ -18,7 +18,7 @@ body {
   background: transparent;
   color: var(--nz-text);
   font-family: var(--nz-font-ui);
-  font-size: 13.5px;
+  font-size: var(--nz-text-lg);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -85,7 +85,7 @@ ol {
 
 ::-webkit-scrollbar-thumb {
   background: var(--nz-scrollbar);
-  border-radius: 4px;
+  border-radius: var(--nz-radius-xs);
   border: 2px solid transparent;
   background-clip: padding-box;
 }

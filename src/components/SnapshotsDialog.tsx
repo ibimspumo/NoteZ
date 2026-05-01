@@ -15,6 +15,7 @@ import { nowTick } from "../stores/clock";
 import { loadNote } from "../stores/notes";
 import { toast } from "../stores/toasts";
 import { ArrowLeftIcon, CloseIcon, HistoryIcon } from "./icons";
+import { Badge, Button, IconButton, Input } from "./ui";
 
 type Props = {
   open: boolean;
@@ -251,22 +252,21 @@ export const SnapshotsDialog: Component<Props> = (props) => {
                       History
                     </h2>
                     <Show when={items().length > 0}>
-                      <span class="nz-trash-count">{items().length}</span>
+                      <Badge variant="neutral">{items().length}</Badge>
                     </Show>
                   </>
                 }
               >
                 {(_v) => (
                   <>
-                    <button
-                      type="button"
-                      class="nz-icon-btn"
+                    <IconButton
+                      size="sm"
                       aria-label="Back to history"
                       title="Back · esc"
                       onClick={() => setViewing(null)}
                     >
                       <ArrowLeftIcon width="14" height="14" />
-                    </button>
+                    </IconButton>
                     <h2 class="nz-trash-title" id="nz-snapshots-title">
                       Compare
                     </h2>
@@ -274,15 +274,9 @@ export const SnapshotsDialog: Component<Props> = (props) => {
                 )}
               </Show>
             </div>
-            <button
-              type="button"
-              class="nz-trash-close"
-              aria-label="Close"
-              title="Close · esc"
-              onClick={props.onClose}
-            >
+            <IconButton aria-label="Close" title="Close · esc" onClick={props.onClose}>
               <CloseIcon />
-            </button>
+            </IconButton>
           </header>
 
           <Show
@@ -307,9 +301,8 @@ export const SnapshotsDialog: Component<Props> = (props) => {
             </p>
 
             <div class="nz-snapshots-take">
-              <input
-                type="text"
-                class="nz-ai-key-input"
+              <Input
+                size="md"
                 placeholder="Optional label for this snapshot…"
                 value={labelInput()}
                 onInput={(e) => setLabelInput(e.currentTarget.value)}
@@ -323,14 +316,14 @@ export const SnapshotsDialog: Component<Props> = (props) => {
                 spellcheck={false}
                 autocomplete="off"
               />
-              <button
-                type="button"
-                class="nz-pill-btn primary"
+              <Button
+                variant="primary"
+                shape="pill"
                 onClick={() => void handleTakeSnapshot()}
                 disabled={taking()}
               >
                 {taking() ? "Saving…" : "Take snapshot"}
-              </button>
+              </Button>
             </div>
 
             <div class="nz-trash-body">
@@ -434,22 +427,21 @@ const SnapshotRow: Component<{
         <Show
           when={p.confirming}
           fallback={
-            <button
-              type="button"
-              class="nz-pill-btn"
+            <Button
+              shape="pill"
               title="Replace current content with this snapshot"
               onClick={p.onRestore}
             >
               Restore
-            </button>
+            </Button>
           }
         >
-          <button type="button" class="nz-pill-btn" onClick={p.onCancelConfirm}>
+          <Button shape="pill" onClick={p.onCancelConfirm}>
             Cancel
-          </button>
-          <button type="button" class="nz-pill-btn danger" onClick={p.onRestore}>
+          </Button>
+          <Button variant="danger" shape="pill" onClick={p.onRestore}>
             Confirm restore
-          </button>
+          </Button>
         </Show>
       </div>
     </li>
@@ -547,17 +539,17 @@ const DiffView: Component<{
         <Show
           when={p.confirming}
           fallback={
-            <button type="button" class="nz-pill-btn primary" onClick={p.onRestore}>
+            <Button variant="primary" shape="pill" onClick={p.onRestore}>
               Restore this snapshot
-            </button>
+            </Button>
           }
         >
-          <button type="button" class="nz-pill-btn" onClick={p.onCancelRestoreConfirm}>
+          <Button shape="pill" onClick={p.onCancelRestoreConfirm}>
             Cancel
-          </button>
-          <button type="button" class="nz-pill-btn danger" onClick={p.onRestore}>
+          </Button>
+          <Button variant="danger" shape="pill" onClick={p.onRestore}>
             Confirm restore
-          </button>
+          </Button>
         </Show>
       </footer>
     </>
@@ -580,7 +572,7 @@ const DiffRow: Component<{ line: DiffLine }> = (p) => {
       </span>
       <Show
         when={"words" in p.line && p.line.words}
-        fallback={<span class="nz-diff-text">{p.line.text || " "}</span>}
+        fallback={<span class="nz-diff-text">{p.line.text || " "}</span>}
       >
         <span class="nz-diff-text">
           <For each={p.line.kind !== "context" ? (p.line.words as WordPart[]) : []}>
