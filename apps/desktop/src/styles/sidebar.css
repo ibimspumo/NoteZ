@@ -31,11 +31,12 @@
 
    Vertical alignment is anchored to the traffic-light cluster: top-aligned
    with a small `padding-top` so the button visual center lands at roughly
-   window y=18-20, where the lights actually render (Tauri's
-   `trafficLightPosition.y` reads as a vertical center on macOS, not the
-   top of the cluster). 44px row height matches `.nz-main-header` so the
-   two top bars read as a single band; 80px left padding reserves the
-   cluster's horizontal footprint. */
+   window y=14, where the lights render at AppKit's default position
+   (we no longer pass `trafficLightPosition` in tauri.conf.json - the
+   feature is layout-timing-sensitive and produced visibly different
+   results in `pnpm tauri dev` vs the bundled .app). 44px row height
+   matches `.nz-main-header` so the two top bars read as a single band;
+   80px left padding reserves the cluster's horizontal footprint. */
 .nz-sidebar-header {
   display: flex;
   align-items: flex-start;

@@ -2567,7 +2567,7 @@ dependencies = [
 
 [[package]]
 name = "notez"
-version = "0.8.15"
+version = "0.8.16"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -2576,9 +2576,6 @@ dependencies = [
  "hex",
  "image",
  "keyring",
- "objc2",
- "objc2-app-kit",
- "objc2-foundation",
  "once_cell",
  "r2d2",
  "r2d2_sqlite",

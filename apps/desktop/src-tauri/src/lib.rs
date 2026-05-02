@@ -4,8 +4,6 @@ mod db;
 mod error;
 mod events;
 mod keychain;
-#[cfg(target_os = "macos")]
-mod mac_chrome;
 mod models;
 mod pagination;
 mod setup;
@@ -329,31 +327,11 @@ pub fn run() {
             // or position, and the next launch would restore stale geometry.
             if let Some(main) = app.get_webview_window("main") {
                 let app_handle = app.handle().clone();
-                #[cfg(target_os = "macos")]
-                let main_for_inset = main.clone();
                 main.on_window_event(move |event| {
                     if matches!(event, WindowEvent::CloseRequested { .. }) {
                         if let Err(e) = app_handle.save_window_state(StateFlags::all()) {
                             tracing::warn!("save_window_state on main close failed: {e}");
                         }
-                    }
-                    // Re-apply the traffic-light inset whenever AppKit
-                    // re-lays-out the title bar. tao only sets the inset on
-                    // its drawRect hook, which runs at a transient state
-                    // during initial launch (vibrancy view insertion, theme
-                    // detection); a Resized or ThemeChanged settles the
-                    // window into its final geometry and is the right
-                    // moment to nail the position down.
-                    #[cfg(target_os = "macos")]
-                    if matches!(
-                        event,
-                        WindowEvent::Resized(_) | WindowEvent::ThemeChanged(_)
-                    ) {
-                        crate::mac_chrome::apply_traffic_light_inset(
-                            &main_for_inset,
-                            crate::setup::TRAFFIC_LIGHT_INSET_X,
-                            crate::setup::TRAFFIC_LIGHT_INSET_Y,
-                        );
                     }
                 });
             }
