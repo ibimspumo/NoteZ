@@ -3,7 +3,28 @@
 Fast, local, beautiful notes for Mac. Tauri 2 + Rust backend + Solid + TypeScript +
 Lexical editor (vanilla, custom UI). Mac-first; Windows/Linux possible later.
 
-## Architecture
+## Monorepo layout
+
+This repo is a pnpm workspace. Top-level layout:
+
+```
+apps/
+  desktop/       the Tauri/Solid app (everything below under "Architecture" lives here)
+  web/           Astro landing page for take-notez.com (dark mode, English)
+packages/
+  shared/        placeholder for sync-related types shared between desktop, web,
+                 and a future sync server. Empty until the sync feature lands.
+tools/           standalone helper crates (e.g. share-bench), not in the workspace
+```
+
+The root `package.json` is `notez-monorepo` and only holds workspace scripts +
+biome. Each app has its own `package.json`. From the repo root run desktop
+commands via `pnpm desktop:dev` / `pnpm desktop:tauri:dev` /
+`pnpm desktop:typecheck`, or `cd apps/desktop` and use the original
+`pnpm dev` / `pnpm tauri:dev` / `pnpm typecheck` scripts directly. Web commands:
+`pnpm web:dev`, `pnpm web:build`.
+
+## Architecture (apps/desktop)
 
 ```
 src-tauri/        Rust backend
@@ -148,17 +169,25 @@ change?* If yes, update the README in the same commit.
 
 ## Commands
 
-```bash
-pnpm install
-pnpm tauri dev          # full app with hot reload
-pnpm dev                # frontend-only Vite (no Tauri shell)
-pnpm typecheck          # tsc --noEmit
-pnpm build              # frontend prod bundle → dist/
-pnpm tauri build        # native .app
+Run from the repo root (workspace-aware) unless noted:
 
-cargo check --manifest-path src-tauri/Cargo.toml
-cargo build --manifest-path src-tauri/Cargo.toml
+```bash
+pnpm install                            # installs every workspace
+pnpm desktop:tauri:dev                  # full app with hot reload
+pnpm desktop:dev                        # frontend-only Vite (no Tauri shell)
+pnpm desktop:typecheck                  # tsc --noEmit
+pnpm desktop:build                      # frontend prod bundle -> apps/desktop/dist/
+pnpm desktop:tauri:build                # native .app
+
+pnpm web:dev                            # Astro landing page on localhost:4321
+pnpm web:build                          # static export -> apps/web/dist/
+
+cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml
+cargo build --manifest-path apps/desktop/src-tauri/Cargo.toml
 ```
+
+Or `cd apps/desktop` and use the original `pnpm dev` / `pnpm tauri:dev` /
+`pnpm typecheck` / `pnpm test` aliases.
 
 ## Debugging
 
@@ -204,18 +233,44 @@ every published build - never auto-decide the release version. Patch bumps
 (no tag) need no such confirmation since they don't publish anything; just
 do them.
 
-**Files to update on every bump (all four must match):**
-1. `package.json` - `version` field (canonical; Vite's `define` injects this
-   into the renderer as `__APP_VERSION__`, so `src/lib/version.ts` no longer
-   needs touching - it just re-exports the global)
-2. `src-tauri/tauri.conf.json` - `version` field
-3. `src-tauri/Cargo.toml` - `[package].version`
-4. `README.md` - the `**vX.Y.Z**` line + badge at the top
+**Files to update on every desktop bump (all four must match):**
+1. `apps/desktop/package.json` - `version` field (canonical; Vite's `define`
+   injects this into the renderer as `__APP_VERSION__`, so `src/lib/version.ts`
+   no longer needs touching - it just re-exports the global)
+2. `apps/desktop/src-tauri/tauri.conf.json` - `version` field
+3. `apps/desktop/src-tauri/Cargo.toml` - `[package].version`
+4. `README.md` (repo root) - the `**vX.Y.Z**` line + badge at the top
+
+The web app (`apps/web/package.json`) versions independently. Marketing-site
+copy that displays the desktop version (`v0.8.x` chips, download buttons)
+imports from `apps/web/src/data/site.ts`, which reads
+`apps/desktop/package.json` at build time - so a desktop bump is reflected
+on take-notez.com after the next Vercel build, no web edits required.
 
 If you ship a change without bumping, you've shipped a regression - the user
 can't tell what version they're running. The version label is the contract.
 
-## Releases
+## Web deploy (apps/web)
+
+The marketing site at `take-notez.com` deploys to **Vercel**, not GitHub
+Actions. Setup is one-time via the Vercel dashboard:
+
+1. Import the repo into Vercel.
+2. Set **Root Directory** to `apps/web`.
+3. Vercel auto-detects Astro from `apps/web/vercel.json` (framework hint
+   plus `buildCommand` that installs at the workspace root and builds the
+   `@notez/web` filter).
+4. Attach `take-notez.com` as the custom domain.
+
+After that, every push to `main` that touches `apps/web/`,
+`packages/shared/`, or the workspace lockfile triggers a deploy. The
+`ignoreCommand` in `vercel.json` skips the build for desktop-only commits.
+Other branches get preview URLs automatically.
+
+There is no GitHub Action for the web deploy. The Action only owns the
+desktop release pipeline.
+
+## Releases (apps/desktop)
 
 Releases are built and published by GitHub Actions
 (`.github/workflows/release.yml`). The workflow fires on any `vX.Y.Z` tag
@@ -261,11 +316,12 @@ the `v` prefix), otherwise `tauri-action` fails the build.
 ## Don'ts
 
 - **Never start the dev server on your own.** Do not run `pnpm dev`,
-  `pnpm tauri dev`, or `preview_start` to "verify" a change unless the
-  user explicitly asks for it. The user runs the dev server themselves;
-  rely on `pnpm typecheck` and `cargo check` for verification, and
-  describe what to look for if a manual check is needed. This overrides
-  the generic preview/verification workflow for this repo.
+  `pnpm tauri dev`, `pnpm desktop:tauri:dev`, `pnpm web:dev`, or
+  `preview_start` to "verify" a change unless the user explicitly asks for
+  it. The user runs the dev server themselves; rely on
+  `pnpm desktop:typecheck` and `cargo check` for verification, and describe
+  what to look for if a manual check is needed. This overrides the generic
+  preview/verification workflow for this repo.
 - **No `@lexical/react`.** Solid + React don't mix; vanilla-only.
 - **No `tauri-plugin-sql`.** We own the schema in Rust (richer than the plugin allows
   for FTS5 + ranking).

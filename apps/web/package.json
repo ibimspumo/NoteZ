@@ -1,0 +1,22 @@
+{
+  "name": "@notez/web",
+  "private": true,
+  "version": "0.1.0",
+  "description": "NoteZ marketing site - take-notez.com",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "typecheck": "astro check"
+  },
+  "dependencies": {
+    "astro": "^5.1.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.4",
+    "typescript": "~5.6.2"
+  }
+}

@@ -1,0 +1,276 @@
+/* NoteZ marketing site - reuses the desktop app's design system tokens 1:1
+ * (see apps/desktop/src/styles/theme.css and the Default theme in
+ * apps/desktop/src/themes/builtins/default.json). The web has no macOS
+ * vibrancy, so we substitute the mono theme's solid `#0a0a0c` body base
+ * for the otherwise-transparent app surface. Everything else - accent,
+ * text, shadows, radii, spacing, fonts - mirrors the app exactly. */
+
+:root {
+  /* Color tokens from default.json (dark, green accent) */
+  --nz-accent: #00dc82;
+  --nz-accent-hot: #00c374;
+  --nz-on-accent: #fff;
+  --nz-accent-soft: rgba(0, 220, 130, 0.16);
+  --nz-accent-glow: rgba(0, 220, 130, 0.32);
+
+  --nz-brand-bright: #1ad592;
+  --nz-brand-deep: #08885a;
+  --nz-brand-glow: rgba(26, 213, 146, 0.28);
+
+  /* Body bg comes from mono.json - the web has no vibrancy. */
+  --nz-body-bg: #0a0a0c;
+  --nz-bg-card: rgba(255, 255, 255, 0.04);
+  --nz-bg-elev: rgba(28, 28, 30, 0.94);
+  --nz-bg-hover: rgba(255, 255, 255, 0.05);
+  --nz-bg-row: rgba(255, 255, 255, 0.035);
+
+  --nz-divider: rgba(255, 255, 255, 0.07);
+  --nz-divider-strong: rgba(255, 255, 255, 0.14);
+
+  --nz-text: #f4f4f5;
+  --nz-text-strong: #fafafa;
+  --nz-text-muted: rgba(244, 244, 245, 0.62);
+  --nz-text-faint: rgba(244, 244, 245, 0.4);
+  --nz-text-whisper: rgba(244, 244, 245, 0.22);
+
+  --nz-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --nz-shadow: 0 14px 44px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --nz-shadow-lg: 0 28px 80px rgba(0, 0, 0, 0.7), 0 8px 22px rgba(0, 0, 0, 0.45);
+
+  --nz-focus-ring: rgba(0, 220, 130, 0.6);
+
+  /* Radii (theme.css) */
+  --nz-radius-xs: 4px;
+  --nz-radius-sm: 6px;
+  --nz-radius-md: 8px;
+  --nz-radius-lg: 12px;
+  --nz-radius-xl: 16px;
+  --nz-radius-pill: 999px;
+
+  /* Easing + duration (theme.css) */
+  --nz-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --nz-dur-fast: 100ms;
+  --nz-dur: 140ms;
+  --nz-dur-medium: 220ms;
+  --nz-dur-slow: 320ms;
+
+  /* Type scale - desktop is 13px-anchored (compact UI). Marketing pages
+   * read at arms length, so we keep the proportions but shift the
+   * baseline up a notch. The named tokens still match the app's
+   * vocabulary so the visual rhythm carries over. */
+  --nz-text-xxs: 11px;
+  --nz-text-xs: 12px;
+  --nz-text-sm: 13px;
+  --nz-text-base: 15px;
+  --nz-text-lg: 16px;
+  --nz-text-xl: 18px;
+  --nz-text-2xl: 22px;
+  --nz-text-3xl: 28px;
+  --nz-text-4xl: 38px;
+  --nz-text-5xl: 56px;
+  --nz-text-6xl: 80px;
+
+  /* Spacing scale (theme.css) */
+  --nz-space-2: 2px;
+  --nz-space-4: 4px;
+  --nz-space-6: 6px;
+  --nz-space-8: 8px;
+  --nz-space-12: 12px;
+  --nz-space-16: 16px;
+  --nz-space-20: 20px;
+  --nz-space-24: 24px;
+  --nz-space-32: 32px;
+  --nz-space-40: 40px;
+  --nz-space-48: 48px;
+  --nz-space-64: 64px;
+  --nz-space-96: 96px;
+  --nz-space-128: 128px;
+
+  /* Fonts: identical stack to the desktop app */
+  --nz-font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --nz-font-mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--nz-body-bg);
+  color-scheme: dark;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  background: var(--nz-body-bg);
+  color: var(--nz-text);
+  font-family: var(--nz-font-ui);
+  font-size: var(--nz-text-base);
+  line-height: 1.55;
+  min-height: 100vh;
+}
+
+::selection {
+  background: rgba(0, 220, 130, 0.34);
+  color: var(--nz-text-strong);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--nz-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--nz-radius-sm);
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--nz-text-strong);
+}
+
+p {
+  margin: 0;
+}
+
+code,
+kbd {
+  font-family: var(--nz-font-mono);
+  font-size: 0.92em;
+}
+
+/* Page-level layout */
+
+.shell {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 var(--nz-space-32);
+}
+
+@media (max-width: 720px) {
+  .shell {
+    padding: 0 var(--nz-space-20);
+  }
+}
+
+/* The whole page sits over a soft radial wash that picks up the brand
+ * green at the top, the way the app's titlebar hairline does. Subtle,
+ * not a gradient party. */
+.bg-wash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(
+      1100px 600px at 50% -200px,
+      rgba(0, 220, 130, 0.08),
+      transparent 70%
+    ),
+    radial-gradient(
+      900px 500px at 90% 110%,
+      rgba(26, 213, 146, 0.05),
+      transparent 60%
+    );
+}
+
+main {
+  position: relative;
+  z-index: 1;
+}
+
+/* Reusable building blocks */
+
+.eyebrow {
+  font-family: var(--nz-font-mono);
+  font-size: var(--nz-text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nz-text-faint);
+}
+
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: var(--nz-radius-sm);
+  border: 1px solid var(--nz-divider-strong);
+  background: var(--nz-bg-card);
+  font-family: var(--nz-font-mono);
+  font-size: var(--nz-text-xs);
+  color: var(--nz-text-muted);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nz-space-8);
+  padding: 12px 18px;
+  border-radius: var(--nz-radius-md);
+  font-family: var(--nz-font-ui);
+  font-size: var(--nz-text-base);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    background var(--nz-dur) var(--nz-ease),
+    border-color var(--nz-dur) var(--nz-ease),
+    transform var(--nz-dur-fast) var(--nz-ease);
+  user-select: none;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn-primary {
+  background: var(--nz-accent);
+  color: var(--nz-on-accent);
+  box-shadow: 0 8px 28px rgba(0, 220, 130, 0.28), 0 1px 0 rgba(255, 255, 255, 0.18) inset;
+}
+
+.btn-primary:hover {
+  background: var(--nz-accent-hot);
+}
+
+.btn-secondary {
+  background: var(--nz-bg-card);
+  color: var(--nz-text);
+  border-color: var(--nz-divider-strong);
+}
+
+.btn-secondary:hover {
+  background: var(--nz-bg-hover);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+/* Section rhythm */
+section {
+  padding: var(--nz-space-128) 0;
+}
+
+@media (max-width: 720px) {
+  section {
+    padding: var(--nz-space-96) 0;
+  }
+}

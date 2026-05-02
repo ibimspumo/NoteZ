@@ -1,0 +1,156 @@
+---
+import { DESKTOP_VERSION, DOWNLOAD_URL, SOURCE_URL } from "../data/site";
+---
+
+<section class="hero">
+  <div class="shell hero-inner">
+    <div class="hero-copy">
+      <span class="eyebrow">A note app for Mac</span>
+      <h1 class="hero-title">
+        The note app that<br />
+        stays fast at one<br />
+        <em>million</em> notes.
+      </h1>
+      <p class="hero-sub">
+        Apple Notes is too simple. Notion is too much. NoteZ is the middle that
+        nobody else built. Local SQLite. Spotlight-grade search. Mac-native.
+        No cloud, no account, no telemetry.
+      </p>
+      <div class="hero-cta">
+        <a href={DOWNLOAD_URL} class="btn btn-primary">
+          Download for Mac
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M8 1.5a.75.75 0 0 1 .75.75v7.69l2.72-2.72a.75.75 0 0 1 1.06 1.06l-4 4a.75.75 0 0 1-1.06 0l-4-4a.75.75 0 1 1 1.06-1.06l2.72 2.72V2.25A.75.75 0 0 1 8 1.5Zm-5.25 11a.75.75 0 0 1 .75.75v.5h9v-.5a.75.75 0 0 1 1.5 0v.75A1.5 1.5 0 0 1 12.5 15.5h-9A1.5 1.5 0 0 1 2 14v-.75a.75.75 0 0 1 .75-.75Z"
+            />
+          </svg>
+        </a>
+        <a href={SOURCE_URL} class="btn btn-secondary">View on GitHub</a>
+      </div>
+      <p class="hero-meta">
+        <span>v{DESKTOP_VERSION}</span>
+        <span class="dot">·</span>
+        <span>Apple Silicon</span>
+        <span class="dot">·</span>
+        <span>~10 MB</span>
+        <span class="dot">·</span>
+        <span>macOS 12+</span>
+      </p>
+    </div>
+
+    <div class="hero-art" aria-hidden="true">
+      <div class="hero-art-frame">
+        <img
+          src="/screenshot-panes.png"
+          alt="NoteZ split panes"
+          width="1600"
+          height="1000"
+          loading="eager"
+          decoding="async"
+        />
+      </div>
+      <div class="hero-glow"></div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .hero {
+    padding-top: var(--nz-space-96);
+    padding-bottom: var(--nz-space-128);
+  }
+  .hero-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--nz-space-64);
+    align-items: center;
+  }
+  @media (min-width: 980px) {
+    .hero-inner {
+      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+      gap: var(--nz-space-96);
+    }
+  }
+  .hero-copy {
+    display: flex;
+    flex-direction: column;
+    gap: var(--nz-space-24);
+  }
+  .hero-title {
+    font-size: clamp(40px, 6vw, var(--nz-text-6xl));
+    line-height: 1.02;
+    letter-spacing: -0.035em;
+    font-weight: 600;
+    color: var(--nz-text-strong);
+    margin-top: var(--nz-space-8);
+  }
+  .hero-title em {
+    font-style: italic;
+    background: linear-gradient(180deg, var(--nz-brand-bright), var(--nz-accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-weight: 600;
+  }
+  .hero-sub {
+    color: var(--nz-text-muted);
+    font-size: var(--nz-text-xl);
+    line-height: 1.55;
+    max-width: 540px;
+  }
+  .hero-cta {
+    display: flex;
+    gap: var(--nz-space-12);
+    margin-top: var(--nz-space-12);
+    flex-wrap: wrap;
+  }
+  .hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--nz-space-8);
+    align-items: center;
+    font-family: var(--nz-font-mono);
+    font-size: var(--nz-text-xs);
+    color: var(--nz-text-faint);
+    letter-spacing: 0.04em;
+    margin-top: var(--nz-space-8);
+  }
+  .hero-meta .dot {
+    color: var(--nz-text-whisper);
+  }
+
+  .hero-art {
+    position: relative;
+    isolation: isolate;
+  }
+  .hero-art-frame {
+    position: relative;
+    border-radius: var(--nz-radius-xl);
+    overflow: hidden;
+    border: 1px solid var(--nz-divider-strong);
+    background: var(--nz-bg-card);
+    box-shadow: var(--nz-shadow-lg);
+    transform: perspective(1400px) rotateX(2deg) rotateY(-3deg);
+    transition: transform var(--nz-dur-slow) var(--nz-ease);
+  }
+  .hero-art-frame:hover {
+    transform: perspective(1400px) rotateX(0deg) rotateY(0deg);
+  }
+  .hero-art-frame img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .hero-glow {
+    position: absolute;
+    inset: -10% -10% -20% -10%;
+    z-index: -1;
+    background: radial-gradient(
+      60% 60% at 50% 40%,
+      rgba(0, 220, 130, 0.18),
+      transparent 70%
+    );
+    filter: blur(40px);
+  }
+</style>

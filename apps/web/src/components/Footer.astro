@@ -1,0 +1,94 @@
+---
+import {
+  DESKTOP_VERSION,
+  DOWNLOAD_URL,
+  SOURCE_URL,
+  README_URL,
+  LICENSE_URL,
+} from "../data/site";
+
+const year = new Date().getFullYear();
+---
+
+<footer class="footer">
+  <div class="shell footer-inner">
+    <div class="footer-brand">
+      <img src="/icon.png" alt="" width="22" height="22" class="footer-mark" />
+      <span class="footer-name">NoteZ</span>
+      <span class="footer-version">v{DESKTOP_VERSION}</span>
+    </div>
+    <div class="footer-links">
+      <a href={SOURCE_URL}>GitHub</a>
+      <a href={DOWNLOAD_URL}>Releases</a>
+      <a href={README_URL}>README</a>
+      <a href={LICENSE_URL}>License</a>
+    </div>
+    <div class="footer-meta">
+      <span>&copy; {year} NoteZ</span>
+      <span class="dot" aria-hidden="true">·</span>
+      <span>MIT</span>
+      <span class="dot" aria-hidden="true">·</span>
+      <span>Made on a Mac</span>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .footer {
+    border-top: 1px solid var(--nz-divider);
+    padding: var(--nz-space-48) 0;
+  }
+  .footer-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--nz-space-24);
+  }
+  .footer-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--nz-space-12);
+  }
+  .footer-mark {
+    border-radius: var(--nz-radius-xs);
+  }
+  .footer-name {
+    font-weight: 600;
+    color: var(--nz-text-strong);
+    letter-spacing: -0.015em;
+  }
+  .footer-version {
+    font-family: var(--nz-font-mono);
+    font-size: var(--nz-text-xs);
+    color: var(--nz-text-faint);
+    padding: 2px 8px;
+    border: 1px solid var(--nz-divider);
+    border-radius: var(--nz-radius-pill);
+  }
+  .footer-links {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--nz-space-20);
+    font-size: var(--nz-text-sm);
+    color: var(--nz-text-muted);
+  }
+  .footer-links a {
+    transition: color var(--nz-dur) var(--nz-ease);
+  }
+  .footer-links a:hover {
+    color: var(--nz-text);
+  }
+  .footer-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--nz-space-8);
+    font-family: var(--nz-font-mono);
+    font-size: var(--nz-text-xs);
+    color: var(--nz-text-faint);
+    letter-spacing: 0.04em;
+  }
+  .footer-meta .dot {
+    color: var(--nz-text-whisper);
+  }
+</style>

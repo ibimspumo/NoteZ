@@ -1,0 +1,98 @@
+---
+const promises = [
+  { label: "No accounts.", body: "Ever." },
+  { label: "No cloud.", body: "Your notes never touch a server we control." },
+  {
+    label: "No telemetry.",
+    body: "We don't watch how, when, or whether you write.",
+  },
+  {
+    label: "No forced updates.",
+    body: "Hourly check against GitHub, install on your terms.",
+  },
+  {
+    label: "No AI surprises.",
+    body: "The one optional AI feature is opt-in and key-local.",
+  },
+  {
+    label: "No lock-in.",
+    body: "It's a SQLite file. You own it.",
+  },
+];
+---
+
+<section class="promises">
+  <div class="shell">
+    <div class="promises-head">
+      <span class="eyebrow">Promises</span>
+      <h2 class="promises-headline">
+        Six things NoteZ will <em>never</em> do.
+      </h2>
+    </div>
+    <ul class="promise-grid">
+      {promises.map((p) => (
+        <li class="promise">
+          <span class="promise-label">{p.label}</span>
+          <span class="promise-body">{p.body}</span>
+        </li>
+      ))}
+    </ul>
+  </div>
+</section>
+
+<style>
+  .promises-head {
+    max-width: 680px;
+    margin-bottom: var(--nz-space-48);
+    display: flex;
+    flex-direction: column;
+    gap: var(--nz-space-16);
+  }
+  .promises-headline {
+    font-size: clamp(28px, 4vw, var(--nz-text-4xl));
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+    font-weight: 600;
+  }
+  .promises-headline em {
+    font-style: italic;
+    color: var(--nz-accent);
+    font-weight: 600;
+  }
+  .promise-grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 0;
+    border-top: 1px solid var(--nz-divider);
+  }
+  .promise {
+    padding: var(--nz-space-24) var(--nz-space-20);
+    border-bottom: 1px solid var(--nz-divider);
+    border-right: 1px solid var(--nz-divider);
+    display: flex;
+    flex-direction: column;
+    gap: var(--nz-space-6);
+  }
+  /* Strip the right border on the last column - works even when the
+   * grid wraps to fewer than `auto-fill` columns by using nth-of-type
+   * trick + media queries. Simpler: just clear right border on every
+   * item, then re-add via separators inside. The visual goal is a
+   * gridded table feel without a heavy outline. */
+  .promise {
+    border-right: none;
+  }
+  .promise-label {
+    font-size: var(--nz-text-base);
+    font-weight: 600;
+    color: var(--nz-text-strong);
+    letter-spacing: -0.015em;
+  }
+  .promise-body {
+    color: var(--nz-text-muted);
+    font-size: var(--nz-text-sm);
+    line-height: 1.55;
+  }
+</style>

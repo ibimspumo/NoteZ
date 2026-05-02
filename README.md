@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.8.14-1f883d?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-0.8.15-1f883d?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/platform-macOS-1f883d?style=flat-square" alt="macOS" />
   <img src="https://img.shields.io/badge/Apple_Silicon-native-1f883d?style=flat-square" alt="Apple Silicon" />
   <img src="https://img.shields.io/badge/storage-local_only-1f883d?style=flat-square" alt="local-only" />
@@ -204,7 +204,7 @@ progress bar, then flips to **Restart to apply** when the bundle is on
 disk. Click that to relaunch immediately, or just quit NoteZ normally
 and the new version starts on the next launch.
 
-In Settings → Updates you can flip auto-download to **On**: the hourly
+In Settings → Auto Update you can flip auto-download to **On**: the hourly
 check then fetches and unpacks the new version silently, so the only
 manual step is the eventual restart (or just keep using NoteZ until you
 quit it for any reason). Off by default; the choice is yours.

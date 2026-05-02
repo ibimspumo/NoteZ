@@ -1,0 +1,127 @@
+---
+const features = [
+  {
+    eyebrow: "Built for one million",
+    figure: "1,000,000",
+    title: "Stays fast at scale.",
+    body: `Most note apps assume a few hundred notes. NoteZ assumes a million.
+      Sidebar virtualizes, database paginates with cursors, search is FTS5
+      with custom BM25 + recency + title + pin ranking. The user with
+      fourteen notes is happy either way - the user with fourteen thousand
+      stays.`,
+  },
+  {
+    eyebrow: "Local-first",
+    figure: "1 file",
+    title: "Your notes never leave the machine.",
+    body: `Everything lives in a single SQLite file in your Application
+      Support folder. Back it up, drop it in iCloud Drive to sync between
+      Macs, open it with any SQLite tool. There is no NoteZ server.
+      There is no account.`,
+  },
+  {
+    eyebrow: "Mac-native",
+    figure: "~10 MB",
+    title: "Tauri + Rust, not Electron.",
+    body: `Translucent vibrancy. Hidden traffic lights that blend into the
+      chrome. Native dark mode that reacts to the system. Global hotkeys
+      that respect Accessibility permissions. The whole app weighs about
+      ten megabytes.`,
+  },
+];
+---
+
+<section class="features">
+  <div class="shell">
+    <div class="features-head">
+      <span class="eyebrow">What makes it different</span>
+      <h2 class="features-headline">
+        Apple Notes speed.<br />Notion-grade structure.<br />
+        <span class="muted">Zero cloud lock-in.</span>
+      </h2>
+    </div>
+
+    <div class="feature-grid">
+      {features.map((f) => (
+        <article class="feature-card">
+          <div class="feature-figure">{f.figure}</div>
+          <div class="feature-body">
+            <span class="eyebrow">{f.eyebrow}</span>
+            <h3 class="feature-title">{f.title}</h3>
+            <p class="feature-text">{f.body}</p>
+          </div>
+        </article>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style>
+  .features-head {
+    max-width: 720px;
+    margin-bottom: var(--nz-space-64);
+    display: flex;
+    flex-direction: column;
+    gap: var(--nz-space-16);
+  }
+  .features-headline {
+    font-size: clamp(30px, 4.4vw, var(--nz-text-5xl));
+    line-height: 1.06;
+    letter-spacing: -0.025em;
+    font-weight: 600;
+  }
+  .features-headline .muted {
+    color: var(--nz-text-muted);
+  }
+
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--nz-space-20);
+  }
+
+  .feature-card {
+    border: 1px solid var(--nz-divider);
+    border-radius: var(--nz-radius-xl);
+    background: var(--nz-bg-card);
+    padding: var(--nz-space-32);
+    display: flex;
+    flex-direction: column;
+    gap: var(--nz-space-24);
+    transition:
+      border-color var(--nz-dur-medium) var(--nz-ease),
+      background var(--nz-dur-medium) var(--nz-ease),
+      transform var(--nz-dur-medium) var(--nz-ease);
+  }
+  .feature-card:hover {
+    border-color: var(--nz-divider-strong);
+    background: rgba(255, 255, 255, 0.05);
+    transform: translateY(-2px);
+  }
+
+  .feature-figure {
+    font-family: var(--nz-font-mono);
+    font-size: clamp(28px, 3.4vw, 40px);
+    color: var(--nz-accent);
+    letter-spacing: -0.02em;
+    font-weight: 500;
+    line-height: 1;
+  }
+  .feature-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--nz-space-8);
+  }
+  .feature-title {
+    font-size: var(--nz-text-2xl);
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    color: var(--nz-text-strong);
+    margin-top: var(--nz-space-4);
+  }
+  .feature-text {
+    color: var(--nz-text-muted);
+    font-size: var(--nz-text-base);
+    line-height: 1.62;
+  }
+</style>

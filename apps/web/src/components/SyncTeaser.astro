@@ -1,0 +1,152 @@
+---
+// Sync is a real future plan, not vapor. The data model and backend slot
+// already exist in the monorepo (packages/shared, future apps/sync-server).
+// This section makes the intent visible without promising a date.
+---
+
+<section class="sync">
+  <div class="shell sync-card">
+    <div class="sync-text">
+      <span class="eyebrow">On the roadmap</span>
+      <h2 class="sync-title">
+        Optional sync. <span class="muted">End-to-end encrypted.</span>
+      </h2>
+      <p class="sync-body">
+        Multi-Mac sync over your own NoteZ account, with end-to-end encryption
+        as the default. The local SQLite file stays the source of truth. Sign
+        in only if you want it; the app keeps working offline forever otherwise.
+      </p>
+      <p class="sync-meta">
+        <span class="status-dot" aria-hidden="true"></span>
+        In design - shipping after the desktop reaches v1.0.
+      </p>
+    </div>
+    <div class="sync-orbit" aria-hidden="true">
+      <div class="orbit-ring r1"></div>
+      <div class="orbit-ring r2"></div>
+      <div class="orbit-ring r3"></div>
+      <div class="orbit-core"></div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .sync-card {
+    border: 1px solid var(--nz-divider-strong);
+    border-radius: var(--nz-radius-xl);
+    background:
+      radial-gradient(
+        90% 140% at 100% 0%,
+        rgba(0, 220, 130, 0.1),
+        transparent 60%
+      ),
+      var(--nz-bg-card);
+    padding: clamp(32px, 5vw, 64px);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--nz-space-48);
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--nz-shadow);
+  }
+  @media (min-width: 880px) {
+    .sync-card {
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    }
+  }
+
+  .sync-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--nz-space-16);
+  }
+  .sync-title {
+    font-size: clamp(26px, 3.6vw, var(--nz-text-4xl));
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+    font-weight: 600;
+  }
+  .sync-title .muted {
+    color: var(--nz-text-muted);
+  }
+  .sync-body {
+    color: var(--nz-text-muted);
+    font-size: var(--nz-text-lg);
+    line-height: 1.6;
+    max-width: 540px;
+  }
+  .sync-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--nz-space-8);
+    font-family: var(--nz-font-mono);
+    font-size: var(--nz-text-xs);
+    color: var(--nz-text-faint);
+    letter-spacing: 0.04em;
+    margin-top: var(--nz-space-4);
+  }
+  .status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--nz-accent);
+    box-shadow: 0 0 10px var(--nz-accent-glow);
+  }
+
+  .sync-orbit {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    width: 100%;
+    max-width: 360px;
+    margin-left: auto;
+  }
+  .orbit-ring {
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--nz-divider-strong);
+    border-radius: 50%;
+  }
+  .orbit-ring.r1 { inset: 8%; }
+  .orbit-ring.r2 { inset: 22%; opacity: 0.7; }
+  .orbit-ring.r3 { inset: 38%; opacity: 0.4; }
+  .orbit-core {
+    position: absolute;
+    inset: 50% 50%;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--nz-accent);
+    transform: translate(-50%, -50%);
+    box-shadow:
+      0 0 0 6px rgba(0, 220, 130, 0.16),
+      0 0 40px var(--nz-accent-glow);
+  }
+  /* Three small node dots, one per ring, suggesting devices on an orbit */
+  .orbit-ring.r1::after,
+  .orbit-ring.r2::after,
+  .orbit-ring.r3::after {
+    content: "";
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--nz-text);
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.06);
+  }
+  .orbit-ring.r1::after {
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  .orbit-ring.r2::after {
+    top: 50%;
+    right: -5px;
+    transform: translateY(-50%);
+  }
+  .orbit-ring.r3::after {
+    bottom: -5px;
+    left: 30%;
+  }
+</style>

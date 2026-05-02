@@ -1,0 +1,66 @@
+---
+import { DESKTOP_VERSION, DOWNLOAD_URL, SOURCE_URL } from "../data/site";
+---
+
+<section class="final-cta">
+  <div class="shell final-inner">
+    <h2 class="final-title">
+      Open it. Type a note.<br />
+      <span class="muted">See how fast a note app can feel.</span>
+    </h2>
+    <div class="final-actions">
+      <a href={DOWNLOAD_URL} class="btn btn-primary">
+        Download v{DESKTOP_VERSION}
+      </a>
+      <a href={SOURCE_URL} class="btn btn-secondary">Read the source</a>
+    </div>
+    <p class="final-footnote">
+      Apple Silicon. macOS 12+. Unsigned for now - clear quarantine with{" "}
+      <code>xattr -cr /Applications/NoteZ.app</code> on first launch.
+    </p>
+  </div>
+</section>
+
+<style>
+  .final-cta {
+    text-align: center;
+    border-top: 1px solid var(--nz-divider);
+    padding-top: var(--nz-space-128);
+    padding-bottom: var(--nz-space-128);
+  }
+  .final-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--nz-space-32);
+    max-width: 720px;
+    margin-inline: auto;
+  }
+  .final-title {
+    font-size: clamp(32px, 5vw, var(--nz-text-5xl));
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    font-weight: 600;
+  }
+  .final-title .muted {
+    color: var(--nz-text-muted);
+  }
+  .final-actions {
+    display: flex;
+    gap: var(--nz-space-12);
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .final-footnote {
+    color: var(--nz-text-faint);
+    font-size: var(--nz-text-sm);
+    line-height: 1.6;
+  }
+  .final-footnote code {
+    background: var(--nz-bg-card);
+    border: 1px solid var(--nz-divider);
+    padding: 2px 6px;
+    border-radius: var(--nz-radius-xs);
+    color: var(--nz-text-muted);
+  }
+</style>

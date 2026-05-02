@@ -1,6 +1,10 @@
-node_modules
-dist
-dist-ssr
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+dist-ssr/
+.astro/
+**/.astro/
 *.local
 
 # Editor
@@ -16,8 +20,8 @@ dist-ssr
 *.sw?
 
 # Tauri / Rust
-src-tauri/target/
-src-tauri/gen/
+**/src-tauri/target/
+**/src-tauri/gen/
 tools/**/target/
 
 # Logs

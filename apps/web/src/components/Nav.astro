@@ -1,0 +1,86 @@
+---
+import { DESKTOP_VERSION, DOWNLOAD_URL, SOURCE_URL } from "../data/site";
+---
+
+<nav class="nav">
+  <div class="shell nav-inner">
+    <a href="/" class="brand" aria-label="NoteZ home">
+      <img src="/icon.png" alt="" width="28" height="28" class="brand-mark" />
+      <span class="brand-name">NoteZ</span>
+      <span class="brand-version">v{DESKTOP_VERSION}</span>
+    </a>
+    <div class="nav-links">
+      <a href={SOURCE_URL} class="nav-link">GitHub</a>
+      <a href={DOWNLOAD_URL} class="nav-link">Releases</a>
+      <a href={DOWNLOAD_URL} class="btn btn-secondary nav-cta">Download</a>
+    </div>
+  </div>
+</nav>
+
+<style>
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    background: rgba(10, 10, 12, 0.72);
+    border-bottom: 1px solid var(--nz-divider);
+  }
+  .nav-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: var(--nz-space-16);
+    padding-bottom: var(--nz-space-16);
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--nz-space-12);
+  }
+  .brand-mark {
+    border-radius: var(--nz-radius-sm);
+    box-shadow: var(--nz-shadow-sm);
+  }
+  .brand-name {
+    font-size: var(--nz-text-xl);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    color: var(--nz-text-strong);
+  }
+  .brand-version {
+    font-family: var(--nz-font-mono);
+    font-size: var(--nz-text-xs);
+    color: var(--nz-text-faint);
+    padding: 2px 8px;
+    border-radius: var(--nz-radius-pill);
+    border: 1px solid var(--nz-divider);
+    margin-left: var(--nz-space-4);
+  }
+  .nav-links {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--nz-space-24);
+  }
+  .nav-link {
+    font-size: var(--nz-text-sm);
+    color: var(--nz-text-muted);
+    transition: color var(--nz-dur) var(--nz-ease);
+  }
+  .nav-link:hover {
+    color: var(--nz-text);
+  }
+  .nav-cta {
+    padding: 8px 14px;
+    font-size: var(--nz-text-sm);
+  }
+  @media (max-width: 560px) {
+    .brand-version {
+      display: none;
+    }
+    .nav-link:not(.nav-cta) {
+      display: none;
+    }
+  }
+</style>

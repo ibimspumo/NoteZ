@@ -1,0 +1,125 @@
+---
+const slides = [
+  {
+    src: "/screenshot-folders.png",
+    alt: "NoteZ folder tree in the sidebar",
+    eyebrow: "Folders",
+    title: "Nested folders. Drag-and-drop. Scoped views.",
+    body: `Group notes into nested folders. Drag notes onto folders, drag
+      folders into folders. Click a folder to scope the sidebar. Inbox
+      holds whatever you haven't filed yet.`,
+  },
+  {
+    src: "/screenshot-mentions.png",
+    alt: "A note with mention pills linking to other notes",
+    eyebrow: "Mentions",
+    title: "Type @ to link your thinking.",
+    body: `Type @ anywhere to link to another note. The popover ranks
+      suggestions by recency and relevance, fuzzy-matches as you type, and
+      renders the result as a token, not a Markdown link. Click the pill
+      to jump.`,
+  },
+];
+---
+
+<section class="tour">
+  <div class="shell">
+    <div class="tour-head">
+      <span class="eyebrow">Tour</span>
+      <h2 class="tour-headline">
+        Built for the way you<br />actually work in a notes app.
+      </h2>
+    </div>
+
+    <div class="tour-stack">
+      {slides.map((s, i) => (
+        <article class={`tour-row ${i % 2 === 1 ? "reverse" : ""}`}>
+          <div class="tour-frame">
+            <img src={s.src} alt={s.alt} loading="lazy" decoding="async" />
+          </div>
+          <div class="tour-text">
+            <span class="eyebrow">{s.eyebrow}</span>
+            <h3 class="tour-title">{s.title}</h3>
+            <p class="tour-body">{s.body}</p>
+          </div>
+        </article>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style>
+  .tour-head {
+    max-width: 680px;
+    margin-bottom: var(--nz-space-64);
+    display: flex;
+    flex-direction: column;
+    gap: var(--nz-space-16);
+  }
+  .tour-headline {
+    font-size: clamp(28px, 4vw, var(--nz-text-4xl));
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+    font-weight: 600;
+  }
+
+  .tour-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--nz-space-128);
+  }
+  @media (max-width: 720px) {
+    .tour-stack {
+      gap: var(--nz-space-96);
+    }
+  }
+
+  .tour-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--nz-space-48);
+    align-items: center;
+  }
+  @media (min-width: 880px) {
+    .tour-row {
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    }
+    .tour-row.reverse {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    }
+    .tour-row.reverse .tour-frame {
+      order: 2;
+    }
+  }
+
+  .tour-frame {
+    border-radius: var(--nz-radius-xl);
+    overflow: hidden;
+    border: 1px solid var(--nz-divider-strong);
+    background: var(--nz-bg-card);
+    box-shadow: var(--nz-shadow);
+  }
+  .tour-frame img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .tour-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--nz-space-12);
+    max-width: 480px;
+  }
+  .tour-title {
+    font-size: clamp(22px, 2.6vw, var(--nz-text-3xl));
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+  }
+  .tour-body {
+    color: var(--nz-text-muted);
+    font-size: var(--nz-text-base);
+    line-height: 1.65;
+  }
+</style>
