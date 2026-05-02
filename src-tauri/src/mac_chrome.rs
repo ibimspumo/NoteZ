@@ -2,17 +2,24 @@
 //!
 //! Tauri 2's `trafficLightPosition` config maps to tao's
 //! `with_traffic_light_inset`, which hooks `drawRect:` on the root content
-//! view to re-position the close/minimize/zoom cluster on every redraw. The
-//! first invocation lands at a transient layout state - in particular,
-//! after `apply_vibrancy` injects an `NSVisualEffectView` the title-bar
-//! container's frame shifts, and bundled (`.app`) vs unbundled launches
-//! exercise slightly different AppKit init orderings. The visible result:
-//! traffic lights sit a few pixels lower in the GitHub-built release than
-//! in `pnpm tauri dev`.
+//! view to re-position the close/minimize/zoom cluster on every redraw.
+//! The catch: tao only mutates the buttons' *X* origin and resizes the
+//! title-bar container; the *Y* origin is left at whatever AppKit picked
+//! during the initial layout pass. That initial Y differs between a
+//! bundled `.app` (the GitHub release) and an unbundled `cargo run` (the
+//! `pnpm tauri dev` shell), so the same `trafficLightPosition: { y: 26 }`
+//! config produces visibly different vertical positions.
 //!
-//! `apply_traffic_light_inset` re-runs the same arithmetic tao uses,
-//! dispatched onto the main thread at a known-good moment (post-vibrancy in
-//! setup, plus on `Resized` / `ThemeChanged`), so the two builds agree.
+//! Our `apply_traffic_light_inset` re-resizes the title-bar container the
+//! same way tao does, then explicitly *centers* the three buttons inside
+//! it - removing the dependency on AppKit's initial Y. tao's drawRect hook
+//! preserves the Y we set on subsequent redraws (its loop only writes
+//! `origin.x`), so once we've nailed Y down it stays.
+//!
+//! Called from `setup` after `apply_vibrancy` (the visual-effect view
+//! insertion is one of the things that perturbs the initial Y), and from
+//! `lib.rs` on `Resized` / `ThemeChanged` (window-state restoration and
+//! the first dark-mode probe both kick the title-bar container around).
 
 use tauri::{Runtime, WebviewWindow};
 
@@ -55,20 +62,40 @@ pub fn apply_traffic_light_inset<R: Runtime>(window: &WebviewWindow<R>, x: f64, 
             return;
         };
 
+        // Resize the title-bar container so it's `close.height + y` tall,
+        // anchored to the top of the window. NSWindow uses bottom-left
+        // origin, so a container whose top touches the window top has
+        // `origin.y = window.height - container.height`.
         let close_rect = close_view.frame();
-        let title_bar_height = close_rect.size.height + y;
+        let button_height = close_rect.size.height;
+        let title_bar_height = button_height + y;
+        let window_height = ns_window.frame().size.height;
         let mut title_bar_rect = title_bar_container.frame();
         title_bar_rect.size.height = title_bar_height;
-        title_bar_rect.origin.y = ns_window.frame().size.height - title_bar_height;
+        title_bar_rect.origin.y = window_height - title_bar_height;
         title_bar_container.setFrame(title_bar_rect);
 
+        // X spacing: keep the same gap between buttons that AppKit's
+        // initial layout chose. The first run captures the system value;
+        // subsequent runs are idempotent (mini.x - close.x stays
+        // `space_between` once we've set them).
         let mini_rect = mini_view.frame();
         let space_between = mini_rect.origin.x - close_rect.origin.x;
 
+        // Y position: vertically center the buttons inside the resized
+        // title-bar container. With container height = button.h + y, the
+        // visual center of the cluster lands at y/2 + button.h/2 below the
+        // window top - independent of whatever Y AppKit stamped on the
+        // buttons during the initial layout pass. With y=26 and the
+        // standard 14px button, that puts the cluster center at ~20px
+        // below the top, which matches the dev build's appearance.
+        let button_y = title_bar_rect.origin.y + (title_bar_height - button_height) / 2.0;
+
         for (i, button) in [close_view, mini_view, zoom_view].iter().enumerate() {
-            let mut rect = button.frame();
-            rect.origin.x = x + (i as f64 * space_between);
-            button.setFrameOrigin(rect.origin);
+            let mut origin = button.frame().origin;
+            origin.x = x + (i as f64 * space_between);
+            origin.y = button_y;
+            button.setFrameOrigin(origin);
         }
     });
 
