@@ -73,7 +73,7 @@ keyring = { version = "3", features = ["apple-native"] }
 rand = "0.8"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-window-vibrancy = "0.6"
+window-vibrancy = "0.7"
 # Direct AppKit access to re-apply the traffic-light inset after vibrancy is
 # installed and after Resized/ThemeChanged events. tao's built-in inset hook
 # fires on every drawRect, but its first calculation can land at a transient
