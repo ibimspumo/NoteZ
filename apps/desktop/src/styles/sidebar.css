@@ -31,12 +31,14 @@
 
    Vertical alignment is anchored to the traffic-light cluster: top-aligned
    with a small `padding-top` so the button visual center lands at roughly
-   window y=14, where the lights render at AppKit's default position
-   (we no longer pass `trafficLightPosition` in tauri.conf.json - the
-   feature is layout-timing-sensitive and produced visibly different
-   results in `pnpm tauri dev` vs the bundled .app). 44px row height
-   matches `.nz-main-header` so the two top bars read as a single band;
-   80px left padding reserves the cluster's horizontal footprint. */
+   window y=18-20, where the lights actually render with our
+   `trafficLightPosition: { x: 17, y: 26 }` config. (Note: tao applies the
+   inset on every drawRect, and the result drifts a few pixels between
+   `pnpm tauri dev` and the bundled .app because of layout-timing
+   differences - we accept the small mismatch since it's the only way to
+   move the cluster off the default top-left position at all.) 44px row
+   height matches `.nz-main-header` so the two top bars read as a single
+   band; 80px left padding reserves the cluster's horizontal footprint. */
 .nz-sidebar-header {
   display: flex;
   align-items: flex-start;

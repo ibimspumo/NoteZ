@@ -12,7 +12,15 @@ permissions:
 jobs:
   build:
     name: Build macOS (Apple Silicon)
-    runs-on: macos-latest
+    # Pin to macos-26 (Tahoe) instead of macos-latest, which currently
+    # resolves to macos-15 (Sequoia). macOS Tahoe enlarged the standard
+    # window-button cluster and changed its vertical centering, so a
+    # binary built against the Sequoia SDK and run on a user's Tahoe
+    # Mac places the traffic lights a few pixels lower than `pnpm tauri
+    # dev` does locally on the same Mac. Building against the Tahoe SDK
+    # makes both paths produce pixel-identical chrome. macos-26 has
+    # been GA on GitHub-hosted runners since 2026-02-26.
+    runs-on: macos-26
 
     steps:
       - name: Checkout
