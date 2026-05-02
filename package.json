@@ -1,7 +1,7 @@
 {
   "name": "notez",
   "private": true,
-  "version": "0.8.12",
+  "version": "0.8.13",
   "description": "NoteZ - fast, local, beautiful notes for Mac.",
   "type": "module",
   "scripts": {
