@@ -1,0 +1,56 @@
+---
+// Left-bordered editorial quote, ported from PerfManifesto in
+// landing-sections.jsx.
+---
+
+<section class="nz-section" style="padding-top: 60px;">
+  <div class="nz-container" style="max-width: 880px;">
+    <div style="border-left: 2px solid var(--accent); padding-left: 28px;">
+      <div class="nz-kicker" style="margin-bottom: 18px;">
+        The performance obsession
+      </div>
+      <p class="manifesto-lead">
+        Most note apps slow down once you have a few thousand notes.<br />
+        <span style="color: var(--fg-mute);">NoteZ doesn't.</span>
+      </p>
+      <p class="manifesto-body">
+        We measure every feature against one user: the one with a million notes.
+        If a feature can't survive that, it doesn't ship. Searching, scrolling,
+        opening, switching - all of it has to feel the same on note one and on
+        note one million. So that's how we built it.
+      </p>
+      <p class="manifesto-tail">
+        Native, lightweight, no telemetry. The whole app is about the size of a
+        single photo.
+      </p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .manifesto-lead {
+    font-family: var(--font-display);
+    font-size: clamp(28px, 3vw, 40px);
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    font-weight: 500;
+    color: var(--fg);
+    margin: 0;
+    text-wrap: balance;
+  }
+  .manifesto-body {
+    font-size: 17px;
+    line-height: 1.65;
+    color: var(--fg-soft);
+    margin-top: 28px;
+    max-width: 640px;
+  }
+  .manifesto-tail {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--fg-mute);
+    margin-top: 20px;
+    font-style: italic;
+    max-width: 640px;
+  }
+</style>

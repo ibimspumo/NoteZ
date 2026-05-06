@@ -1,0 +1,57 @@
+---
+import Icon from "./icons.astro";
+
+const feats = [
+  {
+    icon: "bolt" as const,
+    title: "Search that keeps up with you",
+    body: "Results appear while you're still typing. One note, ten thousand, a million - it stays the same.",
+  },
+  {
+    icon: "chip" as const,
+    title: "Open it. It's already there.",
+    body: "No splash screen. No loading. Click the icon and start writing in the same breath.",
+  },
+  {
+    icon: "layers" as const,
+    title: "Smooth, every scroll",
+    body: "Sidebar, search, trash, history. A million entries scroll like ten. You won't notice it - that's the point.",
+  },
+  {
+    icon: "lock" as const,
+    title: "Yours, only yours",
+    body: "Your notes live on your machine. No cloud. No account. No internet needed. Ever.",
+  },
+  {
+    icon: "at" as const,
+    title: "Mentions that just work",
+    body: "Type @ anywhere to link a note to another. Click to jump. Build a web of ideas without folders.",
+  },
+  {
+    icon: "clock" as const,
+    title: "Quietly remembers everything",
+    body: "Snapshots every few minutes. Up to 50 versions per note. The trash holds for 30 days. Nothing is ever truly gone.",
+  },
+];
+---
+
+<section class="nz-section" id="features">
+  <div class="nz-container">
+    <div class="nz-section-head">
+      <div class="nz-kicker">Built around speed</div>
+      <h2 class="nz-h2">The fastest note app you'll use.</h2>
+      <p class="nz-lead">Six things we obsess over. Performance is in five of them.</p>
+    </div>
+    <div class="nz-features">
+      {feats.map((f) => (
+        <div class="nz-feature">
+          <div class="nz-feature-glyph">
+            <Icon name={f.icon} />
+          </div>
+          <h3>{f.title}</h3>
+          <p>{f.body}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

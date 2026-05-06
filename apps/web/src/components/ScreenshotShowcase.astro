@@ -1,0 +1,107 @@
+---
+const shots = [
+  {
+    id: "split",
+    label: "Split panes",
+    src: "/screenshot-split.png",
+    caption: "Up to 8 panes side-by-side. Layout restores on launch.",
+  },
+  {
+    id: "pricing",
+    label: "Editor",
+    src: "/screenshot-pricing.png",
+    caption:
+      "Just write. Headings, bullets, mentions - all the formatting, none of the noise.",
+  },
+  {
+    id: "onboarding",
+    label: "Mentions",
+    src: "/screenshot-onboarding.png",
+    caption:
+      "Type @ to link to any note. Click to jump. Build a web of ideas without folders.",
+  },
+];
+const defaultId = "pricing";
+const defaultShot = shots.find((s) => s.id === defaultId) ?? shots[0];
+---
+
+<section class="nz-section-tight" style="padding-top: 0;">
+  <div class="nz-container">
+    <div class="shot" data-shot data-default={defaultId} data-interval="5500">
+      <div class="shot-stack">
+        {shots.map((s) => (
+          <img
+            src={s.src}
+            alt={s.label}
+            data-id={s.id}
+            data-caption={s.caption}
+            class:list={["shot-img", { "is-active": s.id === defaultId }]}
+            loading={s.id === defaultId ? "eager" : "lazy"}
+            decoding="async"
+          />
+        ))}
+      </div>
+      <div class="shot-tabs">
+        {shots.map((s) => (
+          <button
+            type="button"
+            class:list={["shot-tab", { "is-active": s.id === defaultId }]}
+            data-shot-tab={s.id}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+      <p class="shot-caption" data-shot-caption>
+        {defaultShot.caption}
+      </p>
+    </div>
+  </div>
+</section>
+
+<script is:inline>
+  // Screenshot showcase - auto-rotate every `data-interval` ms; stop on click.
+  // Captions live on each <img data-caption="...">, so the script doesn't
+  // need any data passed in from the server.
+  document.querySelectorAll("[data-shot]").forEach((root) => {
+    const interval = Number(root.getAttribute("data-interval")) || 5500;
+    const imgs = Array.from(root.querySelectorAll(".shot-img"));
+    const tabs = Array.from(root.querySelectorAll("[data-shot-tab]"));
+    const caption = root.querySelector("[data-shot-caption]");
+    const ids = imgs.map((img) => img.getAttribute("data-id"));
+    if (ids.length === 0) return;
+    let active = root.getAttribute("data-default") || ids[0];
+    let auto = true;
+
+    function setActive(id) {
+      active = id;
+      imgs.forEach((img) => {
+        const match = img.getAttribute("data-id") === id;
+        img.classList.toggle("is-active", match);
+        if (match && caption) {
+          caption.textContent = img.getAttribute("data-caption") || "";
+        }
+      });
+      tabs.forEach((tab) => {
+        tab.classList.toggle(
+          "is-active",
+          tab.getAttribute("data-shot-tab") === id,
+        );
+      });
+    }
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        auto = false;
+        const id = tab.getAttribute("data-shot-tab");
+        if (id) setActive(id);
+      });
+    });
+
+    setInterval(() => {
+      if (!auto) return;
+      const i = ids.indexOf(active);
+      setActive(ids[(i + 1) % ids.length]);
+    }, interval);
+  });
+</script>

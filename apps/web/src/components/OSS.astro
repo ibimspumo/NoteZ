@@ -1,0 +1,46 @@
+---
+import { SOURCE_URL, DOWNLOAD_URL } from "../data/site";
+import Icon from "./icons.astro";
+---
+
+<section class="nz-section">
+  <div class="nz-container">
+    <div class="nz-oss">
+      <div>
+        <div class="nz-kicker">Open source</div>
+        <h2 class="nz-h2">Read the code. Open an issue. Send a PR.</h2>
+        <p class="nz-lead">
+          NoteZ is open source and built in the open. Read the code, open an
+          issue, send a fix - or just look around. The whole app is about the
+          size of a single photo.
+        </p>
+        <div style="margin-top: 28px; display: flex; gap: 12px; flex-wrap: wrap;">
+          <a class="nz-btn nz-btn-primary" href={SOURCE_URL}>
+            <Icon name="github" /> github.com/ibimspumo/NoteZ
+          </a>
+          <a class="nz-btn nz-btn-ghost" href={DOWNLOAD_URL}>
+            Releases
+          </a>
+        </div>
+      </div>
+      <div class="nz-oss-stats">
+        <div class="nz-oss-stat">
+          <div class="num">Native</div>
+          <div class="label">Not a web app</div>
+        </div>
+        <div class="nz-oss-stat">
+          <div class="num">Local</div>
+          <div class="label">Your machine, your file</div>
+        </div>
+        <div class="nz-oss-stat">
+          <div class="num">Open</div>
+          <div class="label">Read every line</div>
+        </div>
+        <div class="nz-oss-stat">
+          <div class="num">Free</div>
+          <div class="label">No paid tier, ever</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

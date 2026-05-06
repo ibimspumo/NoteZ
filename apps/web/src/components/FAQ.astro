@@ -1,0 +1,64 @@
+---
+// Accordion FAQ. Each item is a <button> + <div> pair; vanilla JS toggles
+// the .open class on the parent. No framework needed.
+
+const items = [
+  {
+    q: "Which platforms are supported?",
+    a: `<p>NoteZ is a desktop app. The first build is for Mac; Windows and Linux are next - same speed, same feel, same notes file. Cross-platform was a day-one decision, so the wait won't be long.</p>`,
+  },
+  {
+    q: "Why does macOS say the app is damaged on first launch?",
+    a: `<p>Because we don't pay for an Apple Developer signature yet - macOS is just being cautious. One line in Terminal clears it for good:</p><p><code>xattr -cr /Applications/NoteZ.app</code></p><p>You only do this once. After that, NoteZ opens like any other app.</p>`,
+  },
+  {
+    q: "Where do my notes actually live?",
+    a: `<p>In a single file on your machine. Back it up however you back things up; drop it in iCloud Drive or Dropbox if you want it on a second computer; copy it to a USB stick. It's just a file - it's yours.</p>`,
+  },
+  {
+    q: "Is there sync? A mobile app?",
+    a: `<p>Not yet. Proper end-to-end encrypted sync and a phone companion are on the roadmap - just later. Local comes first. For now, dropping the notes file into iCloud Drive or Dropbox works fine if you only use one machine at a time.</p>`,
+  },
+  {
+    q: "Is it really free?",
+    a: `<p>Yes. Open source, no paid tier. If that ever changes, the version you have today stays free forever.</p>`,
+  },
+  {
+    q: "What's the deal with Windows and Linux?",
+    a: `<p>Coming. NoteZ was built cross-platform from day one - the OS-specific touches are isolated, so the next builds aren't a downgrade. When Windows and Linux land, they'll feel exactly as fast as the first build.</p>`,
+  },
+  {
+    q: "What about AI?",
+    a: `<p>Narrow and opt-in. No silent summaries. No "let me rewrite that for you." If we add an AI feature, you'll have asked for it.</p>`,
+  },
+];
+---
+
+<section class="nz-section" id="faq">
+  <div class="nz-container">
+    <div class="nz-section-head">
+      <div class="nz-kicker">FAQ</div>
+      <h2 class="nz-h2">Things people ask.</h2>
+    </div>
+    <div class="nz-faq">
+      {items.map((item) => (
+        <div class="nz-faq-item" data-faq>
+          <button type="button" class="nz-faq-q" data-faq-toggle>
+            <span>{item.q}</span>
+            <span class="chev">+</span>
+          </button>
+          <div class="nz-faq-a" set:html={item.a} />
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
+
+<script is:inline>
+  document.querySelectorAll("[data-faq]").forEach((item) => {
+    const btn = item.querySelector("[data-faq-toggle]");
+    btn?.addEventListener("click", () => {
+      item.classList.toggle("open");
+    });
+  });
+</script>
